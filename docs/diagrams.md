@@ -405,6 +405,23 @@ flowchart LR
   R -. 검색 실패 .-> FB[폴백 / 핸드오프 R13·R18]
 ```
 
+### CS 인제스천 & 하이브리드 검색
+
+```mermaid
+flowchart LR
+  WEB[samsung.com/support<br/>문제→원인→단계→서비스] --> P[파싱·정규화]
+  P --> SOL[(Solution/Step/Source 색인)]
+  Q[질문/이상] --> H{검색}
+  H -->|오류코드| KEY[정확 매칭]
+  H -->|자유 증상| VEC[벡터 유사도]
+  SOL --> KEY
+  SOL --> VEC
+  KEY --> AUG[상위 근거 augment]
+  VEC --> AUG
+```
+
+> 코드 매칭 우선 + 의미 검색 보완. 상세: `orchestration.md` §5.
+
 ### 폴백 / 예외 결정 흐름 (R13)
 
 ```mermaid

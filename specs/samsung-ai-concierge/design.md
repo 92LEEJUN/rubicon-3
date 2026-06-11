@@ -18,7 +18,7 @@
 - 응답 템플릿·CTA(R11), 스트리밍(R14), 폴백(R13)
 - **주문 사후·CS 보강** — 취소·환불(R21), 보증 판별(R22), 안전 경고(R23), 미연동 온보딩(R24), 수리 후 확인(R25)
 - **선제(proactive) 보강** — 알림 빈도·중요도(R26), 다중 기기 우선순위(R27). 선제 파이프라인은
-  [`docs/architecture.md`](../../docs/architecture.md) §10, 시나리오 분류는 [`scenarios.md`](./scenarios.md) §4-B.
+  [`docs/architecture.md`](../../docs/architecture.md) §10, 시나리오 분류는 [`scenarios/classification.md`](./scenarios/classification.md).
 
 컴포넌트 책임·Port/Repository 시그니처·엔티티 타입은 기반 문서를 참조한다.
 
@@ -271,7 +271,7 @@ CS 페이지가 구조화(문제→원인→단계→서비스)돼 있어 **인�
 
 ## 8. O2O 심화 설계 (후속)
 
-O2O 시나리오 맵은 `scenarios.md` §4-C, 시퀀스는 `diagrams.md`. 아래는 차별 흐름 3종의 흐름·엣지.
+O2O 시나리오 맵은 `scenarios/o2o.md`, 시퀀스는 `diagrams.md`. 아래는 차별 흐름 3종의 흐름·엣지.
 대부분 **후속(파트너 연동)** 이며 MVP는 인터페이스(`StorePort`·`QuotePort`)만 둔다.
 
 ### 8.1 견적 이어보기 (reverse O2O)

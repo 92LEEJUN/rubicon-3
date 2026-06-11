@@ -466,7 +466,7 @@ flowchart LR
   U -. 탭 → reactive .-> CHAT["/chat"]
 ```
 
-> 상세: `docs/architecture.md` §10 · `scenarios.md` §4-B.
+> 상세: `docs/architecture.md` §10 · `scenarios/classification.md`.
 
 ### SmartThings 이벤트 구독 (실 전환)
 

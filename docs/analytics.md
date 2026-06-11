@@ -42,6 +42,10 @@
 - 각 단계 전이에 `flow_step` 변경 → 단계별 진입/완료율·**drop-off** 산출.
 - `flow_abandon`: 흐름 미완료 종료(이탈 지점 = 마지막 `flow_step`).
 
+**브릿지 퍼널** — `card_tap → bridge_view → (bridge_cta_click | bridge_escalate | bridge_dismiss)`.
+`bridge_dismiss`는 **간단 정보로 충분**(긍정 신호), `bridge_escalate`는 대화가 필요했던 비율 → 브릿지/패널 분기 기준 튜닝에 사용.
+`card_type` 값은 `response-templates.md` §9 카드 타입과 동일: `device_status`·`anomaly`·`recommendation`·`order`·`booking`·`warranty`·`notice`·`shortcut`.
+
 ## 4. 이벤트 카탈로그
 
 | 이벤트 | 발생(주체) | 주요 props | 용도 |
@@ -49,6 +53,11 @@
 | `screen_view` | FE | `screen` | 체류·진입 |
 | `screen_exit` | FE | `screen`, `dwell_ms` | **체류 시간** |
 | `chat_open` | FE | `entry`(home/cs/fab) | 진입 분석 |
+| `card_tap` | FE | `card_type` | 브릿지 퍼널 진입(R9) |
+| `bridge_view` | FE | `card_type`, `dwell_ms` | 브릿지 노출·체류 |
+| `bridge_cta_click` | FE | `cta`, `correlation_id` | 브릿지에서 즉시 행동 |
+| `bridge_escalate` | FE | `correlation_id` | 브릿지→AI 패널 전환(P→R) |
+| `bridge_dismiss` | FE | `card_type` | 브릿지로 충분(이탈 아님) |
 | `message_sent` | FE | `modality`(text/image) | 인게이지먼트 |
 | `template_shown` | FE | `kind` | 어떤 템플릿이 노출 |
 | `cta_impression` | FE | `cta`, `template` | CTA 노출(기여 분모) |

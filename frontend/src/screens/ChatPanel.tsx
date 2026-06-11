@@ -33,8 +33,8 @@ const SUGGESTIONS = [
   "공기청정기 필터 주문하기",
 ];
 
-export function ChatPanel({ question, sections, flow = null, wsUrl }:
-  { question: string; sections: MessageSection[]; flow?: string | null; wsUrl?: string }) {
+export function ChatPanel({ question, sections, flow = null, wsUrl, onClose }:
+  { question: string; sections: MessageSection[]; flow?: string | null; wsUrl?: string; onClose?: () => void }) {
   const transport = useMemo(
     () => (wsUrl
       ? new WebSocketTransport(wsUrl)
@@ -48,7 +48,15 @@ export function ChatPanel({ question, sections, flow = null, wsUrl }:
   const pending = useRef(false);
   const scroller = useRef<ScrollView>(null);
 
+  // 위로 펼쳐지는 진입(오버레이 느낌, wireframes §2 · 3.b)
+  const rise = useRef(new Animated.Value(1)).current;
+  useEffect(() => {
+    Animated.timing(rise, { toValue: 0, duration: 240, useNativeDriver: false }).start();
+  }, [rise]);
+  const translateY = rise.interpolate({ inputRange: [0, 1], outputRange: [0, 28] });
+
   const streaming = state.status === "streaming";
+  const empty = messages.length === 0 && !streaming;
 
   function submit(q: string) {
     const v = q.trim();
@@ -81,8 +89,13 @@ export function ChatPanel({ question, sections, flow = null, wsUrl }:
   }, [messages.length, state.assistantText, state.sections.length, streaming]);
 
   return (
-    <View style={styles.root} testID="screen-chat">
+    <Animated.View style={[styles.root, { transform: [{ translateY }], opacity: rise.interpolate({ inputRange: [0, 1], outputRange: [1, 0.4] }) }]} testID="screen-chat">
       <View style={styles.header}>
+        {onClose ? (
+          <Pressable testID="chat-back" accessibilityRole="button" onPress={onClose} style={styles.backBtn}>
+            <Text style={styles.backIcon}>‹</Text>
+          </Pressable>
+        ) : null}
         <View style={styles.avatar}><Text style={styles.avatarText}>AI</Text></View>
         <View style={{ flex: 1 }}>
           <Text style={styles.headerTitle}>AI 컨시어지</Text>
@@ -94,6 +107,13 @@ export function ChatPanel({ question, sections, flow = null, wsUrl }:
       </View>
 
       <ScrollView ref={scroller} style={styles.scroll} contentContainerStyle={styles.content} testID="chat-scroll">
+        {empty ? (
+          <View style={styles.empty} testID="chat-empty">
+            <View style={styles.emptyAvatar}><Text style={styles.avatarText}>AI</Text></View>
+            <Text style={styles.emptyTitle}>무엇을 도와드릴까요?</Text>
+            <Text style={styles.emptyDesc}>가전 문제 진단부터 부품 주문·방문 예약까지 도와드려요.{"\n"}아래 추천을 누르거나 직접 입력해 보세요.</Text>
+          </View>
+        ) : null}
         {messages.map((m, i) =>
           m.role === "user"
             ? <UserMessage key={i} text={m.text} />
@@ -136,7 +156,7 @@ export function ChatPanel({ question, sections, flow = null, wsUrl }:
           <Text style={styles.sendIcon}>↑</Text>
         </Pressable>
       </View>
-    </View>
+    </Animated.View>
   );
 }
 
@@ -199,6 +219,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: space.lg, paddingVertical: space.md,
     borderBottomWidth: 1, borderBottomColor: color.border, backgroundColor: color.surface,
   },
+  backBtn: { width: 32, height: 32, alignItems: "center", justifyContent: "center", marginLeft: -space.sm },
+  backIcon: { fontSize: 28, color: color.text, lineHeight: 30 },
+
+  empty: { alignItems: "center", paddingVertical: space.xl, gap: space.sm },
+  emptyAvatar: { width: 52, height: 52, borderRadius: 26, backgroundColor: color.primary, alignItems: "center", justifyContent: "center", marginBottom: space.sm },
+  emptyTitle: { fontSize: font.size.lg, fontWeight: font.weight.bold as any, color: color.text },
+  emptyDesc: { fontSize: font.size.sm, color: color.textSub, textAlign: "center", lineHeight: 20 },
   avatar: {
     width: 40, height: 40, borderRadius: 20, backgroundColor: color.primary,
     alignItems: "center", justifyContent: "center",

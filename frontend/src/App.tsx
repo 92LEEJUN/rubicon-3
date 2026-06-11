@@ -16,12 +16,15 @@ export function App({ initialScreen = "home", wsUrl }:
 
   if (screen === "live") return <LiveChat wsUrl={wsUrl || "ws://localhost:8000/chat?token=demo"} />;
   if (screen === "gallery") return <Gallery />;
-  if (screen === "chat") return <ChatPanel question={question} sections={j1Sections} flow="troubleshoot" wsUrl={wsUrl} />;
+  if (screen === "chat") {
+    return <ChatPanel question={question} sections={j1Sections} flow="troubleshoot"
+                      wsUrl={wsUrl} onClose={() => setScreen("home")} />;
+  }
 
   return (
     <MainShell
       initialTab={screen === "support" ? "support" : "home"}
-      onOpenChat={(q) => { if (q) setQuestion(q); setScreen("chat"); }}
+      onOpenChat={(q) => { setQuestion(q ?? ""); setScreen("chat"); }}
       onGallery={() => setScreen("gallery")}
     />
   );

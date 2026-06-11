@@ -1,0 +1,32 @@
+[
+  {
+    "id": "dev_washer_01",
+    "type": "washer",
+    "model": "WF45T6000AW",
+    "status": "UNHEALTHY",
+    "consumables": [
+      { "name": "drain_filter", "life_remaining": 0.40, "threshold": 0.20 }
+    ],
+    "metrics": { "vibration": 0.82 }
+  },
+  {
+    "id": "dev_fridge_01",
+    "type": "refrigerator",
+    "model": "RF28R7351SR",
+    "status": "ONLINE",
+    "consumables": [
+      { "name": "water_filter", "life_remaining": 0.15, "threshold": 0.20 }
+    ],
+    "metrics": {}
+  },
+  {
+    "id": "dev_purifier_01",
+    "type": "air_purifier",
+    "model": "AX47T9080WD",
+    "status": "ONLINE",
+    "consumables": [
+      { "name": "hepa_filter", "life_remaining": 0.12, "threshold": 0.15 }
+    ],
+    "metrics": { "pm25": 14 }
+  }
+]

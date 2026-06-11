@@ -1,0 +1,31 @@
+[
+  {
+    "id": "sol_washer_5c",
+    "anomaly_id": "ano_washer_5c",
+    "steps": [
+      { "order": 1, "instruction": "배수 호스가 꺾이거나 눌리지 않았는지 확인하세요.", "media": [], "safety": "none", "pro_required": false },
+      { "order": 2, "instruction": "전원을 끄고 하단 배수 필터를 분리해 이물질을 청소하세요.", "media": [], "safety": "caution", "pro_required": false },
+      { "order": 3, "instruction": "배수 호스를 배수구에 15~20cm 깊이로 정리해 다시 연결하세요.", "media": [], "safety": "none", "pro_required": false }
+    ],
+    "sources": [
+      { "title": "삼성 세탁기 4C/5C 오류 해결", "ref": "https://www.samsung.com/us/support/troubleshoot/TSG10000997/", "confidence": 0.9 }
+    ],
+    "required_parts": ["part_drain_filter"],
+    "escalation_needed": false,
+    "coverage": "unknown"
+  },
+  {
+    "id": "sol_fridge_filter",
+    "anomaly_id": "ano_fridge_filter",
+    "steps": [
+      { "order": 1, "instruction": "정수필터를 시계 반대 방향으로 돌려 분리하세요.", "media": [], "safety": "none", "pro_required": false },
+      { "order": 2, "instruction": "새 정수필터를 장착하고 물 2~3L를 흘려보내 공기를 빼주세요.", "media": [], "safety": "none", "pro_required": false }
+    ],
+    "sources": [
+      { "title": "냉장고 정수필터 교체 방법", "ref": "https://www.samsung.com/sec/support/", "confidence": 0.85 }
+    ],
+    "required_parts": ["part_water_filter"],
+    "escalation_needed": false,
+    "coverage": "free"
+  }
+]

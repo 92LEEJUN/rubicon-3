@@ -1,0 +1,10 @@
+{
+  "parts": [
+    { "id": "part_drain_filter", "device_model": "WF45T6000AW", "name": "세탁기 배수 필터", "sku": "DC97-16513A", "price": 12000, "in_stock": true },
+    { "id": "part_water_filter", "device_model": "RF28R7351SR", "name": "냉장고 정수필터 HAF-QIN", "sku": "HAF-QIN/EXP", "price": 38000, "in_stock": true },
+    { "id": "part_hepa", "device_model": "AX47T9080WD", "name": "공기청정기 HEPA 교체 필터", "sku": "CFX-G100D", "price": 45000, "in_stock": false }
+  ],
+  "products": [
+    { "id": "prod_purifier_cube", "category": "air_purifier", "name": "비스포크 큐브 에어 공기청정기", "model": "AX9500", "price": 599000, "image": null, "specs": { "coverage": "60㎡", "noise": "22dB" }, "in_stock": true }
+  ]
+}

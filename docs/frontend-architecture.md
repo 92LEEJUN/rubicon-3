@@ -34,8 +34,9 @@
 
 - **kind → 컴포넌트 레지스트리(맵)** 로 렌더. 모르는 kind·스키마 불일치 → `text` 폴백(`response-templates.md` §7).
 - `Message` = `text` + `template` + `ctas` + `media` 합성 렌더.
-- **CTA 핸들러** — 구조화 액션은 결정적 엔드포인트 호출(`architecture.md` §8). `confirmation`/`booking` 확정은 ActionGate(R17).
-- **인터랙션 회신**(`choices`·`confirmation`·`booking`)은 선택값을 후속 요청으로 전송(`response-templates.md` §8).
+- **CTA 핸들러 — 두 경로**(`architecture.md` §8): **대화형 CTA**(제안 칩·`choices` 등 회신·설명 요청)는
+  `/chat`으로 전송, **되돌릴 수 없는 커밋**(결제·주문·예약 확정)은 결정적 엔드포인트 + ActionGate(R17).
+- **인터랙션 회신**(`choices`·`confirmation`·`booking`)은 선택값을 `/chat` 후속 요청으로 전송(`response-templates.md` §8).
 - 템플릿 추가 시: 레지스트리에 컴포넌트 등록 + 폴백 유지.
 
 ## 5. 스트리밍 트랜스포트 (상세 결정)
@@ -93,12 +94,38 @@ HttpStreamTransport  # 후보 (필요 시)
 - 재시도·타임아웃·오프라인 안내(FE 측 R13 대응).
 - 인증 토큰은 **보안 저장소(Keychain/Keystore)** 에. 앱 번들에 시크릿 금지(R15 실 전환 시).
 
-## 10. 후속 / 비범위 (MVP 이후)
+## 10. 프로젝트 / 모듈 레이아웃 (제안)
+
+(BE 레이아웃은 `data-model.md` §8.)
+
+```
+frontend/
+├─ src/
+│  ├─ app/                     # 진입점·루트 네비게이션
+│  ├─ screens/                 # 화면 (wireframes 대응)
+│  │  ├─ Home/                 # S1
+│  │  ├─ Support/              # S2 (CS)
+│  │  └─ ChatPanel/            # S3 (전역 오버레이)
+│  ├─ templates/               # kind → 컴포넌트 레지스트리 (§4, 13종)
+│  ├─ transport/               # ChatTransport 추상화 + WebSocket 구현 (§5)
+│  ├─ state/                   # 서버상태(쿼리)·UI/세션 store (§2)
+│  ├─ api/                     # 결정적 엔드포인트 클라이언트 (api-contract §2.2)
+│  ├─ navigation/              # React Navigation·딥링크 (§3)
+│  ├─ design/                  # 토큰·테마 (§6)
+│  ├─ media/                   # 멀티모달 입력·렌더 (§7)
+│  └─ types/                   # data-model DTO 대응 타입(공유 계약)
+└─ __tests__/                  # 컴포넌트·계약(stub) 테스트
+```
+
+- `templates/`·`api/`·`types/`는 **계약(response-templates·api-contract·data-model)** 에 1:1 대응 — 변경 시 함께 갱신.
+- `transport/`는 §5 추상화 뒤에 구현을 둬 트랜스포트 교체 가능.
+
+## 11. 후속 / 비범위 (MVP 이후)
 
 - 접근성(VoiceOver·TalkBack·동적 폰트), 국제화(i18n), 실 푸시(FCM/APNs),
   OTA 업데이트(EAS/CodePush), 크래시 리포팅(Sentry), e2e 테스트(Detox), iOS/Android 차이 대응.
 
-## 11. 미해결 / 검증
+## 12. 미해결 / 검증
 
 - **WebSocket 스파이크** 결과로 §5 보정.
 - 상태관리·네비게이션 라이브러리 최종 선택(현재 우선안 수준) — 스파이크/프로토타입 후 확정.

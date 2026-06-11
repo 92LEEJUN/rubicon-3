@@ -127,6 +127,23 @@ flowchart TB
 | 동의/프라이버시 (ConsentP) | **Mock** 동의/삭제 | 실 동의·데이터 관리 |
 | 저장소 (Repository) | **인메모리/로컬 DB** | Postgres + Redis (옵셔널) |
 
+### 공개 데이터 소스 / ACL 매핑 (Real 어댑터)
+
+`DevicePort`·`CSKnowledgePort`·`CatalogPort` 는 **공개 소스에서 가져올 수 있어** 순수 Mock이 아니라
+"실데이터 일부" 티어다. 외부 스키마는 **ACL(Anti-Corruption Layer = 어댑터)** 에서 우리 도메인 타입으로
+변환해, 외부 표현이 도메인에 새지 않게 격리한다(`data-model.md` §1 Port I/O 분리).
+
+| Port | 공개 소스 후보 | 매핑 대상(우리 타입) |
+|------|----------------|----------------------|
+| `DevicePort` | SmartThings 개인 API(PAT) | 디바이스/상태 → `Device`(`consumables`·`metrics`), `Anomaly`(`error_code` 등) |
+| `CSKnowledgePort` | 공개 CS·사용설명서·FAQ | 문서 → `Solution`(`steps`·`sources`), `Source`(`title`·`ref`) |
+| `CatalogPort` | 공개 제품/부품 스펙 | 스펙 → `Part`(`sku`·`price`·`device_model`·`in_stock`) |
+
+- 변환·정규화·누락 필드 폴백은 **ACL 책임**. 도메인은 변환된 타입만 본다.
+- 소스 커버리지는 부분적일 수 있다(최종 일관성·누락) → null 허용·폴백(R13, `data-model.md` §0).
+- 즉 **계약(Port 시그니처·타입)은 고정**돼 있고, **"어떤 소스 + 필드 매핑 표·적재 파이프라인"** 은
+  Real 어댑터 구현 시 확정한다(MVP는 Mock/부분 실데이터). 인터페이스 위 도메인 작업은 그 전에 병렬로 진행 가능.
+
 ## 6. 진입점 개요
 
 ```mermaid
@@ -171,28 +188,35 @@ flowchart LR
 **진입점은 FastAPI 단일.** 별도 BFF 계층을 두지 않고, FastAPI가 진입점 겸 오케스트레이션을 담당한다.
 (BFF가 지던 책임은 사라지지 않고 FastAPI 안으로 흡수된다 — §9 참조.)
 
-요청은 **종류에 따라 두 경로**로 갈리며, 이 라우팅 판단은 **BE(오케스트레이터)가 소유**한다.
-FE는 "무엇을 보냈는지"(자유 입력인지, 어떤 CTA인지)만 알고, 내부적으로 LLM을 타는지 API를 타는지는
-**알 필요도, 결정할 수도 없다.**
+FE는 **상호작용 유형**(자유 입력인지, 어떤 버튼인지)만 알고 **채널**을 고른다. 그 안에서
+"LLM을 타는지 도메인을 타는지"의 라우팅 판단은 **BE(오케스트레이터)가 소유**한다.
+
+> **주의 — CTA가 곧 "LLM 미경유"는 아니다.** LLM을 안 타는 것은 CTA 전체가 아니라
+> **되돌릴 수 없는 *커밋*(결제·주문·예약 확정)** 뿐이다. 그 외 **대화형 CTA**(제안 칩,
+> `choices`/`confirmation`/`booking` 회신, "왜 추천?"·"자세히" 같은 설명 요청)는 `/chat`으로
+> 재진입해 **LLM을 탈 수 있다.**
 
 ```mermaid
 flowchart TD
-  In["사용자 입력"] --> Q{입력 종류}
+  In["사용자 입력"] --> Q{상호작용 유형}
   Q -->|자유 텍스트·멀티모달| Chat["/chat → 오케스트레이터 → 의도 분류"]
-  Q -->|구조화 액션<br/>CTA·choices·confirm·booking 회신| API["결정적 엔드포인트<br/>/orders·/bookings 등"]
+  Q -->|대화형 CTA<br/>제안 칩·인터랙션 회신·설명 요청| Chat
+  Q -->|되돌릴 수 없는 커밋<br/>결제·주문·예약 확정| API["결정적 엔드포인트<br/>/orders·/bookings 등"]
   Chat -->|추론·생성 필요| LLM["LLM"]
   Chat -->|단순 조회/실행| Dom["도메인 서비스/Port"]
   LLM --> Dom
-  API --> Dom
+  API -->|ActionGate 확인| Dom
 ```
 
 ### 원칙
 1. **자연어(자유 텍스트·멀티모달)** → `/chat` → 오케스트레이터가 의도 분류(design §6.1) 후 LLM 또는 도메인으로 라우팅.
    FE/BFF에 **불투명**하다.
-2. **구조화 액션**(CTA 탭, `choices` 선택, `confirmation`/`booking` 회신) → 의도가 이미 확정이므로
-   **계약상 정해진 결정적 엔드포인트로 직행, LLM 미경유.** (비용·지연·비결정성 회피)
-3. **되돌릴 수 없는 행동(R17)은 LLM 경로에 두지 않는다** — `confirmation` + 결정적 API로 처리해 안전성을 보장.
-4. 구조화 회신 계약은 `docs/response-templates.md` §8(인터랙션 응답)을 따른다.
+2. **대화형 CTA**(제안 칩=자연어 단축키, `choices` 등 인터랙션 회신, 설명/이유 요청) → `/chat` 재진입.
+   회신은 진행 흐름(FlowState)에 반영돼 **LLM으로 다음 단계를 이어갈 수 있다.**
+3. **되돌릴 수 없는 커밋**(결제·주문·예약 확정, R17) → **결정적 엔드포인트로 직행, LLM 미경유** +
+   `confirmation`/ActionGate 확인. (안전성·비결정성 회피) — 단, 커밋 *주변*의 요약·후속 제안은 LLM이 생성할 수 있다.
+4. 즉 LLM 미경유 보장은 **커밋 자체에 한정**된다. FE는 채널만 고르고, 채널 안의 LLM-vs-도메인 판단은 BE 몫이다.
+5. 구조화 회신 계약은 `docs/response-templates.md` §8(인터랙션 응답)을 따른다.
 
 ## 9. BFF 책임 (별도 계층 없이 흡수)
 

@@ -108,7 +108,11 @@
 | `status_tracker` | (상세/이력 보기) |
 | `home_summary` | 항목별 CTA(`reorder`·`add_to_cart`·가이드 연결) |
 
-- **되돌릴 수 없는 CTA**(`checkout` 등)는 `confirmation`/`ActionGatePort` 확인을 거친다(R17).
+- **CTA는 두 종류다** (라우팅은 `architecture.md` §8):
+  - **대화형 CTA** — 제안 칩, `choices`/`confirmation`/`booking` 회신, 설명 요청. `/chat`으로
+    재진입해 흐름(FlowState)을 잇고 **LLM을 탈 수 있다**(§8 인터랙션 응답).
+  - **결정적 커밋** — 결제·주문·예약 확정(`checkout` 등). 결정적 엔드포인트로 직행, **LLM 미경유** +
+    `confirmation`/`ActionGatePort` 확인(R17).
 - CTA `payload` 에는 실행에 필요한 식별자만 담는다(예: `{"order_id": ...}`).
 
 ## 5. 템플릿 선택 규칙 (의도 → 템플릿)

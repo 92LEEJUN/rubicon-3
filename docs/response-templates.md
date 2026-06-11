@@ -149,7 +149,9 @@
 | 주문/서비스 진행·이력 조회(R12) | `status_tracker` |
 | 홈 카드 탭 — 간단 정보(§9) | `bridge` (모달) |
 
-- **복합 질문(R7)** — 의도별 템플릿을 **섹션으로 묶어** 반환하고, `unhandled` 의도는 `text` 로 안내.
+- **복합 질문(R7)** — 한 어시스턴트 응답을 **의도별 `MessageSection`**(`label·intent·template·ctas·handled`,
+  `data-model.md`)으로 묶는다. 단발 응답=섹션 1개, 복합=N개(우선순위 순서). 미처리 의도는 `handled:false`
+  섹션(폴백 `text`)으로 구분(R7-3). 스트리밍은 `section` 청크로 순서대로 전달(`api-contract.md` §2.1).
 - 동일 답변에 텍스트 설명 + 템플릿을 함께 줄 수 있다(텍스트는 `Message.text`, 구조는 `template`).
 
 ## 6. 멀티모달 포함 규칙 (R10)

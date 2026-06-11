@@ -323,14 +323,20 @@ class Template:                          # 응답 템플릿 모델 (R11)
     kind: str                            # 종류·data 스키마는 docs/response-templates.md 참조
     data: dict                           # kind별 구조화 데이터(kind와 스키마 일치, 불일치 시 text 폴백)
 
+class MessageSection:                    # 응답 섹션 — 단발=1개, 복합 질문=의도별 N개 (R7)
+    label: str | None = None             # 섹션 라벨(의도/주제, 예: "세탁기 · 배수 문제")
+    intent: IntentType | None = None     # 이 섹션이 답한 의도
+    template: Template | None = None      # 섹션 본문 템플릿
+    ctas: list[Cta] = []                  # 섹션별 CTA
+    handled: bool = True                  # R7-3: 미처리 의도면 False(폴백 안내 섹션)
+
 class Message:
     id: Id
     role: Role
     modality: Modality
-    text: str | None                     # TEXT면 필수
+    text: str | None                     # 사용자 입력 / 어시스턴트 리드 텍스트
     media: list[Media] = []              # IMAGE/VIDEO면 1개 이상
-    template: Template | None = None     # assistant 메시지에만
-    ctas: list[Cta] = []
+    sections: list[MessageSection] = []  # 어시스턴트 본문. 단발=1, 복합=N (순서=표시 순서, R7)
     created_at: datetime                 # append-only, 수정 불가
 
 class FlowState:                         # 흐름 전환/복원 (R6)
@@ -356,6 +362,7 @@ class Conversation:
 - **Warranty** — `device_id`는 존재하는 Device 참조. `in_warranty=False`면 유상(`Coverage.PAID`) 취급(R22).
 - **SolutionStep** — `safety=DANGER`이거나 `pro_required=True`면 셀프 진행 대신 기사 연결을 우선 안내(R23).
 - **Message** — `TEXT`면 `text` 필수, `IMAGE/VIDEO`면 `media` 필수. 생성 후 불변.
+  어시스턴트 응답 본문은 `sections`(단발=1개, 복합 질문=의도별 N개, 순서=표시 순서). 미처리 의도는 `handled=False` 섹션으로 구분(R7-3).
 - **Conversation** — `active_flow`와 `suspended_flow`는 동시에 같은 흐름을 가리키지 않는다. 채팅 전환 시 `active→suspended` 이동.
 - **Notification** — `opted_in=False`면 전달하지 않는다.
 - **Engagement** — append-only. `Consent.scopes`에 `engagement`가 있을 때만 기록·활용, 삭제 시 cascade(R19·R29).
@@ -390,10 +397,9 @@ class ChatRequest(BaseModel):
 
 class ChatResponseChunk(BaseModel):      # 스트리밍 단위 (R14)
     conversation_id: Id
-    delta_text: str | None = None
-    template: Template | None = None
-    ctas: list[Cta] = []
-    done: bool = False                   # 마지막 청크 표시
+    delta_text: str | None = None        # 리드/섹션 텍스트 토큰
+    section: MessageSection | None = None  # 완성된 섹션 1개(복합이면 의도 순서대로 여러 청크)
+    done: bool = False                   # 마지막 청크. 누적된 sections로 Message 확정
 
 class IntentResult(BaseModel):           # 복합 질문 (R7)
     intents: list[IntentType]            # 1개 이상

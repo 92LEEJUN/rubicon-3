@@ -553,13 +553,13 @@ flowchart TD
 ```mermaid
 flowchart LR
   WS[WS 청크] --> D{type}
-  D -->|delta| ACC[텍스트 누적]
-  D -->|template| TPL[Template 추가]
+  D -->|delta| ACC[리드 텍스트 누적]
+  D -->|section| SEC[섹션 추가<br/>label·template·ctas·handled]
   D -->|flow| FL[FlowState 배지 갱신]
-  D -->|done| FIN[메시지 확정 + ctas]
-  D -->|error| FB[폴백 템플릿 표시 R13]
+  D -->|done| FIN[메시지 확정]
+  D -->|error| FB[폴백 섹션 표시 R13]
   ACC --> RENDER[리렌더]
-  TPL --> RENDER
+  SEC --> RENDER
   FIN --> RENDER
 ```
 

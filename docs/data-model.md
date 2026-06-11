@@ -72,11 +72,17 @@ class ServiceRequestType(str, Enum):     # O2O: 설치/수리 구분
 class Fulfillment(str, Enum):            # 주문 이행 방식 (O2O — BOPIS)
     DELIVERY = "delivery"; PICKUP = "pickup"   # 배송 / 매장 픽업
 
+class PickupStatus(str, Enum):           # 픽업 라이프사이클 (BOPIS). 전이: RESERVED→READY→PICKED_UP | EXPIRED
+    RESERVED = "reserved"; READY = "ready"; PICKED_UP = "picked_up"; EXPIRED = "expired"
+
 class StoreType(str, Enum):              # 오프라인 거점
     RETAIL = "retail"; EXPERIENCE = "experience"; SERVICE_CENTER = "service_center"
 
 class QuoteSource(str, Enum):            # 견적 출처 (reverse O2O)
     OFFLINE = "offline"; ONLINE = "online"
+
+class QuoteStatus(str, Enum):            # 견적 라이프사이클. 전이: ACTIVE→CONVERTED | EXPIRED
+    ACTIVE = "active"; CONVERTED = "converted"; EXPIRED = "expired"
 
 class IntentType(str, Enum):
     DEVICE_STATUS = "device_status"; TROUBLESHOOT = "troubleshoot"
@@ -222,6 +228,7 @@ class Order:
     status: OrderStatus                  # MVP: Mock. 전이 규칙 준수
     fulfillment: Fulfillment = Fulfillment.DELIVERY  # 배송/픽업(BOPIS, O2O). 후속
     store_id: Id | None = None           # PICKUP 시 픽업 매장 (O2O)
+    pickup_status: PickupStatus | None = None  # PICKUP 일 때만 (RESERVED→READY→PICKED_UP|EXPIRED)
     confirmed_at: datetime | None        # CONFIRMED 일 때만 존재 (R17)
     cancelled_at: datetime | None = None # CANCELLED 일 때 (R21)
 
@@ -262,11 +269,13 @@ class Store:                             # 오프라인 거점 — 매장·서�
 
 class Quote:                             # 견적 — 오프라인↔온라인 브리지 (reverse O2O). MVP: 후속/Mock
     id: Id
-    user_id: Id
+    user_id: Id                          # 소유자. 조회 시 본인 확인(타인 견적 거부)
     source: QuoteSource                  # offline(매장 상담) / online
     items: list[OrderItem]               # 견적 품목/부품
-    total: int                           # ≥ 0
+    total: int                           # ≥ 0. 조회 시 현재가와 다르면 재확인
+    status: QuoteStatus = QuoteStatus.ACTIVE
     store_id: Id | None = None           # 발급 매장 (offline)
+    expires_at: datetime | None = None   # 만료 시 재견적 안내
     created_at: datetime                 # 매장 견적을 앱에서 이어보기
 
 class Notification:                      # 선제 알림 (R5·R20)
@@ -340,6 +349,8 @@ class Conversation:
 - **Notification** — `opted_in=False`면 전달하지 않는다.
 - **Engagement** — append-only. `Consent.scopes`에 `engagement`가 있을 때만 기록·활용, 삭제 시 cascade(R19·R29).
 - **User** — `addresses` 중 `default=True`는 최대 1개.
+- **Quote** — 조회는 본인(`user_id`) 한정. `ACTIVE`만 주문 전환 가능(→`CONVERTED`), `expires_at` 경과 시 `EXPIRED`. 전환 시 현재가 검증.
+- **Order(픽업)** — `fulfillment=PICKUP`이면 `store_id`·`pickup_status` 필수. 전이 `RESERVED→READY→PICKED_UP|EXPIRED`. `EXPIRED`는 취소/환불(R21) 연계.
 
 ### 동의 scope (R19)
 

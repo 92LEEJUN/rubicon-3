@@ -263,3 +263,25 @@ sequenceDiagram
 | RN에서 WS 스트리밍·재연결·백그라운드 전환이 안정적? | `/chat` 왕복 PoC | 끊김 없는 스트리밍·자동 재연결 | SSE/대안으로 보정 |
 
 - 결과는 본 설계와 기반 문서(`architecture.md`·`data-model.md`)에 **보정 반영**한다.
+
+## 8. O2O 심화 설계 (후속)
+
+O2O 시나리오 맵은 `scenarios.md` §4-C, 시퀀스는 `diagrams.md`. 아래는 차별 흐름 3종의 흐름·엣지.
+대부분 **후속(파트너 연동)** 이며 MVP는 인터페이스(`StorePort`·`QuotePort`)만 둔다.
+
+### 8.1 견적 이어보기 (reverse O2O)
+- **흐름** — 매장 상담/견적(식별자=QR/번호 발급) → 앱에서 `QuotePort.get_quote(ref)` 조회 →
+  `bridge`/`order_summary`로 표시 → **① 온라인 주문 전환(Quote→Order, 확인 R17)** / ② 추가 질문(에스컬레이션 /chat) / ③ 매장 픽업.
+- **엣지** — 본인 아님(`user_id` 불일치)=거부 · `EXPIRED`=재견적 안내 · 현재가/재고 변동=재확인 · 일부 단종=대체 제안.
+- **상태** — `Quote.status` `ACTIVE→CONVERTED`(주문)·`EXPIRED`.
+
+### 8.2 매장 픽업 (BOPIS)
+- **흐름** — 제품 선택 → `StorePort.find_stores(geo)` + `check_stock` → 재고 매장 선택 →
+  주문(`fulfillment=PICKUP`·`store_id`, `RESERVED`) → 준비 완료 선제 알림(R20, `READY`) → 매장 수령(`PICKED_UP`).
+- **엣지** — 재고 없음=대체 매장/배송 전환 · 미수령 만료=`EXPIRED`→취소/환불(R21) · 수령 시 본인 확인.
+
+### 8.3 서비스 트리아지 (self / 기사 / 센터)
+- **흐름** — 증상 진단(R2·R3) → 결정: **셀프 해결**(`guide_steps`+부품 주문) / **출장 수리**(R18, 위험·복잡) /
+  **센터 방문**(휴대 가능·정밀). 유·무상은 `WarrantyPort`(R22) 동반 안내.
+- **결정 요인** — 심각도·안전(`SolutionStep.safety` danger→기사 R23)·셀프 가능성·보증·부품 가용성.
+- **엣지** — 미연동=증상만으로 트리아지(R24) · 불확실=상담원(R16-2·R18).

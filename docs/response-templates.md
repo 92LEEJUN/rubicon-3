@@ -29,9 +29,10 @@
 | `booking` | 방문 날짜·시간 슬롯 선택 | `request_visit`(슬롯 확정) | R18 |
 | `status_tracker` | 주문·방문 진행 상태/이력 | (상세 보기) | R12 |
 | `home_summary` | 홈 진입 종합 요약·선제안 | 항목별 CTA | R9·R5 |
+| `bridge` | 카드 탭 시 경량 설명 모달(컨테이너) | 즉시 CTA + AI 에스컬레이션 | R9 |
 
-> **출력 vs 인터랙션** — 위 카탈로그는 출력형(읽기)과 **인터랙션형**(`choices`·`confirmation`·`booking`,
-> 사용자 입력을 회신받음)을 함께 포함한다. 인터랙션 회신 처리는 §8 을 본다.
+> **출력 vs 인터랙션 vs 브릿지** — 출력형(읽기), **인터랙션형**(`choices`·`confirmation`·`booking`,
+> 입력 회신, §8), **브릿지형**(`bridge`, 카드 탭 단발 모달 — §9)을 포함한다.
 > 새 kind 추가 시: **이 문서 + `Template.kind`(data-model) + FE 렌더러**를 함께 갱신한다.
 
 ## 3. 템플릿별 data 스키마 (의사 타입)
@@ -89,6 +90,13 @@
 { "alerts": [DeviceStatusRef],               # 이상/소모품 선제 알림
   "recommendations": [ProductRef],
   "shortcuts": [ { "label": str, "intent": str } ] }
+
+# bridge  — 카드 탭 경량 설명 모달 (컨테이너, §9)
+{ "title": str,
+  "summary": str,                            # 간단 설명 (LLM 생성 가능)
+  "detail": Template | None,                 # 다른 템플릿을 끼워 재사용(device_status·product_card 등)
+  "ctas": [Cta],                             # 즉시 행동(주문·예약·재주문 등)
+  "escalate": { "label": str, "intent": str } | None }  # "AI에게 물어보기" → /chat(맥락 주입)
 ```
 
 > `ProductRef`/`PartRef` 는 식별자 + 표시용 최소 필드. 상세 타입은 `docs/data-model.md`.
@@ -130,6 +138,7 @@
 | 되돌릴 수 없는 행동 직전(R17) | `confirmation` |
 | 방문 요청 확정 단계(R18) | `booking` |
 | 주문/서비스 진행·이력 조회(R12) | `status_tracker` |
+| 홈 카드 탭 — 간단 정보(§9) | `bridge` (모달) |
 
 - **복합 질문(R7)** — 의도별 템플릿을 **섹션으로 묶어** 반환하고, `unhandled` 의도는 `text` 로 안내.
 - 동일 답변에 텍스트 설명 + 템플릿을 함께 줄 수 있다(텍스트는 `Message.text`, 구조는 `template`).
@@ -159,3 +168,18 @@
   `ActionGatePort` 규칙을 따른다(R17).
 - 사용자가 응답하지 않거나 다른 주제로 전환하면, 인터랙션은 **흐름 보류(suspended_flow)** 로 두고
   자유 대화로 진행할 수 있다(R6).
+
+## 9. 브릿지 (Bridge) — 카드 탭 경량 모달
+
+홈 카드(또는 알림)를 누를 때, **간단한 정보면 풀 대화(AI 패널) 대신 경량 모달**로 설명한다(R9).
+이 모달의 응답이 `bridge` 템플릿이다.
+
+- **컨테이너** — `bridge`는 자체 `summary`(LLM 생성 가능) + **다른 템플릿을 `detail`로 끼워** 재사용한다
+  (예: 기기 카드 탭 → `bridge` 안에 `device_status`). 새 표현을 중복 정의하지 않는다.
+- **단발성(single-shot)** — 대화 세션을 열지 않는다. 모달 안에서 끝나거나, 두 갈래 출구로 나간다:
+  - **즉시 행동** — `ctas`(주문·예약·재주문 등). 되돌릴 수 없는 커밋은 `confirmation`/ActionGate(R17).
+  - **에스컬레이션** — `escalate` → `/chat` 진입(화면 맥락 주입 R9-4). *알림 탭→대화(P→R 전이)와 같은 패턴.*
+- **bridge vs AI 패널은 BE가 동적 판단** — 카드 탭은 요청을 보내고, 오케스트레이터가
+  **간단(→`bridge` 모달) / 복잡(→대화 패널)** 을 런타임에 결정한다(`architecture.md` §8, FE는 surface만 받아 렌더).
+- **콘텐츠 소스** — 결정적 조회(기기·주문 상태 등) + 필요 시 LLM 요약. 무거운 추론은 에스컬레이션으로 넘긴다.
+- 퍼널 측정(카드 탭→bridge→에스컬레이션/행동/이탈)은 `docs/analytics.md`.

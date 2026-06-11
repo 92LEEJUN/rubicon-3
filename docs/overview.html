@@ -317,7 +317,7 @@ ConsentPort     get_consent() / revoke() / delete_data()     # R19</pre>
   <!-- TEMPLATES -->
   <section id="tpl">
     <h2><span class="n">04</span>응답 템플릿 (FE↔BE 표현 계약)</h2>
-    <p class="lead">응답은 평문이 아니라 <b>구조화된 Template</b>로 전달, 렌더링은 FE가 담당. 모르는 kind는 <code>text</code>로 폴백. <b>13종.</b></p>
+    <p class="lead">응답은 평문이 아니라 <b>구조화된 Template</b>로 전달, 렌더링은 FE가 담당. 모르는 kind는 <code>text</code>로 폴백. <b>14종</b>(+카드 탭 경량 모달 <code>bridge</code>, §9).</p>
 
     <div class="grouplabel">출력형</div>
     <div class="tgrid">
@@ -800,7 +800,7 @@ flowchart LR
     <div class="docgrid">
       <div class="doccard"><div class="f">docs/architecture.md</div><div class="d">시스템 아키텍처·기술 스택·라우팅·Mock↔실·BFF 책임·NFR</div></div>
       <div class="doccard"><div class="f">docs/data-model.md</div><div class="d">도메인 타입·Port/Repository 시그니처·예외·BE 레이아웃</div></div>
-      <div class="doccard"><div class="f">docs/response-templates.md</div><div class="d">FE↔BE 응답 표현 계약(13종·CTA·인터랙션)</div></div>
+      <div class="doccard"><div class="f">docs/response-templates.md</div><div class="d">FE↔BE 응답 표현 계약(14종·CTA·인터랙션·브릿지)</div></div>
       <div class="doccard"><div class="f">docs/frontend-architecture.md</div><div class="d">RN 내부 구조·상태·네비·트랜스포트·FE 레이아웃</div></div>
       <div class="doccard"><div class="f">docs/wireframes.md</div><div class="d">저충실도 화면 명세(레이아웃·흐름)</div></div>
       <div class="doccard"><div class="f">docs/api-contract.md</div><div class="d">외부 노출 API(WS·엔드포인트)·API/DB 경계·Mock 전략</div></div>

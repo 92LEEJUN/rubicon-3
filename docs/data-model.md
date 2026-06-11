@@ -87,6 +87,14 @@ class CtaType(str, Enum):
     REORDER = "reorder"
     CANCEL_ORDER = "cancel_order"        # R21
     CONFIRM_RESOLVED = "confirm_resolved" # R25 수리 후 확인
+
+class EngagementAction(str, Enum):       # 유저 확인 상태 (R29)
+    VIEWED = "viewed"; DISMISSED = "dismissed"
+    ACKNOWLEDGED = "acknowledged"; INTERESTED = "interested"
+
+class EngagementRef(str, Enum):          # 확인 대상 종류 (R29)
+    RECOMMENDATION = "recommendation"; ALERT = "alert"; SOLUTION = "solution"
+    PRODUCT = "product"; BRIDGE = "bridge"
 ```
 
 ## 3. 도메인 엔티티
@@ -106,13 +114,34 @@ erDiagram
   USER ||--o{ SERVICE_REQUEST : opens
   USER ||--o{ NOTIFICATION : receives
   USER ||--|| CONSENT : has
+  USER ||--o{ ADDRESS : has
+  USER ||--o{ ENGAGEMENT : records
 ```
 
 ```python
+class UserPreferences:                   # 알림·관심 설정 (R26)
+    notify_opt_in: bool = True
+    notify_min_priority: Severity = Severity.INFO  # 이 이상만 알림
+    interest_categories: list[str] = []  # 관심 카테고리(개인화 보조, R8)
+
+class Address:                           # 배송/방문 주소 (R4·R18)
+    label: str                           # 예: "집"
+    line: str
+    default: bool = False
+
 class User:
     id: Id
     display_name: str
     linked_device_ids: list[Id]          # R15 (MVP: Mock 고정). 중복 없음
+    preferences: UserPreferences         # 선호/알림 설정 (R26)
+    addresses: list[Address] = []        # 배송/방문 (R4·R18). default 1개 이하
+
+class EngagementRecord:                  # 유저가 확인한 정보 (R29). append-only, 내부 데이터
+    user_id: Id
+    ref_type: EngagementRef              # recommendation/alert/solution/product/bridge
+    ref_id: Id
+    action: EngagementAction             # viewed/dismissed/acknowledged/interested
+    at: datetime                         # UTC
 
 class Consumable:
     name: str                            # 비어있지 않음
@@ -277,6 +306,8 @@ class Conversation:
 - **Message** — `TEXT`면 `text` 필수, `IMAGE/VIDEO`면 `media` 필수. 생성 후 불변.
 - **Conversation** — `active_flow`와 `suspended_flow`는 동시에 같은 흐름을 가리키지 않는다. 채팅 전환 시 `active→suspended` 이동.
 - **Notification** — `opted_in=False`면 전달하지 않는다.
+- **Engagement** — append-only. 동의 범위(`Consent.scopes`) 안에서만 활용하고, 삭제 요청 시 cascade(R19·R29).
+- **User** — `addresses` 중 `default=True`는 최대 1개.
 
 ## 4. API DTO (Pydantic, 예시)
 
@@ -342,6 +373,12 @@ class SessionRepository(Protocol):       # 세션 맥락 (R6·R7), Redis 후보
 class OrderRepository(Protocol):
     def get(self, order_id: Id) -> Order | None: ...
     def save(self, order: Order) -> None: ...
+
+class EngagementRepository(Protocol):    # 유저가 확인한 정보 (R29). 내부 데이터 = Repository(외부 Port 아님)
+    def record(self, e: EngagementRecord) -> None: ...                       # append-only
+    def has_seen(self, user_id: Id, ref_type: EngagementRef, ref_id: Id) -> bool: ...  # 중복 방지
+    def dismissed(self, user_id: Id, ref_type: EngagementRef) -> list[Id]: ...         # 재노출 제외
+    def interests(self, user_id: Id) -> list[str]: ...                       # 관심 신호(개인화 R8)
 ```
 
 ## 6. Port 인터페이스 (외부 어댑터 = Mock↔실 경계)

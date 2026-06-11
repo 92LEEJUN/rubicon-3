@@ -365,6 +365,33 @@ flowchart TB
   BE -. 실데이터 일부 .-> CAT
 ```
 
+### 도메인 맵 (Bounded Context)
+
+외부 연동=Port, 내부 데이터=Repository. (`architecture.md` §12)
+
+```mermaid
+flowchart TB
+  subgraph 외부연동 [외부 연동 = Port]
+    DEV[Device/IoT · SmartThings]
+    CAT[Catalog/Product]
+    O2O[Commerce/O2O]
+    CS[CS/Knowledge · Warranty]
+    AUTH[User/Identity · Auth]
+    NOTI[Notification]
+    AN[Analytics]
+  end
+  subgraph 내부데이터 [내부 데이터 = Repository]
+    ENG[Engagement · 확인 정보 R29]
+    CONV[Conversation/Session]
+    PERS[Personalization · 조합]
+  end
+  PERS --> ENG
+  PERS --> CONV
+  PERS --> CAT
+  NOTI --> ENG
+  Bridge[Bridge/추천] --> ENG
+```
+
 ### RAG 데이터 흐름 (DFD)
 
 ```mermaid

@@ -1,6 +1,6 @@
 # 설계 (Design) — 삼성 AI 컨시어지
 
-> 이 문서는 `requirements.md` 의 요구사항(이하 R1~R27)을 **어떻게** 만족시킬지 설명한다.
+> 이 문서는 `requirements.md` 의 요구사항(이하 R1~R29)을 **어떻게** 만족시킬지 설명한다.
 > 전체 아키텍처·기술 스택·Mock↔실 전략은 **기반 문서**를 따른다 — 여기서 중복 정의하지 않는다.
 > - 시스템 아키텍처: [`docs/architecture.md`](../../docs/architecture.md)
 > - 공유 데이터 모델/클래스 구조/Port·Repository 타입: [`docs/data-model.md`](../../docs/data-model.md)
@@ -122,6 +122,9 @@ sequenceDiagram
   복귀 요청 시 복원(R6).
 - **개인화** — 추천 시 대화 이력(관심 제품)과 보유 기기를 반영하고, 보유 기기는 중복 추천 제외,
   근거를 함께 제시. 데이터 부족 시 일반 추천 폴백(R8).
+- **확인 정보(Engagement)** — 열람/무시/관심을 `EngagementRepository`에 기록(R29). 추천·알림 생성 시
+  `has_seen`/`dismissed`로 **중복 제시 방지**, `interests`로 개인화 신호 반영(R8·R26). 분석(R28)과 달리
+  **앱 동작을 바꾸는 내부 도메인 상태**다(`architecture.md` §12). 동의·삭제는 R19.
 - **템플릿/CTA** — 응답은 `Template` + `Cta`로 구조화, 클라이언트가 렌더링. 템플릿 카탈로그·data
   스키마·선택/CTA 매핑 규칙은 기반 문서 [`docs/response-templates.md`](../../docs/response-templates.md) 참조(R10·R11).
 - **확인 게이트** — 결제·주문·방문 등은 `ActionGatePort.requires_confirmation`으로 확인 후 처리(R17).

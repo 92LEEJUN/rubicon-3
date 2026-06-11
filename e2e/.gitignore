@@ -1,0 +1,4 @@
+node_modules/
+playwright-report/
+test-results/
+# E2E 라이브 스크린샷(__screenshots__/*.png)은 증빙용으로 커밋한다.

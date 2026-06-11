@@ -1,0 +1,35 @@
+{
+  "name": "mvp-concierge-frontend",
+  "version": "0.1.0",
+  "private": true,
+  "description": "삼성 AI 컨시어지 — React Native(Web) 앱. BFF만 호출(api-contract §2).",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview --port 4173",
+    "test": "jest",
+    "screenshots": "node scripts/screenshot.mjs"
+  },
+  "dependencies": {
+    "react": "18.3.1",
+    "react-dom": "18.3.1",
+    "react-native-web": "0.21.2"
+  },
+  "devDependencies": {
+    "@babel/core": "7.26.0",
+    "@babel/preset-env": "7.26.0",
+    "@babel/preset-react": "7.26.3",
+    "@babel/preset-typescript": "7.26.0",
+    "@testing-library/jest-dom": "6.6.3",
+    "@testing-library/react": "16.1.0",
+    "@types/react": "18.3.12",
+    "@types/react-dom": "18.3.1",
+    "@vitejs/plugin-react": "4.3.4",
+    "babel-jest": "29.7.0",
+    "jest": "29.7.0",
+    "jest-environment-jsdom": "29.7.0",
+    "playwright": "1.49.1",
+    "typescript": "5.7.2",
+    "vite": "6.0.5"
+  }
+}

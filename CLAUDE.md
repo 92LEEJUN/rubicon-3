@@ -34,6 +34,7 @@
 **1) 기반 문서 (공유, 상위) — `docs/`**
 - `docs/architecture.md` — 전체 시스템 아키텍처, 기술 스택, Mock↔실 전략 등 제품·시스템 수준 설계.
 - `docs/data-model.md` — 여러 스펙이 공유하는 도메인 데이터 모델·스키마·클래스 구조, Repository/Port 인터페이스 타입.
+- `docs/response-templates.md` — FE↔BE 공유 응답 표현 계약(템플릿 종류·스키마·선택/CTA 규칙).
 - 이들은 **여러 스펙이 공유하는 진실의 출처(single source of truth)** 다.
 
 **2) 스펙 문서 (기능별, 하위) — `specs/<작업명>/`**

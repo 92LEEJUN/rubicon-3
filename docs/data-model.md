@@ -198,8 +198,8 @@ class Cta:                               # R11
     payload: dict                        # 예: {"part_id": ...} / {"order_id": ...}
 
 class Template:                          # 응답 템플릿 모델 (R11)
-    kind: str                            # "product_card" | "guide_steps" | "comparison" | "text"
-    data: dict                           # kind별 구조화 데이터(kind와 스키마 일치)
+    kind: str                            # 종류·data 스키마는 docs/response-templates.md 참조
+    data: dict                           # kind별 구조화 데이터(kind와 스키마 일치, 불일치 시 text 폴백)
 
 class Message:
     id: Id

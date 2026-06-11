@@ -127,6 +127,23 @@ flowchart TB
 | 동의/프라이버시 (ConsentP) | **Mock** 동의/삭제 | 실 동의·데이터 관리 |
 | 저장소 (Repository) | **인메모리/로컬 DB** | Postgres + Redis (옵셔널) |
 
+### 공개 데이터 소스 / ACL 매핑 (Real 어댑터)
+
+`DevicePort`·`CSKnowledgePort`·`CatalogPort` 는 **공개 소스에서 가져올 수 있어** 순수 Mock이 아니라
+"실데이터 일부" 티어다. 외부 스키마는 **ACL(Anti-Corruption Layer = 어댑터)** 에서 우리 도메인 타입으로
+변환해, 외부 표현이 도메인에 새지 않게 격리한다(`data-model.md` §1 Port I/O 분리).
+
+| Port | 공개 소스 후보 | 매핑 대상(우리 타입) |
+|------|----------------|----------------------|
+| `DevicePort` | SmartThings 개인 API(PAT) | 디바이스/상태 → `Device`(`consumables`·`metrics`), `Anomaly`(`error_code` 등) |
+| `CSKnowledgePort` | 공개 CS·사용설명서·FAQ | 문서 → `Solution`(`steps`·`sources`), `Source`(`title`·`ref`) |
+| `CatalogPort` | 공개 제품/부품 스펙 | 스펙 → `Part`(`sku`·`price`·`device_model`·`in_stock`) |
+
+- 변환·정규화·누락 필드 폴백은 **ACL 책임**. 도메인은 변환된 타입만 본다.
+- 소스 커버리지는 부분적일 수 있다(최종 일관성·누락) → null 허용·폴백(R13, `data-model.md` §0).
+- 즉 **계약(Port 시그니처·타입)은 고정**돼 있고, **"어떤 소스 + 필드 매핑 표·적재 파이프라인"** 은
+  Real 어댑터 구현 시 확정한다(MVP는 Mock/부분 실데이터). 인터페이스 위 도메인 작업은 그 전에 병렬로 진행 가능.
+
 ## 6. 진입점 개요
 
 ```mermaid

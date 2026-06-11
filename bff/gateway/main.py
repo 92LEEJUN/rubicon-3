@@ -1,0 +1,102 @@
+"""BFF FastAPI 앱 — 클라이언트 표면(api-contract §2). FE는 이 서비스만 본다.
+
+WS /chat(섹션 스트림 중계) · 결정적 HTTP(/devices·/home·/orders·/bookings·/surface).
+BE 도메인 내부 API를 BackendClient(async)로 호출하고, 인증 게이트·폴백 정형화를 더한다.
+"""
+from __future__ import annotations
+
+from typing import Optional
+
+from fastapi import Depends, FastAPI, Request, WebSocket, WebSocketDisconnect
+
+from .auth import require_auth, ws_user
+from .backend_client import BackendClient
+from .transform import fallback_body, interaction_to_text, relay
+
+
+def _backend(request: Request) -> BackendClient:
+    return request.app.state.backend
+
+
+def create_app(backend: Optional[BackendClient] = None) -> FastAPI:
+    app = FastAPI(title="MVP 컨시어지 — BFF (클라이언트 표면)")
+    app.state.backend = backend or BackendClient()
+
+    # ── 결정적 조회(§2.2) — 인증 게이트 ────────────────────────────────────
+    @app.get("/devices")
+    async def list_devices(user: str = Depends(require_auth), be: BackendClient = Depends(_backend)):
+        return await relay(be.list_devices)
+
+    @app.get("/devices/{device_id}")
+    async def get_device(device_id: str, user: str = Depends(require_auth),
+                         be: BackendClient = Depends(_backend)):
+        return await relay(lambda: be.get_device(device_id))
+
+    @app.get("/home")
+    async def home(user: str = Depends(require_auth), be: BackendClient = Depends(_backend)):
+        return await relay(be.home)
+
+    @app.get("/catalog/recommend")
+    async def recommend(user: str = Depends(require_auth), be: BackendClient = Depends(_backend)):
+        return await relay(be.recommend)
+
+    # ── 커밋(§2.2) — 주문 게이트(R17) 그대로 중계(409 포함) ─────────────────
+    @app.post("/orders")
+    async def place_order(request: Request, user: str = Depends(require_auth),
+                          be: BackendClient = Depends(_backend)):
+        body = await request.json()
+        body.setdefault("user_id", user)
+        return await relay(lambda: be.place_order(body))
+
+    # ── 예약(§2.2, R18) ─────────────────────────────────────────────────────
+    @app.get("/bookings/slots")
+    async def booking_slots(visit_type: str = "REPAIR", user: str = Depends(require_auth),
+                            be: BackendClient = Depends(_backend)):
+        return await relay(lambda: be.booking_slots(visit_type))
+
+    @app.post("/bookings")
+    async def create_booking(request: Request, user: str = Depends(require_auth),
+                             be: BackendClient = Depends(_backend)):
+        body = await request.json()
+        return await relay(lambda: be.create_booking(body))
+
+    # ── 카드 탭 surface(§2.3) ───────────────────────────────────────────────
+    @app.post("/surface")
+    async def surface(request: Request, user: str = Depends(require_auth),
+                      be: BackendClient = Depends(_backend)):
+        body = await request.json()
+        return await relay(lambda: be.surface(body))
+
+    # ── 대화 WS(§2.1) — BE 섹션 스트림 중계 ────────────────────────────────
+    @app.websocket("/chat")
+    async def chat(ws: WebSocket):
+        await ws.accept()
+        if ws_user(ws.headers.get("authorization")) is None:
+            await ws.send_json({"type": "error", "code": "unauthorized",
+                                "fallback": {"kind": "text", "data": {"message": "인증이 필요합니다."}}})
+            await ws.close()
+            return
+        be: BackendClient = ws.app.state.backend
+        try:
+            while True:
+                msg = await ws.receive_json()
+                if msg.get("type") not in ("user_message", "interaction_reply"):
+                    await ws.send_json({"type": "error", "code": "bad_request"})
+                    continue
+                text = msg.get("text") if msg.get("type") == "user_message" else interaction_to_text(msg)
+                payload = {"session_id": msg.get("session_id", "s1"),
+                           "text": text or "", "screen_context": msg.get("screen_context")}
+                try:
+                    chunks = await be.turn_chunks(payload)
+                except Exception:
+                    await ws.send_json({"type": "error", **fallback_body()})
+                    continue
+                for chunk in chunks:
+                    await ws.send_json(chunk)
+        except WebSocketDisconnect:
+            return
+
+    return app
+
+
+app = create_app()

@@ -5,7 +5,6 @@
 """
 import os
 from pathlib import Path
-from openai import OpenAI
 
 try:  # backend/.env 자동 로드(있으면). 키는 .env(gitignore) 또는 환경변수로만.
     from dotenv import load_dotenv
@@ -14,4 +13,17 @@ except ModuleNotFoundError:
     pass
 
 MODEL = os.getenv("LLM_MODEL", "gpt-4o-mini")
-client = OpenAI()  # OPENAI_API_KEY 환경변수 사용
+
+_client = None
+
+
+def get_client():
+    """OpenAI 클라이언트 지연 생성 — 키 없이도 모듈 import는 가능(테스트·오프라인).
+
+    실제 LLM 호출(legacy CLI·OpenAIClassifier) 시점에만 OPENAI_API_KEY가 필요하다.
+    """
+    global _client
+    if _client is None:
+        from openai import OpenAI
+        _client = OpenAI()  # OPENAI_API_KEY 환경변수 사용
+    return _client

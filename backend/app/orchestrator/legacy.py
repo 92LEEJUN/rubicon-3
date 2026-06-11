@@ -5,7 +5,7 @@ OpenAI function calling으로 tool을 자유 호출하는 프로토타입 경로
 """
 import json
 
-from ..llm import MODEL, client
+from ..llm import MODEL, get_client
 from ..tools import TOOLS, call
 
 SYSTEM = (
@@ -43,7 +43,7 @@ INTENT_SCHEMA = {
 
 def classify(user_message: str) -> dict:
     """① 의도 분류·분해 (구조화 출력)."""
-    resp = client.chat.completions.create(
+    resp = get_client().chat.completions.create(
         model=MODEL,
         messages=[
             {"role": "system", "content": "사용자 입력의 의도를 분류·분해한다."},
@@ -63,7 +63,7 @@ def run(user_message: str, max_steps: int = 6, verbose: bool = True) -> str:
                 {"role": "user", "content": user_message}]
 
     for _ in range(max_steps):
-        resp = client.chat.completions.create(
+        resp = get_client().chat.completions.create(
             model=MODEL, messages=messages, tools=TOOLS, tool_choice="auto",
         )
         msg = resp.choices[0].message
@@ -81,5 +81,5 @@ def run(user_message: str, max_steps: int = 6, verbose: bool = True) -> str:
                 "content": json.dumps(result, ensure_ascii=False),
             })
     # 루프 한계 — 마지막 한 번 더 생성
-    final = client.chat.completions.create(model=MODEL, messages=messages)
+    final = get_client().chat.completions.create(model=MODEL, messages=messages)
     return final.choices[0].message.content or ""

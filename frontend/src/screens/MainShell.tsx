@@ -1,6 +1,6 @@
 /** 메인 셸 — 상단 브랜드 + 토글(홈↔고객지원) + 하단 고정 채팅바(전 탭 공통, wireframes §6). */
 import React, { useState } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { Caption, Heading } from "../components/primitives";
 import { SegmentedTabs } from "../components/SegmentedTabs";
 import { HomeScreen } from "./HomeScreen";
@@ -14,7 +14,14 @@ export function MainShell({ initialTab = "home", apiBase, token, onOpenChat, onG
   { initialTab?: MainTab; apiBase?: string; token?: string;
     onOpenChat?: (q?: string) => void; onGallery?: () => void }) {
   const [tab, setTab] = useState<MainTab>(initialTab);
+  const [draft, setDraft] = useState("");
   const data = useHomeData({ base: apiBase, token });
+
+  // 전송(또는 엔터) 시에만 채팅을 연다 — 바를 탭하면 그 자리에서 커서만 놓인다.
+  function submit() {
+    onOpenChat?.(draft.trim());
+    setDraft("");
+  }
 
   return (
     <View style={styles.root} testID="screen-main">
@@ -33,12 +40,22 @@ export function MainShell({ initialTab = "home", apiBase, token, onOpenChat, onG
         ? <HomeScreen data={data} onOpenChat={(q) => onOpenChat?.(q)} onGallery={onGallery} />
         : <SupportScreen data={data} onAsk={(q) => onOpenChat?.(q)} />}
 
-      {/* 하단 고정 채팅바 — 홈·CS 공통(탭하면 채팅으로 펼침) */}
-      <Pressable testID="open-chat" accessibilityRole="button" onPress={() => onOpenChat?.()}
-                 style={styles.chatBar}>
-        <View style={styles.chatStub}><Text style={styles.chatStubText}>가전 문제·부품 주문을 물어보세요</Text></View>
-        <View style={styles.chatSend}><Text style={styles.chatSendIcon}>↑</Text></View>
-      </Pressable>
+      {/* 하단 고정 채팅바(홈·CS 공통) — 그 자리에서 입력, 전송 시에만 채팅 열림 */}
+      <View style={styles.chatBar}>
+        <TextInput
+          testID="chat-bar-input"
+          style={styles.chatInput}
+          value={draft}
+          onChangeText={setDraft}
+          placeholder="가전 문제·부품 주문을 물어보세요"
+          placeholderTextColor={color.textMuted}
+          onSubmitEditing={submit}
+          returnKeyType="send"
+        />
+        <Pressable testID="open-chat" accessibilityRole="button" onPress={submit} style={styles.chatSend}>
+          <Text style={styles.chatSendIcon}>↑</Text>
+        </Pressable>
+      </View>
     </View>
   );
 }
@@ -55,8 +72,8 @@ const styles = StyleSheet.create({
     backgroundColor: color.surface, borderTopWidth: 1, borderTopColor: color.border,
     maxWidth: 480, width: "100%", alignSelf: "center",
   },
-  chatStub: { flex: 1, backgroundColor: color.surfaceAlt, borderRadius: radius.pill, paddingHorizontal: space.lg, paddingVertical: 13 },
-  chatStubText: { color: color.textMuted, fontSize: font.size.md },
+  chatInput: { flex: 1, backgroundColor: color.surfaceAlt, borderRadius: radius.pill,
+    paddingHorizontal: space.lg, paddingVertical: 13, fontSize: font.size.md, color: color.text },
   chatSend: { width: 46, height: 46, borderRadius: 23, backgroundColor: color.primary, alignItems: "center", justifyContent: "center",
     ...( { backgroundImage: gradient.brand } as any ) },
   chatSendIcon: { color: "#fff", fontSize: 20, fontWeight: font.weight.bold as any },

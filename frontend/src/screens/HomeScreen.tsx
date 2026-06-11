@@ -132,13 +132,6 @@ export function HomeScreen({ data, onOpenChat }:
           </View>
         ) : null}
       </ScrollView>
-
-      {/* 하단 고정 채팅바 — 탭하면 채팅으로 펼침(자유 입력) */}
-      <Pressable testID="open-chat" accessibilityRole="button" onPress={() => onOpenChat?.()}
-                 style={styles.chatBar}>
-        <View style={styles.chatStub}><Text style={styles.chatStubText}>가전 문제·부품 주문을 물어보세요</Text></View>
-        <View style={styles.chatSend}><Text style={styles.chatSendIcon}>↑</Text></View>
-      </Pressable>
     </View>
   );
 }

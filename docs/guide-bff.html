@@ -3,33 +3,32 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>BFF(API/표현 계층) 필독 가이드 — 삼성 AI 컨시어지</title>
+<title>BFF 완성 가이드 — 삼성 AI 컨시어지</title>
 <style>
   :root{ --accent:#0e7a4b; --ink:#16202e; --muted:#5b6b80; --line:#e3e8ef; --bg:#f5f7fb; --card:#fff; --chip:#e9f7f1; }
   *{box-sizing:border-box} body{margin:0;font-family:system-ui,-apple-system,"Segoe UI","Apple SD Gothic Neo","Malgun Gothic",sans-serif;color:var(--ink);background:var(--bg);line-height:1.65}
-  .wrap{max-width:1000px;margin:0 auto;padding:0 20px 80px}
-  a{color:var(--accent);text-decoration:none} a:hover{text-decoration:underline}
-  header.hero{background:linear-gradient(135deg,#06291b,var(--accent));color:#fff;padding:38px 0 30px}
+  .wrap{max-width:1040px;margin:0 auto;padding:0 20px 80px}
+  header.hero{background:linear-gradient(135deg,#06291b,var(--accent));color:#fff;padding:36px 0 28px}
   .hero h1{margin:0 0 6px;font-size:27px}
   .hero .role{display:inline-block;background:rgba(255,255,255,.16);border:1px solid rgba(255,255,255,.3);padding:3px 12px;border-radius:999px;font-size:13px;margin-bottom:10px}
   .hero p{margin:4px 0;opacity:.93;font-size:15px}
-  .nav{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}
-  .nav a{background:rgba(255,255,255,.14);color:#fff;padding:4px 11px;border-radius:7px;font-size:13px}
-  section{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:20px 22px;margin-top:18px;box-shadow:0 1px 2px rgba(16,32,60,.03)}
+  nav.toc{position:sticky;top:0;z-index:5;background:rgba(255,255,255,.94);backdrop-filter:blur(6px);border-bottom:1px solid var(--line);padding:9px 0}
+  nav.toc .wrap{padding-bottom:0;display:flex;gap:6px;flex-wrap:wrap}
+  nav.toc a{font-size:12.5px;color:var(--muted);padding:4px 9px;border-radius:6px;text-decoration:none}
+  nav.toc a:hover{background:var(--chip);color:var(--accent)}
+  section{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:20px 22px;margin-top:18px}
   h2{margin:0 0 12px;font-size:19px;color:#06291b;display:flex;align-items:center;gap:8px}
   h2 .n{font-size:12px;background:var(--chip);color:var(--accent);border-radius:7px;padding:2px 8px;font-weight:700}
+  h3{font-size:14.5px;margin:16px 0 6px;color:#06291b}
   .own{display:grid;grid-template-columns:1fr 1fr;gap:12px}
   .own .box{border:1px solid var(--line);border-radius:10px;padding:12px 14px}
   .own .yes{background:#e9f7f1;border-color:#c9ecdd} .own .no{background:#fbfcfe}
   .own h4{margin:0 0 6px;font-size:14px} .own ul{margin:0;padding-left:18px;font-size:13.5px} .own li{margin:3px 0}
-  .docgrid{display:grid;grid-template-columns:1fr;gap:10px}
-  .doc{border:1px solid var(--line);border-radius:10px;padding:12px 14px;background:#fbfcfe}
-  .doc .f{font-family:ui-monospace,Menlo,monospace;font-size:13px;color:#06291b;font-weight:700}
-  .doc .why{font-size:13.5px;color:var(--muted);margin-top:3px}
-  .doc .focus{font-size:13px;margin-top:5px}
-  .badge{display:inline-block;font-size:11px;font-weight:700;border-radius:6px;padding:1px 7px;background:var(--chip);color:var(--accent);margin-left:6px}
   ul.flat{margin:6px 0;padding-left:20px} ul.flat li{margin:4px 0;font-size:14px}
+  table{border-collapse:collapse;width:100%;margin:10px 0;font-size:13px} th,td{border:1px solid var(--line);padding:6px 9px;text-align:left;vertical-align:top} th{background:#eef7f2;color:#06291b} tbody tr:nth-child(even){background:#fafbfe}
   code{background:#f0f3f9;border:1px solid #e2e8f2;border-radius:5px;padding:1px 5px;font-size:12.5px;font-family:ui-monospace,Menlo,monospace}
+  pre{background:#0c1f17;color:#d7f0e4;border-radius:9px;padding:13px 15px;overflow:auto;font-size:12px;line-height:1.5;font-family:ui-monospace,Menlo,monospace}
+  details{border:1px solid var(--line);border-radius:10px;margin:10px 0;background:#fbfcfe} details>summary{cursor:pointer;padding:10px 13px;font-weight:600;font-size:13.5px;color:#06291b} .det{padding:0 14px 12px}
   .callout{border-left:4px solid var(--accent);background:#eafaf3;border-radius:0 8px 8px 0;padding:10px 14px;margin:10px 0;font-size:13.5px}
   footer{color:var(--muted);font-size:12.5px;text-align:center;margin-top:24px}
   @media(max-width:680px){.own{grid-template-columns:1fr}}
@@ -38,75 +37,150 @@
 <body>
 <header class="hero"><div class="wrap">
   <span class="role">🔀 API / 표현 계층 (BFF 역할)</span>
-  <h1>BFF 필독 가이드</h1>
-  <p><b>별도 서비스가 아니라 FastAPI 안의 계층.</b> 화면 집계·Template 정형화·스트리밍 중계·인증 게이트. <b>비즈니스 로직은 갖지 않는다</b>(조합·변환·중계만).</p>
-  <div class="nav"><a href="#own">책임</a><a href="#docs">필독 문서</a><a href="#contract">계약</a><a href="#diag">다이어그램</a><a href="#care">주의</a></div>
+  <h1>BFF 완성 가이드</h1>
+  <p>FastAPI 안의 계층 — 집계·정형화·스트리밍 중계·인증 게이트. <b>비즈니스 로직은 갖지 않는다.</b> 이 문서 하나로 책임·계약이 완결된다.</p>
 </div></header>
+<nav class="toc"><div class="wrap">
+  <a href="#own">책임</a><a href="#layer">계층</a><a href="#route">라우팅</a><a href="#ws">/chat</a><a href="#ep">엔드포인트</a><a href="#agg">집계·정형화</a><a href="#proactive">선제</a><a href="#analytics">분석</a><a href="#fallback">폴백</a><a href="#care">주의</a>
+</div></nav>
 
 <div class="wrap">
   <section id="own">
-    <h2><span class="n">01</span>내 책임 / 경계</h2>
+    <h2><span class="n">01</span>책임 / 경계</h2>
     <div class="own">
-      <div class="box yes"><h4>✅ 내가 한다</h4><ul>
-        <li>화면 단위 aggregation(예: <code>home_summary</code>)</li>
-        <li>도메인/LLM 출력 → <code>Template</code>/<code>MessageSection</code> 정형화</li>
-        <li>LLM·오케스트레이터 스트림 → WebSocket <b>중계</b></li>
+      <div class="box yes"><h4>✅ 한다</h4><ul>
+        <li>화면 단위 aggregation(예: home_summary)</li>
+        <li>도메인/LLM 출력 → Template/MessageSection 정형화</li>
+        <li>LLM·오케스트레이터 스트림 → WebSocket 중계</li>
         <li>인증/세션 게이트(토큰 검증·조용한 재인증)</li>
         <li>외부 실패 → 폴백 응답 정규화(R13)</li>
-        <li>카드 탭 <code>/surface</code> → bridge/panel 응답 형태 구성</li>
+        <li>카드 탭 /surface → bridge/panel 응답 구성</li>
       </ul></div>
-      <div class="box no"><h4>🚫 내가 안 한다</h4><ul>
-        <li>"LLM이냐 도메인이냐" <b>라우팅 판단</b> → 오케스트레이터</li>
+      <div class="box no"><h4>🚫 안 한다</h4><ul>
+        <li>"LLM이냐 도메인이냐" 라우팅 판단 → 오케스트레이터</li>
         <li>도메인 비즈니스 로직 → 도메인 서비스</li>
         <li>도메인 DB 직접 접근 → 서비스/Port 경유</li>
         <li>되돌릴 수 없는 커밋 자체 처리 → 도메인+ActionGate</li>
       </ul></div>
     </div>
-    <div class="callout"><b>이음새(seam) 유지.</b> 지금은 FastAPI에 흡수돼 있지만, 비즈니스 로직을 안 가지므로 2nd 클라이언트·독립 스케일 필요 시 떼어내기 쉽게(architecture §9).</div>
   </section>
 
-  <section id="docs">
-    <h2><span class="n">02</span>필독 문서 (우선순위)</h2>
-    <div class="docgrid">
-      <div class="doc"><div class="f">docs/architecture.md <span class="badge">핵심</span></div><div class="why">내 계층의 정의·경계</div><div class="focus"><b>§8 요청 라우팅</b>·<b>§9 BFF 책임</b>·§10 선제 파이프라인·§11 분석·§12 도메인 맵</div></div>
-      <div class="doc"><div class="f">docs/api-contract.md <span class="badge">계약</span></div><div class="why">내가 노출/구현하는 표면</div><div class="focus">전체 — §2.1 WS(section 청크)·§2.2 엔드포인트 req/resp·§2.3 <code>/surface</code>·§3 인증/재인증·§4 폴백·§5 Mock/Stub</div></div>
-      <div class="doc"><div class="f">docs/response-templates.md <span class="badge">계약</span></div><div class="why">정형화 대상</div><div class="focus">Template/Cta 조립·<b>§5 복합=섹션</b>·§8 인터랙션·§9 브릿지</div></div>
-      <div class="doc"><div class="f">docs/data-model.md <span class="badge">타입</span></div><div class="why">DTO·표현 타입</div><div class="focus">§4 API DTO·<code>Template</code>·<code>MessageSection</code>·<code>ChatResponseChunk</code>·동의 scope</div></div>
-      <div class="doc"><div class="f">docs/orchestration.md <span class="badge">경계</span></div><div class="why">위임 대상 이해</div><div class="focus">오케스트레이터 파이프라인(나는 입력 전달·스트림 중계만)</div></div>
-    </div>
+  <section id="layer">
+    <h2><span class="n">02</span>내부 계층 (단일 FastAPI)</h2>
+<pre>[API / 표현 계층]  ← 내 책임: aggregation · Template 변환 · 스트리밍 중계 · 인증 게이트
+       │  (인프로세스 함수 호출, HTTP 아님)
+[오케스트레이션]   ← 의도 분류 · 흐름 · 세션 · tool 조합
+       │
+[도메인 서비스]    ← 비즈니스 로직
+       │
+[어댑터(Port)]     ← Mock↔실 (외부) / Repository (내부 데이터)</pre>
+    <div class="callout"><b>별도 BFF 배포 없음</b>(FastAPI 흡수). 비즈니스 로직을 안 가지므로 <b>이음새(seam) 유지</b> → 2nd 클라이언트(웹)·독립 스케일·팀 분리 시 떼어내기 쉽게. 분리 시 집계·정형화·중계·인증게이트→BFF, 도메인·Port→도메인 BE 잔류.</div>
   </section>
 
-  <section id="contract">
-    <h2><span class="n">03</span>내가 빌드할 계약</h2>
+  <section id="route">
+    <h2><span class="n">03</span>요청 라우팅 (BE가 소유)</h2>
+    <p style="font-size:13.5px;color:var(--muted)">FE는 상호작용 유형으로 채널만 고름. 채널 안 LLM-vs-도메인 판단은 오케스트레이터.</p>
+    <table>
+      <tr><th>상호작용</th><th>채널</th><th>LLM</th></tr>
+      <tr><td>자유 텍스트·멀티모달</td><td>/chat → 오케스트레이터</td><td>BE가 결정(불투명)</td></tr>
+      <tr><td>대화형 CTA(제안 칩·회신·설명 요청)</td><td>/chat 재진입</td><td>가능(흐름 재개)</td></tr>
+      <tr><td>되돌릴 수 없는 커밋(결제·주문·예약 확정)</td><td>결정적 엔드포인트</td><td>미경유 + ActionGate(R17)</td></tr>
+    </table>
+    <div class="callout"><b>"CTA=결정적"이 아니라 "커밋=결정적".</b> LLM 미경유 보장은 커밋 자체에 한정 — 커밋 주변 요약/후속은 LLM 생성 가능.</div>
+  </section>
+
+  <section id="ws">
+    <h2><span class="n">04</span>WebSocket <code>/chat</code> 중계</h2>
+<pre># 수신
+user_message      { session_id, text, media[], screen_context }
+interaction_reply { session_id, ref, kind, payload }
+
+# 송신(스트림 중계) — 오케스트레이터 출력을 청크로
+delta   { text }
+section { section: MessageSection }     # 복합이면 의도 우선순위 순서대로 여러 번
+flow    { active_flow }
+done    { message_id }
+error   { code, fallback }
+
+MessageSection = { label, intent, template:Template, ctas:[Cta], handled }</pre>
+  </section>
+
+  <section id="ep">
+    <h2><span class="n">05</span>결정적 엔드포인트 (req/resp)</h2>
+    <table>
+      <tr><th>엔드포인트</th><th>메서드</th><th>요청 → 응답</th><th>비고</th></tr>
+      <tr><td>/devices · /devices/{id}</td><td>GET</td><td>– → [Device] · Device(+[Anomaly])</td><td>R2</td></tr>
+      <tr><td>/cart</td><td>GET/POST/DELETE</td><td>CartRequest → Order(DRAFT)</td><td>R4</td></tr>
+      <tr><td>/orders</td><td>POST</td><td>OrderRequest(confirmed) → Order / 409</td><td>미확인 시 409 ConfirmationRequired(R17)</td></tr>
+      <tr><td>/orders/{id}</td><td>GET</td><td>– → Order</td><td>R12</td></tr>
+      <tr><td>/bookings/slots · /bookings</td><td>GET·POST</td><td>– → [BookingSlot] · BookingRequest → Booking</td><td>R18</td></tr>
+      <tr><td>/handoff</td><td>POST</td><td>{type,context_ref} → ServiceRequest</td><td>R18</td></tr>
+      <tr><td>/history</td><td>GET</td><td>?limit&cursor → Page[…]</td><td>커서</td></tr>
+      <tr><td>/surface</td><td>POST</td><td>{card_type,ref,screen_context} → {surface, template?|conversation_id?}</td><td>브릿지/패널 동적</td></tr>
+    </table>
+    <details><summary>핵심 DTO (data-model)</summary><div class="det">
+<pre>ChatRequest        { conversation_id, text(≤4000), media[], screen_context }
+OrderRequest       { items[≥1], confirmed }
+CartRequest        { items[≥1] }
+BookingRequest     { slot_id, context_ref }
+InteractionReply   { conversation_id, ref, kind, payload }
+ChatResponseChunk  { conversation_id, delta_text, section:MessageSection, done }
+Template           { kind, data }
+Page[T]            { items[], next_cursor }</pre>
+    </div></details>
+  </section>
+
+  <section id="agg">
+    <h2><span class="n">06</span>집계 · 정형화 (내 핵심)</h2>
     <ul class="flat">
-      <li><b>WS <code>/chat</code></b> — user_message/interaction_reply 수신, <code>delta</code>/<code>section</code>/<code>flow</code>/<code>done</code> 중계(api-contract §2.1)</li>
-      <li><b>결정적 엔드포인트</b> — <code>/devices·/cart·/orders·/bookings·/handoff·/history·/surface</code> req/resp(§2.2·§2.3)</li>
-      <li><b>aggregation</b> — 여러 도메인 서비스 결과를 <code>home_summary</code> 등으로 조합</li>
-      <li><b>폴백 정규화</b> — <code>{code, message, fallback}</code> (R13)</li>
+      <li><b>aggregation</b> — 홈은 여러 도메인 서비스 결과를 <code>home_summary</code>로 조합: alerts(device_status)+recommendations(product)+shortcuts.</li>
+      <li><b>정형화</b> — 도메인/LLM 출력 → <code>Template</code>/<code>Cta</code>/<code>MessageSection</code>으로 변환. 복합은 의도별 섹션.</li>
+      <li><b>중계</b> — 오케스트레이터 스트림을 WS 청크로 변환·전달.</li>
+      <li><b>인증 게이트</b> — 진입 토큰 검증, 만료 시 조용한 재인증(백그라운드 재발급, 실패만 안내).</li>
     </ul>
-    <div class="callout">도메인 호출은 <b>인프로세스 함수</b>(HTTP 아님). 데이터는 외부=Port / 내부=Repository (api-contract §1).</div>
   </section>
 
-  <section id="diag">
-    <h2><span class="n">04</span>핵심 다이어그램</h2>
-    <ul class="flat">
-      <li><b>요청 라우팅</b>(architecture §8) — 자유텍스트/대화형CTA/커밋 3갈래</li>
-      <li><b>diagrams.md</b> — 메인 시퀀스 · 주문 확인 게이트 · 선제 파이프라인 · 분석 파이프라인</li>
-      <li><b>FastAPI 내부 계층</b>(architecture §9) — API/표현 → 오케스트레이션 → 도메인 → Port</li>
-    </ul>
+  <section id="proactive">
+    <h2><span class="n">07</span>선제(Proactive) 파이프라인</h2>
+    <p style="font-size:13.5px;color:var(--muted)">사용자 요청 없이 시스템이 시작(이상·소모품·알림). 라우팅(§3)과 별개.</p>
+<pre>텔레메트리(폴링/이벤트) → 이상·임계치 판정 → 알림 생성·집약
+  → {빈도·중요도 R26} → 우선순위·다중기기 R27 → {옵트인·동의 R20·R19}
+  → 허용? AlertPort 전달(인앱/푸시) : 발송 안 함
+  → 사용자 탭 → /chat(reactive 전이, 맥락 주입)</pre>
+    <p style="font-size:13px;color:var(--muted)">실 이벤트: SmartThings 구독 webhook(서명 검증)은 인바운드 ingress(별도). MVP는 폴링/인앱 Mock.</p>
+  </section>
+
+  <section id="analytics">
+    <h2><span class="n">08</span>분석 파이프라인</h2>
+<pre>FE 이벤트(screen·cta·flow) + BE 이벤트(order_confirmed·notification_*)
+  → {동의·가명화 R19} → AnalyticsPort → sink(MVP 로그/실 플랫폼) → 퍼널·전환·리텐션</pre>
+    <p style="font-size:13px;color:var(--muted)"><b>비차단</b> — 분석 emit이 사용자 흐름을 지연·중단시키지 않음. 동의 없으면 수집 안 함.</p>
+  </section>
+
+  <section id="fallback">
+    <h2><span class="n">09</span>에러 / 폴백 정규화 (R13)</h2>
+    <p style="font-size:13.5px">모든 외부 실패를 클라이언트 계약으로 정규화. 대화 전체 중단 금지.</p>
+<pre>표준 에러:  { code, message, fallback: Template | None }</pre>
+    <table><tr><th>상황</th><th>처리</th></tr>
+      <tr><td>SmartThings 실패/미연동</td><td>일반 안내 폴백 + 연동 유도</td></tr>
+      <tr><td>O2O/결제 실패</td><td>보류 + 재시도 CTA</td></tr>
+      <tr><td>CS 미발견 / 신뢰도 낮음</td><td>단정 금지 → 핸드오프(R18) 안내</td></tr>
+      <tr><td>LLM 지연/타임아웃</td><td>상태 표시 + 대기/재시도/취소(R14)</td></tr>
+      <tr><td>세션 만료</td><td>조용한 재인증, 실패만 재로그인 안내</td></tr>
+    </table>
   </section>
 
   <section id="care">
-    <h2><span class="n">05</span>주의 / 알아둘 결정</h2>
+    <h2><span class="n">10</span>주의 / 결정</h2>
     <ul class="flat">
-      <li><b>단일 진입점 = FastAPI</b>. 별도 BFF 배포 없음(흡수). 트리거 발생 시 분리 검토.</li>
-      <li><b>커밋만 LLM 미경유</b> — 대화형 CTA는 <code>/chat</code> 재진입(LLM 가능). "CTA=결정적"이 아니라 "커밋=결정적".</li>
-      <li><b>스트리밍 우선</b> — 모든 응답 점진 전달. 복합은 <code>section</code> 청크 순서대로 중계.</li>
-      <li><b>비차단 분석</b> — 분석 emit이 사용자 흐름을 막지 않게, 동의 게이트.</li>
+      <li><b>도메인 호출은 인프로세스 함수</b>(HTTP 아님). 외부=Port / 내부=Repository.</li>
+      <li><b>라우팅 판단 안 함</b> — 오케스트레이터에 위임, 나는 중계.</li>
+      <li><b>스트리밍 우선</b> — 복합은 section 청크 순서대로.</li>
+      <li><b>커밋만 LLM 미경유</b> + ActionGate(R17).</li>
+      <li><b>seam 유지</b> — 비즈니스 로직 금지(조합·변환·중계만).</li>
     </ul>
   </section>
-
-  <footer>BFF(API/표현 계층) 필독 가이드 · 파생 문서(온보딩용) · 단일 출처는 각 기반 문서</footer>
+  <footer>BFF(API/표현 계층) 완성 가이드 · 독립 스냅샷(2026-06) · 삼성 AI 컨시어지</footer>
 </div>
 </body>
 </html>

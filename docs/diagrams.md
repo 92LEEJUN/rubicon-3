@@ -629,4 +629,4 @@ flowchart TD
   SELF -. 미해결 .-> TECH
 ```
 
-> 상세 흐름·엣지: `specs/samsung-ai-concierge/design.md` §8.
+> 상세 흐름·엣지: `specs/mvp-concierge/design.md` §8.

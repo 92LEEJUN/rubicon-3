@@ -3,7 +3,7 @@
 > **기반 문서 (공유).** 대화 오케스트레이터의 내부 동작 — 의도 처리·tool 호출·RAG·응답 생성 —
 > 을 정의한다. 외부 API는 `docs/api-contract.md`, 데이터 타입은 `docs/data-model.md`,
 > 응답 표현은 `docs/response-templates.md`, 비즈니스 로직 결정은
-> `specs/samsung-ai-concierge/design.md` §6 를 본다.
+> `specs/mvp-concierge/design.md` §6 를 본다.
 
 ## 1. 개요 / 모델
 

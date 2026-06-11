@@ -2,7 +2,7 @@
 
 > **기반 문서 (공유).** FE↔BE가 같은 이벤트명을 쓰도록 하는 **분석 이벤트 계약**(R28).
 > 타입은 `docs/data-model.md`(`AnalyticsEvent`·`AnalyticsPort`), 파이프라인은
-> `docs/architecture.md` §11, 시나리오는 `specs/samsung-ai-concierge/scenarios/`.
+> `docs/architecture.md` §11, 시나리오는 `specs/mvp-concierge/scenarios/`.
 > 이벤트명/스키마가 바뀌면 **이 문서를 갱신**한다(FE/BE 동시 영향).
 
 ## 1. 목표 ↔ 데이터

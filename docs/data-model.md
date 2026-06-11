@@ -152,8 +152,8 @@ class Device:
     id: Id
     type: str                            # 예: "washer"
     model: str
-    status: str                          # 정상/오류 등 요약 상태
-    consumables: list[Consumable]        # name 유일
+    status: str                          # 요약 상태. ST Health(ONLINE/UNHEALTHY/OFFLINE)+operating state 매핑(arch §5)
+    consumables: list[Consumable]        # name 유일. ST filterStatus/custom capability에서 매핑
     metrics: dict[str, float]            # 임의 수치 지표
 
 class Anomaly:

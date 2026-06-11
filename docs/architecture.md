@@ -146,6 +146,18 @@ flowchart TB
 - 즉 **계약(Port 시그니처·타입)은 고정**돼 있고, **"어떤 소스 + 필드 매핑 표·적재 파이프라인"** 은
   Real 어댑터 구현 시 확정한다(MVP는 Mock/부분 실데이터). 인터페이스 위 도메인 작업은 그 전에 병렬로 진행 가능.
 
+#### 공개 문서 조사 결과 (2026-06, 스파이크 입력)
+
+**SmartThings (`DevicePort`)** — [Devices API](https://developer.smartthings.com/docs/api/public)·[Health](https://developer.smartthings.com/docs/devices/health)·[Capabilities](https://developer.smartthings.com/docs/devices/capabilities/)
+- **연결 상태(Health)**: `ONLINE`·`UNHEALTHY`·`OFFLINE` → `Device.status` 연결성 매핑.
+- **상태(`GET /devices/{id}/status`)**: capability별 **attributes**(상태) + **commands**. 예: `filterStatus`(냉장고 필터 정상/교체) → `Consumable`/`Anomaly(CONSUMABLE)`, `washerOperatingState`/`dishwasherOperatingState`(machineState·jobState) → `Device.status`·`metrics`.
+- **Samsung custom capability**(`custom.*`)로 소모품 수명·오류가 노출될 수 있음. **단, 기기 오류코드(예: 4C/5C)의 API 노출은 불확실**(패널 표시 위주일 수 있음) → 이상감지(§design 6.3) **부분 검증, 스파이크에서 확인 필요**.
+- **주의**: `custom.disabledCapabilities`에 "비활성"으로 표기돼도 실제 동작하는 capability가 있음 → ACL은 맹신 말고 검증.
+
+**Samsung CS (`CSKnowledgePort`)** — samsung.com/support 오류코드별 가이드(예: [4C/5C](https://www.samsung.com/us/support/troubleshoot/TSG10000997/))
+- 구조: **오류코드 → 의미 → 단계별 해결**. 예: `4C`=급수 문제 → (수도꼭지·호스 꺾임·메시필터 확인), `5C`=배수 문제 → (배수필터 청소·호스 정리).
+- **매핑이 깔끔함**: 코드별 문서 → `Solution.steps`(단계), `Source`(title·URL). 지역별 페이지라 로케일 고려.
+
 ## 6. 진입점 개요
 
 ```mermaid

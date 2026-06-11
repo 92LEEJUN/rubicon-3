@@ -251,6 +251,12 @@ sequenceDiagram
 | 제품정보 기기↔부품 매핑 수준? | 샘플 매핑 시도 | 정확 매칭/후보 산출 | 부품 매칭(R4)·`CatalogPort` |
 | 개인화/Engagement 저장·보존·동의 처리? | 정책·범위 확인 | 동의 scope·보존 정책 확정 | R8·R29·R19 |
 
+> **공개 문서 1차 조사(2026-06)** — 실 호출 전, 공개 문서로 부분 확인(상세·출처: `architecture.md` §5 ACL):
+> - **SmartThings** — Health(ONLINE/UNHEALTHY/OFFLINE)·operating state·`filterStatus`(소모품) 확인 ✅.
+>   단, **기기 오류코드(4C/5C 등)의 API 노출은 불확실** → 실 PAT 호출로 확인 필요(이상감지 §6.3 핵심 리스크).
+> - **Samsung CS** — 오류코드→의미→단계별 해결 구조 확인 ✅. `Solution.steps`/`Source` 매핑 양호.
+> - **O2O·제품-부품 매핑** — 미확인(실 API 검증 대상).
+
 ### B. WebSocket 트랜스포트 스파이크 (`docs/frontend-architecture.md` §5)
 | 검증 질문 | 방법 | 합격 기준 | 틀리면 |
 |-----------|------|-----------|--------|

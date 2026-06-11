@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=390">
+<title>변형 C — Depth Stack</title>
+<style>
+  :root{
+    --primary:#0381FE;--primaryDark:#026AD6;--primaryTint:#E8F2FF;
+    --bg:#EEF1F5;--surface:#FFF;--surfaceAlt:#F0F2F5;--border:#E3E6EB;
+    --text:#1A1C1E;--sub:#5A6068;--muted:#8B9097;
+    --success:#1FA463;--warning:#F2A20C;--danger:#E5484D;
+    --warningTint:#FDF3E0;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;-webkit-font-smoothing:antialiased}
+  body{width:390px;background:var(--bg);font-family:-apple-system,"Segoe UI",Roboto,"Noto Sans KR",sans-serif;color:var(--text)}
+  .wrap{min-height:844px;display:flex;flex-direction:column}
+  .head{padding:18px 16px 8px}
+  .brand{font-size:12px;color:var(--muted);font-weight:600;letter-spacing:.3px}
+  .h1{font-size:26px;font-weight:800;margin-top:2px}
+  .toggle{display:flex;background:#E3E7EC;border-radius:999px;padding:4px;margin-top:14px}
+  .seg{flex:1;text-align:center;padding:9px;border-radius:999px;font-size:14px;font-weight:600;color:var(--sub)}
+  .seg.on{background:var(--surface);color:var(--text);box-shadow:0 2px 6px rgba(0,0,0,.1)}
+  .body{flex:1;padding:8px 16px 0}
+  .label{font-size:12px;color:var(--muted);font-weight:600;margin:16px 2px 10px;text-transform:uppercase;letter-spacing:.5px}
+
+  /* pronounced depth deck — offset stacked cards visible */
+  .deck{position:relative;height:210px;margin-top:6px}
+  .behind{position:absolute;background:var(--surface);border-radius:22px;box-shadow:0 6px 16px rgba(15,30,50,.08)}
+  .b1{left:26px;right:26px;top:20px;height:184px;opacity:.7}
+  .b2{left:14px;right:14px;top:10px;height:190px;opacity:.9}
+  .card{position:absolute;left:0;right:0;top:0;height:188px;background:var(--surface);border-radius:22px;padding:20px;
+    box-shadow:0 18px 34px rgba(15,30,50,.16);border:1px solid #fff}
+  .row{display:flex;align-items:center;gap:10px}
+  .ic{width:44px;height:44px;border-radius:14px;background:var(--warningTint);display:flex;align-items:center;justify-content:center;font-size:22px}
+  .badge{font-size:11px;font-weight:700;padding:3px 9px;border-radius:999px;background:var(--warningTint);color:var(--warning)}
+  .cardT{font-size:20px;font-weight:800;margin-top:14px}
+  .cardD{font-size:14px;color:var(--sub);margin-top:7px;line-height:1.55}
+  .cardCta{margin-top:16px;display:inline-block;background:var(--text);color:#fff;font-size:13px;font-weight:700;padding:10px 18px;border-radius:999px}
+  .dots{display:flex;gap:6px;justify-content:center;margin-top:16px}
+  .dot{width:7px;height:7px;border-radius:4px;background:#CDD3DA}
+  .dot.on{width:20px;background:var(--text)}
+
+  /* 2-col tiles with left color bar */
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:6px}
+  .tile{position:relative;background:var(--surface);border-radius:16px;padding:14px 14px 14px 16px;overflow:hidden;box-shadow:0 4px 12px rgba(15,30,50,.06)}
+  .tile::before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px}
+  .t1::before{background:var(--warning)}.t2::before{background:var(--success)}
+  .t3::before{background:var(--primary)}.t4::before{background:var(--muted)}
+  .tt{font-size:14px;font-weight:700}
+  .ts{font-size:12px;color:var(--muted);margin-top:4px}
+  .tv{font-size:13px;font-weight:700;margin-top:8px}
+
+  .chatbar{position:sticky;bottom:0;background:var(--surface);box-shadow:0 -8px 24px rgba(15,30,50,.1);padding:12px 16px 18px;display:flex;gap:8px;align-items:center;border-radius:22px 22px 0 0}
+  .cinput{flex:1;background:#EDF0F4;border-radius:999px;padding:14px 18px;color:var(--muted);font-size:15px}
+  .csend{width:46px;height:46px;border-radius:23px;background:var(--text);color:#fff;display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:700}
+</style></head>
+<body><div class="wrap">
+  <div class="head">
+    <div class="brand">SAMSUNG</div>
+    <div class="h1">AI 컨시어지</div>
+    <div class="toggle"><div class="seg on">홈</div><div class="seg">고객지원</div></div>
+  </div>
+  <div class="body">
+    <div class="label">오늘의 브리핑 · 밀어서 넘기기</div>
+    <div class="deck">
+      <div class="behind b1"></div><div class="behind b2"></div>
+      <div class="card">
+        <div class="row"><div class="ic">🧺</div><span class="badge">점검 필요</span></div>
+        <div class="cardT">세탁기 배수 이상 (5C)</div>
+        <div class="cardD">배수 필터 수명 40%. 지금 청소·교체하면 5C 오류를 예방할 수 있어요.</div>
+        <span class="cardCta">해결 방법 보기 →</span>
+      </div>
+    </div>
+    <div class="dots"><div class="dot on"></div><div class="dot"></div><div class="dot"></div></div>
+
+    <div class="label">한눈에 보기</div>
+    <div class="grid">
+      <div class="tile t1"><div class="tt">세탁기</div><div class="ts">WF45T6000AW</div><div class="tv" style="color:var(--warning)">점검 필요</div></div>
+      <div class="tile t2"><div class="tt">냉장고</div><div class="ts">정수필터</div><div class="tv" style="color:var(--success)">정상</div></div>
+      <div class="tile t3"><div class="tt">부품 주문</div><div class="ts">배수 필터</div><div class="tv" style="color:var(--primary)">₩12,000</div></div>
+      <div class="tile t4"><div class="tt">방문 예약</div><div class="ts">출장 수리</div><div class="tv">예약 가능</div></div>
+    </div>
+  </div>
+  <div class="chatbar"><div class="cinput">가전 문제·부품 주문을 물어보세요</div><div class="csend">↑</div></div>
+</div></body></html>

@@ -25,7 +25,7 @@ export function MainShell({ initialTab = "home", onOpenChat, onGallery }:
         />
       </View>
       {tab === "home"
-        ? <HomeScreen onOpenChat={() => onOpenChat?.()} onGallery={onGallery} />
+        ? <HomeScreen onOpenChat={(q) => onOpenChat?.(q)} onGallery={onGallery} />
         : <SupportScreen onAsk={(q) => onOpenChat?.(q)} />}
     </View>
   );

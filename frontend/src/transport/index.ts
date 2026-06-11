@@ -17,19 +17,28 @@ export class WebSocketTransport implements ChatTransport {
   private ws?: WebSocket;
   private chunkHandler: (c: Chunk) => void = () => {};
   private stateHandler: (s: "open" | "closed" | "error") => void = () => {};
+  private outbox: string[] = []; // OPEN 전 송신 보류 큐(자동 첫 질문 전송 대비)
 
   constructor(private url: string) {}
 
   connect() {
     this.ws = new WebSocket(this.url);
-    this.ws.onopen = () => this.stateHandler("open");
+    this.ws.onopen = () => {
+      this.stateHandler("open");
+      for (const data of this.outbox) this.ws!.send(data); // 보류분 플러시
+      this.outbox = [];
+    };
     this.ws.onclose = () => this.stateHandler("closed");
     this.ws.onerror = () => this.stateHandler("error");
     this.ws.onmessage = (e) => {
       try { this.chunkHandler(JSON.parse(String(e.data))); } catch { /* ignore */ }
     };
   }
-  send(message: ClientMessage) { this.ws?.send(JSON.stringify(message)); }
+  send(message: ClientMessage) {
+    const data = JSON.stringify(message);
+    if (this.ws && this.ws.readyState === WebSocket.OPEN) this.ws.send(data);
+    else this.outbox.push(data); // 아직 연결 전 — 열리면 보낸다
+  }
   onChunk(h: (c: Chunk) => void) { this.chunkHandler = h; }
   onState(h: (s: "open" | "closed" | "error") => void) { this.stateHandler = h; }
   close() { this.ws?.close(); }

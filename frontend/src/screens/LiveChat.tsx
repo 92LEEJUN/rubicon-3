@@ -26,7 +26,12 @@ export function LiveChat({ wsUrl }: { wsUrl: string }) {
       <View style={styles.header}><Title>AI 컨시어지</Title></View>
       <ScrollView contentContainerStyle={styles.content} testID="chat-scroll">
         {sent ? <View style={styles.userBubble}><Text style={styles.userText}>{sent}</Text></View> : null}
-        {state.status === "streaming" && state.sections.length === 0 ? (
+        {state.assistantText ? (
+          <View style={styles.assistantBubble} testID="assistant-text">
+            <Text style={styles.assistantTextStyle}>{state.assistantText}</Text>
+          </View>
+        ) : null}
+        {state.status === "streaming" && state.sections.length === 0 && !state.assistantText ? (
           <Caption>답변을 작성하고 있어요…</Caption>
         ) : null}
         <MessageView sections={state.sections} onCta={() => {}} />
@@ -58,6 +63,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: space.lg, borderRadius: radius.lg, marginBottom: space.lg, maxWidth: "85%",
   },
   userText: { color: "#fff", fontSize: 15, lineHeight: 22 },
+  assistantBubble: {
+    alignSelf: "flex-start", backgroundColor: color.surface, borderWidth: 1, borderColor: color.border,
+    paddingVertical: space.sm, paddingHorizontal: space.lg, borderRadius: radius.lg, marginBottom: space.lg, maxWidth: "90%",
+  },
+  assistantTextStyle: { color: color.text, fontSize: 15, lineHeight: 22 },
   inputBar: {
     flexDirection: "row", gap: space.sm, padding: space.md, borderTopWidth: 1,
     borderTopColor: color.border, backgroundColor: color.surface,

@@ -12,6 +12,15 @@
 from __future__ import annotations
 
 import json
+import os
+from pathlib import Path
+from typing import Iterator
+
+try:  # backend/.env 자동 로드(있으면) — OPENAI_API_KEY·LLM_BACKED 등.
+    from dotenv import load_dotenv
+    load_dotenv(Path(__file__).resolve().parents[2] / ".env")
+except ModuleNotFoundError:
+    pass
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.responses import JSONResponse, StreamingResponse
@@ -27,6 +36,20 @@ app = FastAPI(title="MVP 컨시어지 — BE 내부 API")
 # MVP: 단일 컨테이너(인메모리 상태). 실 전환 시 세션/사용자별로 분리.
 _container = build_container()
 _orch = Orchestrator(container=_container)
+
+
+def _llm_backed() -> bool:
+    """LLM 자연어 경로 사용 여부 — 매 호출 평가(런타임 env·.env 모두 반영)."""
+    return os.getenv("LLM_BACKED", "").strip().lower() in ("1", "true", "yes", "on")
+
+
+def _stream_turn(text: str, screen_context: dict | None) -> Iterator[dict]:
+    """턴 스트림 디스패치 — LLM_BACKED면 자연어(delta), 아니면 결정적 섹션."""
+    if _llm_backed():
+        from ..orchestrator.legacy import stream_turn as _llm_stream
+        yield from _llm_stream(text, screen_context)
+    else:
+        yield from _orch.stream_turn(text, screen_context)
 
 
 # ── 요청 모델 ────────────────────────────────────────────────────────────────
@@ -62,7 +85,7 @@ async def turn_ws(ws: WebSocket) -> None:
         while True:
             msg = await ws.receive_json()
             text = msg.get("text", "")
-            for chunk in _orch.stream_turn(text, msg.get("screen_context")):
+            for chunk in _stream_turn(text, msg.get("screen_context")):
                 await ws.send_json(chunk)
     except WebSocketDisconnect:
         return
@@ -72,7 +95,7 @@ async def turn_ws(ws: WebSocket) -> None:
 def turn_http(req: TurnRequest) -> StreamingResponse:
     """BFF 중계용 HTTP 스트림(NDJSON) — 한 줄당 청크 1개(§2.1 봉투)."""
     def gen():
-        for chunk in _orch.stream_turn(req.text, req.screen_context):
+        for chunk in _stream_turn(req.text, req.screen_context):
             yield json.dumps(chunk, ensure_ascii=False) + "\n"
     return StreamingResponse(gen(), media_type="application/x-ndjson")
 

@@ -33,6 +33,11 @@ export const font = {
   weight: { regular: "400", medium: "500", semibold: "600", bold: "700" },
 } as const;
 
+// 변형 B(Vivid) — 브랜드 그라데이션(웹 CSS). RN-Web에서 backgroundImage로 적용.
+export const gradient = {
+  brand: "linear-gradient(135deg, #0A8BFF 0%, #0257D8 100%)",
+} as const;
+
 export const shadow = {
   card: {
     shadowColor: "#000",

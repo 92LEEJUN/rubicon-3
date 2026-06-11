@@ -117,7 +117,7 @@ flowchart TB
 |------|-----|-----------|
 | SmartThings (STP) | 스파이크=PAT, **MVP 실연동=OAuth** + 일부 Mock | 조직=Enterprise(Service Account) |
 | CS 데이터 (CSDataP) | 실데이터 일부 적재 | 전체 CS 연동 |
-| 제품정보 (CatP) | 실데이터 일부 | 전체 카탈로그 |
+| 제품정보 (CatP) | **카테고리별 일부** 실/더미 (브라우즈 없음) | 전체 카탈로그 |
 | O2O 주문 (O2OP) | **Mock** (주문 성공/실패·취소/환불 시뮬레이션, R21) | 실제 주문/결제 연동 |
 | O2O 거점·재고 (StoreP) | **후속/Mock** 매장·서비스센터·픽업 재고 | 매장/A/S 파트너 시스템 |
 | O2O 견적 (QuoteP) | **후속/Mock** 오프라인 견적 이어보기 | 매장 견적/상담 시스템 |
@@ -141,12 +141,15 @@ flowchart TB
 |------|----------------|----------------------|
 | `DevicePort` | SmartThings 개인 API(PAT) | 디바이스/상태 → `Device`(`consumables`·`metrics`), `Anomaly`(`error_code` 등) |
 | `CSKnowledgePort` | 공개 CS·사용설명서·FAQ | 문서 → `Solution`(`steps`·`sources`), `Source`(`title`·`ref`) |
-| `CatalogPort` | 공개 제품/부품 스펙 | 스펙 → `Part`(`sku`·`price`·`device_model`·`in_stock`) |
+| `CatalogPort` | 공개 제품/부품 스펙 | 스펙 → `Part`(부품)·`Product`(완제품). **카테고리별 일부면 충분** |
 
 - 변환·정규화·누락 필드 폴백은 **ACL 책임**. 도메인은 변환된 타입만 본다.
 - 소스 커버리지는 부분적일 수 있다(최종 일관성·누락) → null 허용·폴백(R13, `data-model.md` §0).
 - 즉 **계약(Port 시그니처·타입)은 고정**돼 있고, **"어떤 소스 + 필드 매핑 표·적재 파이프라인"** 은
   Real 어댑터 구현 시 확정한다(MVP는 Mock/부분 실데이터). 인터페이스 위 도메인 작업은 그 전에 병렬로 진행 가능.
+- **데이터 규모** — CS·제품·SmartThings 모두 **카테고리별 일부 실/더미 데이터로 충분**(전수 불필요). 더미는 Mock 어댑터가 반환.
+- **제품정보는 demand-driven** — **카탈로그 나열/브라우즈 화면이 없다.** 제품은 매칭(부품 R4)·추천(R8) 결과로만
+  `product_card`/`recommendation_list`/`product_comparison` 또는 챗에 노출. `CatalogPort`도 by-id 조회·매칭만(검색-all 없음).
 
 #### 공개 문서 조사 결과 (2026-06, 스파이크 입력)
 

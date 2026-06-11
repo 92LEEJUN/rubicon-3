@@ -122,6 +122,9 @@ sequenceDiagram
   복귀 요청 시 복원(R6).
 - **개인화** — 추천 시 대화 이력(관심 제품)과 보유 기기를 반영하고, 보유 기기는 중복 추천 제외,
   근거를 함께 제시. 데이터 부족 시 일반 추천 폴백(R8).
+- **제품정보(카탈로그)** — **demand-driven**: 제품을 나열/브라우즈하지 않고, **부품 매칭(R4)·추천(R8) 결과**로만
+  `product_card`/`recommendation_list`/`product_comparison`·챗에 노출. `CatalogPort`는 by-id 조회·매칭만(검색-all 없음).
+  데이터는 카테고리별 일부면 충분(architecture §5). `Part`(부품)·`Product`(완제품) 분리(data-model).
 - **확인 정보(Engagement)** — 열람/무시/관심을 `EngagementRepository`에 기록(R29). 추천·알림 생성 시
   `has_seen`/`dismissed`로 **중복 제시 방지**, `interests`로 개인화 신호 반영(R8·R26). 분석(R28)과 달리
   **앱 동작을 바꾸는 내부 도메인 상태**다(`architecture.md` §12). `Consent.scopes`에 `engagement`가 있을 때만 기록·활용(R19).

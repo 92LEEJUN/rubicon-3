@@ -209,13 +209,24 @@ class Solution:
     escalation_needed: bool              # 사람 연결 필요 (R18)
     coverage: Coverage = Coverage.UNKNOWN    # 보증 유·무상 판별 (R22)
 
-class Part:
+class Part:                              # 부품/소모품 (수리·재주문, R4)
     id: Id
     device_model: str                    # 호환 기기 모델
     name: str
     sku: str                             # 유일
     price: int                           # ≥ 0, 최소 단위(원)
     in_stock: bool = True                # 재고 없으면 주문 CTA 비활성
+
+class Product:                           # 완제품/액세서리 (추천·카드, R8). 부품은 Part
+    id: Id
+    category: str                        # 카테고리(예: "washer"). 더미도 카테고리별 일부면 충분
+    name: str; model: str
+    price: int                           # ≥ 0
+    image: Media | None = None
+    specs: dict = {}                     # 주요 스펙 키-값(카드 표시)
+    in_stock: bool = True
+    # 주의: 제품은 전체 나열/브라우즈가 아니라 카드(product_card/recommendation_list/comparison)·
+    #       챗으로만 노출(demand-driven). 카탈로그 브라우즈 화면 없음.
 
 class OrderItem:
     part_id: Id
@@ -455,8 +466,11 @@ class DevicePort(Protocol):                            # R2  SmartThings
 class CSKnowledgePort(Protocol):                       # R3  CS 데이터
     def find_solutions(self, query: str | Anomaly) -> list[Solution]: ...   # 빈 결과 가능
 
-class CatalogPort(Protocol):                           # R4  제품정보
-    def match_parts(self, device_id: Id, part_spec: str) -> list[Part]: ... # 0/다수 → 호출측 확인
+class CatalogPort(Protocol):                           # R4·R8  제품정보  MVP: 실데이터 일부(카테고리별)
+    def match_parts(self, device_id: Id, part_spec: str) -> list[Part]: ... # 기기↔부품 매칭(R4). 0/다수 → 호출측 확인
+    def get_products(self, ids: list[Id]) -> list[Product]: ...   # 카드 묶음(추천 결과 등) by-id
+    def get_product(self, product_id: Id) -> Product | None: ...  # 카드 상세
+    # demand-driven: by-id 조회·매칭만. 전체 나열/검색-all(브라우즈) 메서드는 두지 않는다.
 
 class OrderPort(Protocol):                             # R4  O2O  MVP: Mock
     def add_to_cart(self, items: list[OrderItem]) -> Order: ...

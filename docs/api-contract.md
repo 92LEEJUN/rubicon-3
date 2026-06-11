@@ -1,24 +1,27 @@
 # API 계약 (API Contract)
 
-> **기반 문서 (공유).** 클라이언트(FE)↔서버(FastAPI)의 **외부 노출 인터페이스**를 정의한다.
+> **기반 문서 (공유).** 클라이언트(FE)↔BFF, BFF↔BE의 **노출 인터페이스**를 정의한다.
 > 데이터 타입은 `docs/data-model.md`, 응답 표현은 `docs/response-templates.md`,
-> 라우팅 원칙은 `docs/architecture.md` §8, 오케스트레이션 내부는 `docs/orchestration.md` 를 본다.
+> 라우팅 원칙은 `docs/architecture.md` §8, 서비스 분리는 §9, 오케스트레이션 내부는 `docs/orchestration.md` 를 본다.
 
 ## 1. 핵심 경계 — "전부 API가 아니다"
 
-호출을 세 종류로 구분한다. **외부로 노출하는 것만 HTTP/WS API**고, 내부는 함수·DB 접근이다.
+호출을 네 종류로 구분한다. **계층을 넘는 것만 HTTP/WS API**고, 한 서비스 안은 함수·DB 접근이다.
 
 | 종류 | 누가 호출 | 형태 | 예 |
 |------|-----------|------|-----|
-| **외부 노출 API** | 클라이언트(FE) | HTTP/WS 엔드포인트 | `/chat`(WS), `/orders`, `/devices` |
-| **내부 도메인 호출** | 오케스트레이터 → 도메인 서비스 | **인프로세스 함수 호출** (HTTP 아님) | `device_service.get_status(...)` |
+| **클라이언트 API** | 클라이언트(FE) → **BFF** | HTTP/WS 엔드포인트 | `/chat`(WS), `/orders`, `/devices` (§2) |
+| **내부 BFF↔BE API** | BFF → **BE 도메인** | HTTP/WS (네트워크) | `POST /internal/turn`, BE 스트림 중계 (§2.4) |
+| **BE 인프로세스 호출** | 오케스트레이터 → 도메인 서비스 | **함수 호출** (HTTP 아님) | `device_service.get_status(...)` |
 | **데이터 접근** | 도메인 서비스 → 데이터 | 외부면 **Port(API)**, 내부면 **Repository(DB)** | `STP.fetch(...)` / `conv_repo.get(...)` |
 
 **원칙**
-- 단일 FastAPI 프로세스라 **오케스트레이터→도메인은 HTTP가 아니라 함수 호출**이다. (마이크로서비스 아님)
+- **FE는 BFF만 본다.** 클라이언트 계약(§2)은 BFF가 소유하고, BFF는 BE 도메인을 **내부 API**(§2.4)로 호출한다(architecture §9).
+- BE 도메인 안에서 **오케스트레이터→도메인은 HTTP가 아니라 함수 호출**이다(한 프로세스). BFF↔BE만 네트워크 경계.
 - **내부 데이터는 DB/Repository로 직접** 접근한다. 외부 연동(SmartThings·O2O 등)만 Port로 추상화해 API화한다.
 - 즉 "기기 상태 조회"는 외부(SmartThings)라 Port, "대화 이력 조회"는 내부라 **DB 함수**다. 모든 동작을 API로 만들지 않는다.
 - LLM **tool**은 이 셋 위의 얇은 어댑터다(구현이 함수/DB/Port 중 무엇이든 무관) — `docs/orchestration.md` §3.
+- **계약 드리프트 방지** — 클라이언트↔BFF와 BFF↔BE는 같은 data-model DTO를 쓴다. BFF는 변환·중계만 하고 새 타입을 만들지 않는다.
 
 ## 2. 클라이언트 API 표면
 
@@ -90,6 +93,24 @@ POST /surface   요청 { "card_type": str, "ref": Id, "screen_context": dict | N
 - `bridge.summary`는 LLM 생성 가능(가벼운 단발). 무거운 추론은 `surface: panel`로 넘긴다.
 - 에스컬레이션(`bridge.escalate`)·복잡 분기는 §2.1 `/chat`으로 이어진다.
 
+## 2.4 내부 계약 — BFF ↔ BE 도메인
+
+BFF는 클라이언트 표면을 받고, **추론·도메인 처리는 BE 도메인에 위임**한다(architecture §9). BFF는 변환·중계만 한다.
+
+| 호출 | 메서드 | 요청 | 응답 | 대응 클라이언트 표면 |
+|------|--------|------|------|----------------------|
+| `/internal/turn` | WS | `{ session_id, text, media, screen_context }` | **청크 스트림**(`delta`·`section`·`flow`·`done`·`error`, §2.1과 동일 봉투) | WS `/chat` |
+| `/internal/interaction` | WS | `{ session_id, ref, kind, payload }` | 청크 스트림 | `interaction_reply` |
+| `/internal/surface` | POST | `{ card_type, ref, screen_context }` | `{ surface, template \| conversation_id }` | `POST /surface` |
+| `/internal/devices` 등 | GET/POST | §2.2 요청과 동일 | §2.2 응답(`Device`·`Order` 등) DTO | 결정적 엔드포인트 |
+
+**원칙**
+- **같은 봉투·DTO 재사용** — BE→BFF 청크는 §2.1 클라이언트 청크와 **동일 봉투**다. BFF는 그대로 중계(필요 시 인증·세션 주입만).
+- **라우팅은 BE 소유** — "LLM vs 도메인" 판단은 BE 오케스트레이터(§8). BFF는 `/internal/turn`에 그대로 넘긴다.
+- **커밋은 BFF에서 게이트** — 되돌릴 수 없는 커밋(`/orders` 등 R17)은 BFF가 `confirmed`·인증을 검증한 뒤 BE 도메인 호출.
+- **인증 경계** — 토큰 검증·세션 식별은 **BFF가 수행**, BE 도메인은 검증된 `session_id`·사용자 컨텍스트를 신뢰한다(내부망 전제).
+- **폴백** — BE 실패 시 BFF가 §4 폴백 응답으로 정규화해 클라이언트 계약을 지킨다(R13).
+
 ## 3. 인증 / 세션
 
 - 인증 토큰은 헤더로 전달(`Authorization`), **도메인 모델에 저장 안 함**(architecture NFR). MVP는 AuthP Mock.
@@ -106,12 +127,12 @@ POST /surface   요청 { "card_type": str, "ref": Id, "screen_context": dict | N
 
 ## 5. Mock / 스텁 — 병렬 개발
 
-세 워크스트림(FE · API/표현 계층 · BE 도메인)이 **서로 막히지 않고** 병렬 개발하도록, Mock을 **두 레벨**로 둔다.
+세 워크스트림(**FE · BFF · BE 도메인**, 독립 브랜치)이 **서로 막히지 않고** 병렬 개발하도록, Mock을 **두 레벨**로 둔다.
 
 | 레벨 | 무엇 | 누가 쓰나 | 출처 |
 |------|------|-----------|------|
 | **Port 레벨 Mock** | 외부 어댑터(SmartThings·O2O 등) 가짜 구현 | BE 도메인 | data-model §6, architecture §5 |
-| **계약 레벨 Stub 서버** | API 경계(`/chat` WS·도메인 엔드포인트)를 고정 응답으로 흉내 | FE · API 계층 | **이 문서 + response-templates + data-model DTO** |
+| **계약 레벨 Stub 서버** | API 경계를 고정 응답으로 흉내 — 클라이언트↔BFF(§2)와 BFF↔BE(§2.4) **두 경계** | FE는 BFF stub에, BFF는 BE stub에 | **이 문서 + response-templates + data-model DTO** |
 
 **계약 Stub 서버 규칙**
 - **이 계약을 단일 출처로** 따른다 → FE가 stub에, 실 BE가 같은 계약에 수렴해 **계약 드리프트를 방지**한다.

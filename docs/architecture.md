@@ -313,7 +313,37 @@ flowchart LR
 
 ### Mock ↔ 실
 - **MVP** — 텔레메트리는 SmartThings 폴링/임계치, 전달은 인앱 Mock(AlertPort).
-- **실 전환** — 이벤트 스트림(예: 메시지 버스) 기반 실시간 감지 + 실 푸시 채널.
+- **실 전환** — SmartThings **이벤트 구독(webhook)** 기반 실시간 감지 + 실 푸시 채널(아래).
+
+### 실 이벤트 구독 처리 (SmartThings)
+
+폴링(MVP) 대신 **구독 webhook**으로 실시간 이벤트를 받는다. 구성·흐름·검증:
+
+**구성**
+- **Sink** — 우리 쪽 HTTPS webhook 엔드포인트(계정 단위). 1개 sink가 여러 subscription 수용.
+- **Subscription** — sink ↔ 이벤트를 **필터**로 연결. `scope: ACCOUNT | LOCATION_GROUP`.
+  - EVENT 필터: `DEVICE_EVENT`(capability 변화)·`DEVICE_HEALTH_EVENT`(online/offline)·`DEVICE_LIFECYCLE_EVENT` 등.
+  - CAPABILITY 필터: `{capability, attribute, component}`(와일드카드·`exclude` 지원).
+
+**셋업/수명주기**
+1. Sink 등록 → SmartThings가 `SINK_CONFIRMATION` challenge 전송 → 우리가 `200` + challenge 에코(검증 전엔 비활성).
+2. Subscription 생성(필터 지정).
+3. 배치 이벤트 수신.  4. sink 제거 전 subscription 삭제.
+
+**수신 페이로드(배치)** — `notificationType:"EVENT"`, `eventNotification.events[]`. 각 이벤트:
+`eventTime`·`eventType`·`deviceEvent{ deviceId, locationId, componentId, capability, attribute, value, valueType, stateChange }`.
+
+**검증(필수, 보안)** — **HTTP Signature**(`rsa-sha256`):
+- `Authorization` 헤더의 `keyId·headers·algorithm·signature` 파싱.
+- 서명 대상: `(request-target)`·`digest`(본문 SHA-256)·`date`.
+- 공개키를 `key.smartthings.com/key/{keyId}`에서 **동적 fetch**(키 로테이션 → 무한 캐시 금지), 서명 검증.
+- `date`가 **5분 초과면 거부**(리플레이 방지). 본문 `digest` 불일치면 거부(변조 탐지).
+
+**처리 흐름** — webhook 수신 → 서명 검증 → ACL이 `deviceEvent`를 도메인으로 정규화(→ `Device`/`Anomaly`/`Consumable`)
+→ 이상·임계치 판정(design §6.3) → NotificationService(빈도·동의 게이트) → AlertPort. *위 선제 파이프라인과 동일.*
+
+**교체 용이성** — **폴링(MVP)과 구독(실)은 같은 내부 "기기 이벤트"로 정규화**하므로 이상감지 로직은 불변.
+수신 엔드포인트는 `/chat`과 무관한 **인바운드 webhook ingress**(API/표현 계층, §9 인증 게이트와 별도 서명 검증).
 
 ## 11. 사용 분석 (Analytics) 파이프라인
 

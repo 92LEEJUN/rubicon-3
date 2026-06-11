@@ -44,6 +44,7 @@
 
 **브릿지 퍼널** — `card_tap → bridge_view → (bridge_cta_click | bridge_escalate | bridge_dismiss)`.
 `bridge_dismiss`는 **간단 정보로 충분**(긍정 신호), `bridge_escalate`는 대화가 필요했던 비율 → 브릿지/패널 분기 기준 튜닝에 사용.
+`card_type` 값은 `response-templates.md` §9 카드 타입과 동일: `device_status`·`anomaly`·`recommendation`·`order`·`booking`·`warranty`·`notice`·`shortcut`.
 
 ## 4. 이벤트 카탈로그
 

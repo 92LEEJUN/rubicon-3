@@ -1,0 +1,26 @@
+[
+  {
+    "id": "ano_washer_5c",
+    "device_id": "dev_washer_01",
+    "type": "error_code",
+    "severity": "warning",
+    "detail": "5C — 배수가 원활하지 않습니다.",
+    "detected_at": "2026-06-01T09:10:00Z"
+  },
+  {
+    "id": "ano_fridge_filter",
+    "device_id": "dev_fridge_01",
+    "type": "consumable",
+    "severity": "warning",
+    "detail": "정수필터 수명이 15% 남았습니다.",
+    "detected_at": "2026-06-01T08:00:00Z"
+  },
+  {
+    "id": "ano_purifier_filter",
+    "device_id": "dev_purifier_01",
+    "type": "consumable",
+    "severity": "info",
+    "detail": "HEPA 필터 교체 시기가 임박했습니다.",
+    "detected_at": "2026-06-01T08:00:00Z"
+  }
+]

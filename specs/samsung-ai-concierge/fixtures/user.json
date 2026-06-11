@@ -1,0 +1,17 @@
+{
+  "id": "usr_01",
+  "display_name": "홍길동",
+  "linked_device_ids": ["dev_washer_01", "dev_fridge_01", "dev_purifier_01"],
+  "preferences": {
+    "notify_opt_in": true,
+    "notify_min_priority": "info",
+    "interest_categories": ["air_purifier"]
+  },
+  "addresses": [
+    { "label": "집", "line": "서울특별시 강남구 …", "default": true }
+  ],
+  "consent": {
+    "scopes": ["device_data", "personalization", "engagement", "analytics"],
+    "updated_at": "2026-05-20T00:00:00Z"
+  }
+}

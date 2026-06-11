@@ -214,3 +214,37 @@ Intent = Literal["device_status", "troubleshoot", "order", "recommend", "general
 class IntentResult(_Base):
     intents: list[Intent] = Field(default_factory=list)
     is_compound: bool = False
+
+
+# ── 응답 표현 (Template · CTA · Section, response-templates.md) ─────────────
+# action: 대화형(chat)·커밋(commit)·이동(navigate) — architecture.md §8 두 경로
+CtaAction = Literal["chat", "commit", "navigate"]
+
+
+class Cta(_Base):
+    label: str
+    action: CtaAction = "chat"
+    kind: Optional[str] = None        # order · reorder · booking · explain ...
+    payload: dict = Field(default_factory=dict)
+
+
+class Template(_Base):
+    """kind → FE 컴포넌트 레지스트리로 렌더. data는 kind별 페이로드(response-templates.md)."""
+    kind: str
+    data: dict = Field(default_factory=dict)
+
+
+class MessageSection(_Base):
+    """복합 응답(R7)의 의도별 섹션. handled=False면 미처리(품절·폴백 등)."""
+    label: str
+    intent: str
+    template: Template
+    ctas: list[Cta] = Field(default_factory=list)
+    handled: bool = True
+
+
+class AssistantTurn(_Base):
+    """한 번의 어시스턴트 응답 — 단일=섹션 1개, 복합=N개(우선순위 순서)."""
+    sections: list[MessageSection] = Field(default_factory=list)
+    active_flow: Optional[str] = None
+    message_id: Optional[str] = None

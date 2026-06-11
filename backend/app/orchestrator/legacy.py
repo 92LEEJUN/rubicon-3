@@ -1,11 +1,12 @@
-"""오케스트레이터 — orchestration.md 파이프라인의 소형 프로토타입.
+"""레거시 오케스트레이터 — LLM tool-loop 데모(CLI용).
 
-흐름: ① 의도 분류(구조화 출력) → ② tool 호출 루프(기기·CS·부품) → ③ 근거 기반 응답.
-근거(기기 상태·CS 단계·부품)는 tool 결과에서만 가져온다(환각 억제).
+OpenAI function calling으로 tool을 자유 호출하는 프로토타입 경로. 실제 내부 API는
+`core.Orchestrator`(결정적 섹션 생성, 테스트 가능)를 쓴다. 본 모듈은 CLI 데모에 한정한다.
 """
 import json
-from .llm import client, MODEL
-from .tools import TOOLS, call
+
+from ..llm import MODEL, client
+from ..tools import TOOLS, call
 
 SYSTEM = (
     "당신은 삼성 가전 AI 컨시어지입니다. 사용자의 가전 문제를 진단하고, "

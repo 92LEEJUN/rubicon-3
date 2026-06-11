@@ -27,8 +27,20 @@ tests/               # pytest — 도메인 모델·Mock 어댑터·서비스(31
 ## 테스트 (TDD)
 ```bash
 pip install -r requirements-dev.txt
-python -m pytest          # 도메인 core: 모델·Port·서비스(네트워크 불필요)
+python -m pytest          # 모델·Port·서비스·오케스트레이터·내부 API (네트워크 불필요)
 ```
+
+## 내부 API 서버 (BFF용, api-contract §2.4)
+```bash
+pip install -r requirements.txt
+uvicorn app.api.internal:app --reload --port 8001
+```
+- WS `/internal/turn` — 자연어 → 오케스트레이터 섹션 스트림(§2.1 봉투)
+- `GET /internal/devices`·`/internal/home`·`/internal/catalog/recommend` — 결정적 조회
+- `POST /internal/orders` — 커밋 게이트(R17): 미확인 시 **409** + `confirmation` 템플릿
+- `GET/POST /internal/bookings` — 방문 슬롯·예약(R18) / `POST /internal/surface` — bridge·panel(§2.3)
+
+> 오케스트레이터 분류기는 기본 **규칙기반(네트워크 불필요)**. LLM 분류는 `OpenAIClassifier`로 교체.
 
 ## 실행
 ```bash

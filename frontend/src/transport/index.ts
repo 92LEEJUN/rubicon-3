@@ -44,6 +44,55 @@ export class WebSocketTransport implements ChatTransport {
   close() { this.ws?.close(); }
 }
 
+/**
+ * 회복형 트랜스포트 — WS 우선, 연결 실패/타임아웃이면 조용히 Mock으로 폴백.
+ * BE 미연결 상황에서도 에러를 노출하지 않고 예시 응답을 보여준다(graceful degradation).
+ */
+export class ResilientTransport implements ChatTransport {
+  private ws: WebSocketTransport;
+  private mock: MockTransport;
+  private chunkHandler: (c: Chunk) => void = () => {};
+  private stateHandler: (s: "open" | "closed" | "error") => void = () => {};
+  private sent: ClientMessage[] = [];
+  private opened = false;
+  private fellBack = false;
+  private timer: ReturnType<typeof setTimeout> | undefined;
+
+  constructor(url: string, mockScript: (m: ClientMessage) => Chunk[], private timeoutMs = 3500) {
+    this.ws = new WebSocketTransport(url);
+    this.mock = new MockTransport(mockScript);
+  }
+
+  private fallback() {
+    if (this.fellBack || this.opened) return;
+    this.fellBack = true;
+    if (this.timer) clearTimeout(this.timer);
+    this.mock.onChunk((c) => this.chunkHandler(c));
+    this.mock.onState(() => {}); // 폴백은 항상 "정상"처럼 보이게(에러 숨김)
+    this.mock.connect();
+    this.stateHandler("open");
+    for (const m of this.sent) this.mock.send(m); // 보낸 메시지를 Mock으로 재생
+  }
+
+  connect() {
+    this.ws.onChunk((c) => this.chunkHandler(c));
+    this.ws.onState((s) => {
+      if (this.fellBack) return;
+      if (s === "open") { this.opened = true; if (this.timer) clearTimeout(this.timer); this.stateHandler("open"); }
+      else if (!this.opened) this.fallback(); // error/closed before open → 폴백
+    });
+    this.ws.connect();
+    this.timer = setTimeout(() => this.fallback(), this.timeoutMs); // 무응답 → 폴백
+  }
+  send(message: ClientMessage) {
+    if (!this.fellBack) this.sent.push(message);
+    (this.fellBack ? this.mock : this.ws).send(message);
+  }
+  onChunk(h: (c: Chunk) => void) { this.chunkHandler = h; }
+  onState(h: (s: "open" | "closed" | "error") => void) { this.stateHandler = h; }
+  close() { if (this.timer) clearTimeout(this.timer); this.ws.close(); this.mock.close(); }
+}
+
 /** 스크립트된 청크를 재생하는 Mock(테스트·오프라인 스크린샷). */
 export class MockTransport implements ChatTransport {
   private chunkHandler: (c: Chunk) => void = () => {};

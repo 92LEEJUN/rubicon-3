@@ -1,26 +1,37 @@
-/** S3 채팅 패널 — 사용자 말풍선 + 어시스턴트(자연어/섹션 스택, 복합 R7).
+/** S3 채팅 — 멀티턴 대화(유저/어시스턴트 말풍선) + 자연어 텍스트·리치 섹션(R7).
  *
  * wsUrl 이 있으면 실 서버(BFF /chat)에 WebSocket으로 붙어 입력→스트림을 렌더하고,
- * 없으면 기존 데모처럼 MockTransport로 스크립트 섹션을 재생한다(정적 배포·테스트).
- * 첫 질문은 마운트 시 자동 전송하고, 입력창으로 후속 질문을 이어갈 수 있다.
+ * 없으면 MockTransport로 스크립트 응답을 재생한다(정적 배포·테스트). 입력창은 항상 떠 있다.
+ * 첫 질문은 마운트 시 자동 전송하고, 입력창·추천 칩으로 대화를 이어간다.
  */
-import React, { useEffect, useMemo, useState } from "react";
-import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
-import { Caption, Title } from "../components/primitives";
-import { MessageView } from "../components/message";
+import React, { useEffect, useMemo, useRef, useState } from "react";
+import { Animated, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { SectionView } from "../components/message";
 import { MockTransport, WebSocketTransport } from "../transport";
 import { useChat } from "../state/useChat";
-import { color, radius, space } from "../design/tokens";
-import type { Chunk, ClientMessage, MessageSection } from "../types/contract";
+import { color, font, radius, shadow, space } from "../design/tokens";
+import type { Chunk, ClientMessage, Cta, MessageSection } from "../types/contract";
 
-/** 섹션 배열 → 청크 스트림(section* → flow → done). */
+/** 데모 응답 — 자연어 인트로(delta) + 섹션 스택(section* → flow → done). */
 function toChunks(sections: MessageSection[], flow: string | null): Chunk[] {
   return [
+    { type: "delta",
+      text: "세탁기 배수 문제(5C)를 확인했어요. 아래에 진단·해결 단계를 정리했고, 필요한 부품도 함께 준비했어요." } as Chunk,
     ...sections.map((section) => ({ type: "section", section } as Chunk)),
     { type: "flow", active_flow: flow } as Chunk,
     { type: "done", message_id: "msg_demo" } as Chunk,
   ];
 }
+
+type ChatMsg =
+  | { role: "user"; text: string }
+  | { role: "assistant"; text: string; sections: MessageSection[]; flow: string | null };
+
+const SUGGESTIONS = [
+  "세탁기 배수 오류(5C) 해결",
+  "냉장고 정수필터 교체 안내",
+  "공기청정기 필터 주문하기",
+];
 
 export function ChatPanel({ question, sections, flow = null, wsUrl }:
   { question: string; sections: MessageSection[]; flow?: string | null; wsUrl?: string }) {
@@ -31,36 +42,82 @@ export function ChatPanel({ question, sections, flow = null, wsUrl }:
     [wsUrl, sections, flow],
   );
   const { state, send, replyInteraction } = useChat(transport);
-  const [lastUser, setLastUser] = useState(question);
+  const [messages, setMessages] = useState<ChatMsg[]>([]);
   const [text, setText] = useState("");
-
-  useEffect(() => { send(question); }, []); // 데모/실서버 공통: 마운트 시 첫 질문 전송
+  const [turnSeq, setTurnSeq] = useState(0);
+  const pending = useRef(false);
+  const scroller = useRef<ScrollView>(null);
 
   const streaming = state.status === "streaming";
 
-  function onSend() {
-    const q = text.trim();
-    if (!q || streaming) return; // 빈 입력·생성 중 중복 전송 방지
-    setLastUser(q);
-    send(q);
+  function submit(q: string) {
+    const v = q.trim();
+    if (!v || streaming) return; // 빈 입력·생성 중 중복 전송 방지
+    setMessages((m) => [...m, { role: "user", text: v }]);
+    pending.current = true;
+    setTurnSeq((s) => s + 1);
+    send(v);
     setText("");
   }
 
+  // 첫 질문 자동 전송(데모/실서버 공통)
+  useEffect(() => { if (question?.trim()) submit(question); }, []);
+
+  // 턴 완료 시 어시스턴트 응답을 히스토리에 커밋(스트리밍 뷰는 state로만 노출)
+  useEffect(() => {
+    if (pending.current && (state.status === "done" || state.status === "error")) {
+      pending.current = false;
+      setMessages((m) => [...m, {
+        role: "assistant", text: state.assistantText,
+        sections: state.sections, flow: state.activeFlow,
+      }]);
+    }
+  }, [turnSeq, state.status]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // 새 메시지·스트림 변화 시 하단으로 스크롤
+  useEffect(() => {
+    const id = setTimeout(() => scroller.current?.scrollToEnd({ animated: true }), 50);
+    return () => clearTimeout(id);
+  }, [messages.length, state.assistantText, state.sections.length, streaming]);
+
   return (
     <View style={styles.root} testID="screen-chat">
-      <View style={styles.header}><Title>AI 컨시어지</Title></View>
-      <ScrollView contentContainerStyle={styles.content} testID="chat-scroll">
-        <View style={styles.userBubble}><Text style={styles.userText}>{lastUser}</Text></View>
-        {state.assistantText ? (
-          <View style={styles.assistantBubble} testID="assistant-text">
-            <Text style={styles.assistantTextStyle}>{state.assistantText}</Text>
+      <View style={styles.header}>
+        <View style={styles.avatar}><Text style={styles.avatarText}>AI</Text></View>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.headerTitle}>AI 컨시어지</Text>
+          <View style={styles.statusRow}>
+            <View style={[styles.statusDot, { backgroundColor: wsUrl ? color.success : color.textMuted }]} />
+            <Text style={styles.statusText}>{wsUrl ? "온라인 · 실시간 응답" : "데모 모드 · 예시 응답"}</Text>
           </View>
+        </View>
+      </View>
+
+      <ScrollView ref={scroller} style={styles.scroll} contentContainerStyle={styles.content} testID="chat-scroll">
+        {messages.map((m, i) =>
+          m.role === "user"
+            ? <UserMessage key={i} text={m.text} />
+            : <AssistantMessage key={i} text={m.text} sections={m.sections} onCta={replyInteraction} />)}
+
+        {/* 진행 중인 어시스턴트 턴(스트리밍) */}
+        {streaming ? (
+          <AssistantMessage text={state.assistantText} sections={state.sections}
+                            onCta={replyInteraction}
+                            typing={!state.assistantText && state.sections.length === 0} />
         ) : null}
-        {streaming && state.sections.length === 0 && !state.assistantText ? (
-          <Caption>답변을 작성하고 있어요…</Caption>
-        ) : null}
-        <MessageView sections={state.sections} onCta={replyInteraction} />
       </ScrollView>
+
+      {/* 추천 프롬프트 칩 — 항상 접근 가능 */}
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipsBar}
+                  contentContainerStyle={styles.chipsContent}>
+        {SUGGESTIONS.map((s) => (
+          <Pressable key={s} testID="chat-chip" onPress={() => submit(s)} disabled={streaming}
+                     style={({ pressed }) => [styles.chip, pressed && { opacity: 0.7 }, streaming && { opacity: 0.5 }]}>
+            <Text style={styles.chipText}>{s}</Text>
+          </Pressable>
+        ))}
+      </ScrollView>
+
       <View style={styles.inputBar}>
         <TextInput
           testID="chat-input"
@@ -70,40 +127,138 @@ export function ChatPanel({ question, sections, flow = null, wsUrl }:
           editable={!streaming}
           placeholder="가전 문제·부품 주문을 물어보세요"
           placeholderTextColor={color.textMuted}
-          onSubmitEditing={onSend}
+          onSubmitEditing={() => submit(text)}
         />
-        <Pressable testID="chat-send" accessibilityRole="button" onPress={onSend}
-                   disabled={streaming} style={[styles.sendBtn, streaming && styles.sendBtnDisabled]}>
-          <Text style={styles.sendText}>{streaming ? "전송 중…" : "전송"}</Text>
+        <Pressable testID="chat-send" accessibilityRole="button" onPress={() => submit(text)}
+                   disabled={streaming || !text.trim()}
+                   style={({ pressed }) => [styles.sendBtn,
+                     (streaming || !text.trim()) && styles.sendBtnDisabled, pressed && { opacity: 0.85 }]}>
+          <Text style={styles.sendIcon}>↑</Text>
         </Pressable>
       </View>
     </View>
   );
 }
 
+/** 유저 말풍선 — 우측 정렬 프라이머리. */
+function UserMessage({ text }: { text: string }) {
+  return (
+    <View style={styles.userRow}>
+      <View style={styles.userBubble}><Text style={styles.userText}>{text}</Text></View>
+    </View>
+  );
+}
+
+/** 어시스턴트 메시지 — 아바타 + 자연어 텍스트 말풍선 + 리치 섹션 카드. */
+function AssistantMessage({ text, sections, onCta, typing }:
+  { text: string; sections: MessageSection[]; onCta?: (c: Cta) => void; typing?: boolean }) {
+  return (
+    <View style={styles.assistantRow}>
+      <View style={styles.smallAvatar}><Text style={styles.smallAvatarText}>AI</Text></View>
+      <View style={styles.assistantCol}>
+        {typing ? (
+          <View style={styles.textBubble}><TypingDots /></View>
+        ) : null}
+        {text ? (
+          <View style={styles.textBubble} testID="assistant-text">
+            <Text style={styles.assistantText}>{text}</Text>
+          </View>
+        ) : null}
+        {sections.map((s, i) => <SectionView key={i} section={s} onCta={onCta} />)}
+      </View>
+    </View>
+  );
+}
+
+/** 타이핑 인디케이터 — 점 3개 페이드 루프. */
+function TypingDots() {
+  const a = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    const loop = Animated.loop(Animated.sequence([
+      Animated.timing(a, { toValue: 1, duration: 500, useNativeDriver: false }),
+      Animated.timing(a, { toValue: 0, duration: 500, useNativeDriver: false }),
+    ]));
+    loop.start();
+    return () => loop.stop();
+  }, [a]);
+  const op = (lo: number) => a.interpolate({ inputRange: [0, 1], outputRange: [lo, 1] });
+  return (
+    <View style={styles.typing}>
+      {[0.3, 0.5, 0.7].map((lo, i) => (
+        <Animated.View key={i} style={[styles.typingDot, { opacity: op(lo) }]} />
+      ))}
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: color.bg },
-  header: { padding: space.lg, borderBottomWidth: 1, borderBottomColor: color.border, backgroundColor: color.surface },
-  content: { padding: space.lg, maxWidth: 480, width: "100%", alignSelf: "center" },
+
+  header: {
+    flexDirection: "row", alignItems: "center", gap: space.md,
+    paddingHorizontal: space.lg, paddingVertical: space.md,
+    borderBottomWidth: 1, borderBottomColor: color.border, backgroundColor: color.surface,
+  },
+  avatar: {
+    width: 40, height: 40, borderRadius: 20, backgroundColor: color.primary,
+    alignItems: "center", justifyContent: "center",
+  },
+  avatarText: { color: "#fff", fontWeight: font.weight.bold as any, fontSize: font.size.sm },
+  headerTitle: { fontSize: font.size.lg, fontWeight: font.weight.semibold as any, color: color.text },
+  statusRow: { flexDirection: "row", alignItems: "center", gap: space.xs, marginTop: 2 },
+  statusDot: { width: 7, height: 7, borderRadius: 4 },
+  statusText: { fontSize: font.size.xs, color: color.textSub },
+
+  scroll: { flex: 1 },
+  content: { padding: space.lg, gap: space.sm, maxWidth: 560, width: "100%", alignSelf: "center" },
+
+  userRow: { alignItems: "flex-end", marginBottom: space.sm },
   userBubble: {
-    alignSelf: "flex-end", backgroundColor: color.primary, paddingVertical: space.sm,
-    paddingHorizontal: space.lg, borderRadius: radius.lg, marginBottom: space.lg, maxWidth: "85%",
+    backgroundColor: color.primary, paddingVertical: space.sm, paddingHorizontal: space.lg,
+    borderTopLeftRadius: radius.lg, borderTopRightRadius: radius.lg, borderBottomLeftRadius: radius.lg,
+    borderBottomRightRadius: radius.sm, maxWidth: "85%", ...shadow.card,
   },
-  userText: { color: "#fff", fontSize: 15, lineHeight: 22 },
-  assistantBubble: {
-    alignSelf: "flex-start", backgroundColor: color.surface, borderWidth: 1, borderColor: color.border,
-    paddingVertical: space.sm, paddingHorizontal: space.lg, borderRadius: radius.lg, marginBottom: space.lg, maxWidth: "90%",
+  userText: { color: "#fff", fontSize: font.size.md, lineHeight: 22 },
+
+  assistantRow: { flexDirection: "row", gap: space.sm, marginBottom: space.sm, alignItems: "flex-start" },
+  smallAvatar: {
+    width: 28, height: 28, borderRadius: 14, backgroundColor: color.primaryTint,
+    alignItems: "center", justifyContent: "center", marginTop: 2,
   },
-  assistantTextStyle: { color: color.text, fontSize: 15, lineHeight: 22 },
+  smallAvatarText: { color: color.primaryDark, fontWeight: font.weight.bold as any, fontSize: 11 },
+  assistantCol: { flex: 1, gap: space.sm, alignItems: "flex-start" },
+  textBubble: {
+    backgroundColor: color.surface, borderWidth: 1, borderColor: color.border,
+    paddingVertical: space.sm, paddingHorizontal: space.lg,
+    borderTopLeftRadius: radius.sm, borderTopRightRadius: radius.lg,
+    borderBottomLeftRadius: radius.lg, borderBottomRightRadius: radius.lg, maxWidth: "92%",
+  },
+  assistantText: { color: color.text, fontSize: font.size.md, lineHeight: 22 },
+
+  typing: { flexDirection: "row", gap: 5, paddingVertical: 4 },
+  typingDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: color.textMuted },
+
+  chipsBar: { maxHeight: 44, backgroundColor: color.bg },
+  chipsContent: { paddingHorizontal: space.lg, paddingVertical: space.sm, gap: space.sm },
+  chip: {
+    backgroundColor: color.surface, borderWidth: 1, borderColor: color.border,
+    borderRadius: radius.pill, paddingHorizontal: space.md, paddingVertical: 6,
+  },
+  chipText: { fontSize: font.size.sm, color: color.textSub },
+
   inputBar: {
-    flexDirection: "row", gap: space.sm, padding: space.md, borderTopWidth: 1,
-    borderTopColor: color.border, backgroundColor: color.surface,
+    flexDirection: "row", gap: space.sm, paddingHorizontal: space.lg, paddingTop: space.sm,
+    paddingBottom: space.lg, borderTopWidth: 1, borderTopColor: color.border, backgroundColor: color.surface,
+    alignItems: "center",
   },
   input: {
     flex: 1, backgroundColor: color.surfaceAlt, borderRadius: radius.pill,
-    paddingHorizontal: space.lg, paddingVertical: space.md, fontSize: 15, color: color.text,
+    paddingHorizontal: space.lg, paddingVertical: space.md, fontSize: font.size.md, color: color.text,
   },
-  sendBtn: { backgroundColor: color.primary, borderRadius: radius.pill, paddingHorizontal: space.lg, justifyContent: "center" },
-  sendBtnDisabled: { opacity: 0.5 },
-  sendText: { color: "#fff", fontWeight: "600", fontSize: 15 },
+  sendBtn: {
+    width: 44, height: 44, borderRadius: 22, backgroundColor: color.primary,
+    alignItems: "center", justifyContent: "center",
+  },
+  sendBtnDisabled: { backgroundColor: color.textMuted, opacity: 0.5 },
+  sendIcon: { color: "#fff", fontSize: 20, fontWeight: font.weight.bold as any, lineHeight: 22 },
 });

@@ -27,6 +27,12 @@ export OPENAI_API_KEY=sk-...        # 키는 환경변수로만 (저장소에 �
 python -m app.cli "세탁기에서 물이 안 빠져요. 해결법과 부품 주문 도와줘"
 ```
 
+키를 매번 export하기 번거로우면 `backend/.env`(gitignore됨)에 둘 수 있다 — 실행 시 자동 로드된다.
+```
+OPENAI_API_KEY=sk-...
+LLM_MODEL=gpt-4o-mini
+```
+
 ## 동작 (J1 데모)
 의도 분류 → `get_device_status`(세탁기 5C) → `search_solutions`(배수 가이드) →
 `match_parts`(배수 필터) → 단계 가이드 + 부품(12,000원) 주문 제안.

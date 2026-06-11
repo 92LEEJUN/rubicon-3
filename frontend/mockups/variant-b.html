@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=390">
+<title>변형 B — Vivid Gradient</title>
+<style>
+  :root{
+    --primary:#0381FE;--primaryDark:#026AD6;--primaryTint:#E8F2FF;
+    --bg:#F5F6F8;--surface:#FFF;--surfaceAlt:#F0F2F5;--border:#E3E6EB;
+    --text:#1A1C1E;--sub:#5A6068;--muted:#8B9097;
+    --success:#1FA463;--warning:#F2A20C;--danger:#E5484D;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;-webkit-font-smoothing:antialiased}
+  body{width:390px;background:var(--bg);font-family:-apple-system,"Segoe UI",Roboto,"Noto Sans KR",sans-serif;color:var(--text)}
+  .wrap{min-height:844px;display:flex;flex-direction:column}
+  .head{padding:18px 16px 8px}
+  .brand{font-size:12px;color:var(--muted);font-weight:600;letter-spacing:.3px}
+  .h1{font-size:26px;font-weight:800;margin-top:2px}
+  .toggle{display:flex;background:var(--surfaceAlt);border-radius:999px;padding:4px;margin-top:14px}
+  .seg{flex:1;text-align:center;padding:9px;border-radius:999px;font-size:14px;font-weight:600;color:var(--sub)}
+  .seg.on{background:var(--surface);color:var(--text);box-shadow:0 2px 6px rgba(0,0,0,.08)}
+  .body{flex:1;padding:8px 16px 0}
+  .label{font-size:12px;color:var(--muted);font-weight:600;margin:14px 2px 8px}
+
+  /* gradient swipe deck */
+  .deck{position:relative;height:196px;margin-top:6px}
+  .deck .behind{position:absolute;left:16px;right:16px;top:16px;height:176px;background:#BBD9FF;border-radius:22px;opacity:.6}
+  .deck .behind2{left:8px;right:8px;top:8px;background:#7FB5FF;opacity:.7}
+  .card{position:absolute;left:0;right:0;top:0;height:176px;border-radius:22px;padding:20px;color:#fff;
+    background:linear-gradient(135deg,#0A8BFF 0%,#0257D8 100%);box-shadow:0 14px 30px rgba(3,99,214,.35)}
+  .badge{display:inline-block;font-size:11px;font-weight:700;padding:4px 10px;border-radius:999px;background:rgba(255,255,255,.22);color:#fff}
+  .cardT{font-size:21px;font-weight:800;margin-top:12px}
+  .cardD{font-size:14px;color:rgba(255,255,255,.92);margin-top:8px;line-height:1.5}
+  .cardCta{margin-top:16px;display:inline-block;background:#fff;color:var(--primaryDark);font-size:13px;font-weight:700;padding:10px 18px;border-radius:999px}
+  .dots{display:flex;gap:6px;justify-content:center;margin-top:14px}
+  .dot{width:7px;height:7px;border-radius:4px;background:var(--border)}
+  .dot.on{width:18px;background:var(--primary)}
+
+  /* 2-col tiles with colored chips */
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:6px}
+  .tile{background:var(--surface);border-radius:18px;padding:15px;box-shadow:0 4px 14px rgba(0,0,0,.05)}
+  .chip{width:38px;height:38px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:18px}
+  .c1{background:#FDF3E0}.c2{background:#E6F6EE}.c3{background:#E8F2FF}.c4{background:#FCEBEC}
+  .tt{font-size:15px;font-weight:700;margin-top:11px}
+  .ts{font-size:12px;color:var(--muted);margin-top:3px}
+
+  .chatbar{position:sticky;bottom:0;background:var(--surface);box-shadow:0 -6px 20px rgba(0,0,0,.06);padding:12px 16px 18px;display:flex;gap:8px;align-items:center}
+  .cinput{flex:1;background:var(--surfaceAlt);border-radius:999px;padding:14px 18px;color:var(--muted);font-size:15px}
+  .csend{width:46px;height:46px;border-radius:23px;color:#fff;display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:700;background:linear-gradient(135deg,#0A8BFF,#0257D8)}
+</style></head>
+<body><div class="wrap">
+  <div class="head">
+    <div class="brand">SAMSUNG</div>
+    <div class="h1">AI 컨시어지</div>
+    <div class="toggle"><div class="seg on">홈</div><div class="seg">고객지원</div></div>
+  </div>
+  <div class="body">
+    <div class="label">오늘의 브리핑</div>
+    <div class="deck">
+      <div class="behind"></div><div class="behind behind2"></div>
+      <div class="card">
+        <span class="badge">⚠ 점검 필요</span>
+        <div class="cardT">세탁기 배수 이상 (5C)</div>
+        <div class="cardD">배수 필터 수명 40%. 지금 청소·교체하면 오류를 예방할 수 있어요.</div>
+        <span class="cardCta">해결 방법 보기 →</span>
+      </div>
+    </div>
+    <div class="dots"><div class="dot on"></div><div class="dot"></div><div class="dot"></div></div>
+
+    <div class="label">한눈에 보기</div>
+    <div class="grid">
+      <div class="tile"><div class="chip c1">🧺</div><div class="tt">세탁기 점검</div><div class="ts">배수 필터 교체 권장</div></div>
+      <div class="tile"><div class="chip c2">❄️</div><div class="tt">냉장고 정상</div><div class="ts">정수필터 양호</div></div>
+      <div class="tile"><div class="chip c3">📦</div><div class="tt">부품 주문</div><div class="ts">배수 필터 ₩12,000</div></div>
+      <div class="tile"><div class="chip c4">🏠</div><div class="tt">방문 예약</div><div class="ts">출장 수리 가능</div></div>
+    </div>
+  </div>
+  <div class="chatbar"><div class="cinput">가전 문제·부품 주문을 물어보세요</div><div class="csend">↑</div></div>
+</div></body></html>

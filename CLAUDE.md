@@ -95,5 +95,14 @@
 - 구현 중 설계와 달라지는 부분이 생기면 코드만 바꾸지 말고
   해당 문서(design/tasks)도 함께 갱신한다.
 
+## 브랜치 / PR 규칙
+
+- 브랜치명은 **`<유형>/<상세>`** 형태로 짓는다.
+  - **유형** — 작업 목적: `feat`(기능), `fix`(버그), `doc`(문서), `cicd`(CI/CD).
+    필요 시 `refactor`·`test`·`chore` 등을 추가로 쓴다.
+  - **상세** — 작업 내용을 케밥케이스(kebab-case)로 간결하게.
+  - 예: `feat/chat-streaming`, `fix/csv-parsing`, `doc/branch-naming`, `cicd/build-pipeline`.
+- 작업은 지정 브랜치에서 진행하고, 완료 후 PR을 만든다.
+
 ## 문서 언어
 - 모든 스펙 문서와 규칙은 **한국어**로 작성한다.

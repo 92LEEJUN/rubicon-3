@@ -64,8 +64,19 @@ class OrderStatus(str, Enum):            # 전이: DRAFT→CONFIRMED|FAILED, CON
     DRAFT = "draft"; CONFIRMED = "confirmed"; FAILED = "failed"
     CANCELLED = "cancelled"; REFUNDED = "refunded"               # MVP: Mock
 
-class ServiceRequestType(str, Enum):
-    AGENT = "agent"; VISIT = "visit"
+class ServiceRequestType(str, Enum):     # O2O: 설치/수리 구분
+    AGENT = "agent"                      # 상담원 연결
+    VISIT = "visit"                      # (호환) 일반 방문 = 수리 방문
+    REPAIR = "repair"; INSTALL = "install"  # 수리 방문 / 설치 방문
+
+class Fulfillment(str, Enum):            # 주문 이행 방식 (O2O — BOPIS)
+    DELIVERY = "delivery"; PICKUP = "pickup"   # 배송 / 매장 픽업
+
+class StoreType(str, Enum):              # 오프라인 거점
+    RETAIL = "retail"; EXPERIENCE = "experience"; SERVICE_CENTER = "service_center"
+
+class QuoteSource(str, Enum):            # 견적 출처 (reverse O2O)
+    OFFLINE = "offline"; ONLINE = "online"
 
 class IntentType(str, Enum):
     DEVICE_STATUS = "device_status"; TROUBLESHOOT = "troubleshoot"
@@ -209,6 +220,8 @@ class Order:
     user_id: Id
     items: list[OrderItem]               # 1개 이상
     status: OrderStatus                  # MVP: Mock. 전이 규칙 준수
+    fulfillment: Fulfillment = Fulfillment.DELIVERY  # 배송/픽업(BOPIS, O2O). 후속
+    store_id: Id | None = None           # PICKUP 시 픽업 매장 (O2O)
     confirmed_at: datetime | None        # CONFIRMED 일 때만 존재 (R17)
     cancelled_at: datetime | None = None # CANCELLED 일 때 (R21)
 
@@ -235,7 +248,26 @@ class Booking:                           # 확정된 방문 예약 (VISIT 핸드
     user_id: Id
     slot_id: Id                          # 존재하는 BookingSlot 참조
     context_ref: Id                      # Conversation.id
+    visit_type: ServiceRequestType = ServiceRequestType.REPAIR  # 수리/설치/센터방문 (O2O)
+    store_id: Id | None = None           # 서비스센터/매장 방문 거점 (O2O)
     created_at: datetime
+
+class Store:                             # 오프라인 거점 — 매장·서비스센터 (O2O). MVP: 후속/Mock
+    id: Id
+    name: str
+    type: StoreType                      # retail/experience/service_center
+    address: str
+    geo: tuple[float, float] | None      # 위도·경도 (위치 기반 찾기)
+    hours: str | None = None             # 운영시간
+
+class Quote:                             # 견적 — 오프라인↔온라인 브리지 (reverse O2O). MVP: 후속/Mock
+    id: Id
+    user_id: Id
+    source: QuoteSource                  # offline(매장 상담) / online
+    items: list[OrderItem]               # 견적 품목/부품
+    total: int                           # ≥ 0
+    store_id: Id | None = None           # 발급 매장 (offline)
+    created_at: datetime                 # 매장 견적을 앱에서 이어보기
 
 class Notification:                      # 선제 알림 (R5·R20)
     id: Id
@@ -420,6 +452,13 @@ class OrderPort(Protocol):                             # R4  O2O  MVP: Mock
     def checkout(self, order: Order) -> Order: ...     # 멱등 키 고려(중복 결제 방지)
     def cancel(self, order_id: Id) -> Order: ...        # 취소→환불 상태전이 (R21)
 
+class StorePort(Protocol):                             # O2O 거점·재고 (위치 기반)  MVP: 후속/Mock
+    def find_stores(self, geo: tuple[float, float], type: StoreType) -> list[Store]: ...  # 가까운 매장/센터
+    def check_stock(self, store_id: Id, part_id: Id) -> bool: ...   # 픽업(BOPIS) 재고
+
+class QuotePort(Protocol):                             # O2O 견적 이어보기 (reverse)  MVP: 후속/Mock
+    def get_quote(self, quote_ref: Id) -> Quote | None: ...         # 매장 견적/상담 내역 조회
+
 class WarrantyPort(Protocol):                          # R22  MVP: Mock
     def get_warranty(self, device_id: Id) -> Warranty: ...
 
@@ -431,8 +470,9 @@ class ActionGatePort(Protocol):                        # R17  확인 UX 실/처�
 
 class HandoffPort(Protocol):                           # R18  MVP: Mock
     def handoff(self, req_type: ServiceRequestType, context_ref: Id) -> ServiceRequest: ...
-    def list_slots(self, user_id: Id) -> list[BookingSlot]: ...     # 방문 예약 가능 슬롯
-    def book_slot(self, slot_id: Id, context_ref: Id) -> Booking: ... # 멱등(중복 예약 방지)
+    def list_slots(self, user_id: Id, visit_type: ServiceRequestType = ServiceRequestType.REPAIR) -> list[BookingSlot]: ...
+    def book_slot(self, slot_id: Id, context_ref: Id,
+                  visit_type: ServiceRequestType = ServiceRequestType.REPAIR, store_id: Id | None = None) -> Booking: ...  # 수리/설치/센터, 멱등
 
 class AlertPort(Protocol):                             # R20  MVP: Mock(in_app)
     def deliver(self, notification: Notification) -> None: ...   # opted_in=False면 no-op

@@ -119,6 +119,8 @@ flowchart TB
 | CS 데이터 (CSDataP) | 실데이터 일부 적재 | 전체 CS 연동 |
 | 제품정보 (CatP) | 실데이터 일부 | 전체 카탈로그 |
 | O2O 주문 (O2OP) | **Mock** (주문 성공/실패·취소/환불 시뮬레이션, R21) | 실제 주문/결제 연동 |
+| O2O 거점·재고 (StoreP) | **후속/Mock** 매장·서비스센터·픽업 재고 | 매장/A/S 파트너 시스템 |
+| O2O 견적 (QuoteP) | **후속/Mock** 오프라인 견적 이어보기 | 매장 견적/상담 시스템 |
 | 보증 (WarrantyP) | **Mock** 샘플 보증 규칙 (R22) | 실 보증 데이터 연동 |
 | Auth/계정 (AuthP) | **Mock** 고정 사용자/기기 | 삼성 계정 SSO |
 | 신뢰성/근거 (TrustP) | **Mock** 고정 규칙/샘플 출처 | 실제 grounding·평가 |
@@ -377,7 +379,7 @@ flowchart LR
 | **Engagement(확인 정보)** | 열람·무시·관심 상태 (R29) | **`EngagementRepository`** | **내부(DB)** |
 | Device/IoT | 기기·상태·이상 | `DevicePort`(SmartThings) | 외부 |
 | Catalog/Product | 제품·부품·스펙 | `CatalogPort` | 외부 |
-| Commerce/O2O | 장바구니·주문·취소(R21) | `OrderPort` | 외부 |
+| Commerce/O2O | 장바구니·주문·취소(R21), 거점·픽업·견적(후속) | `OrderPort`·`StorePort`·`QuotePort` | 외부 |
 | CS/Knowledge | 해결·근거·보증(R22) | `CSKnowledgePort`·`WarrantyPort` | 외부 |
 | Personalization | 추천(관심·보유 반영) | 서비스 + Engagement·이력 | 내부(조합) |
 | Notification | 선제 알림(R5·R26) | `AlertPort` + 정책 | 외부(전달) |

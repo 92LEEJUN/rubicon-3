@@ -451,6 +451,30 @@ flowchart LR
 
 > 상세: `docs/architecture.md` §10 · `scenarios.md` §4-B.
 
+### SmartThings 이벤트 구독 (실 전환)
+
+```mermaid
+sequenceDiagram
+  autonumber
+  participant BE as 우리 BE(Sink)
+  participant ST as SmartThings
+  participant ACL as ACL/DeviceService
+  participant NOTI as 알림 서비스
+  Note over BE,ST: 셋업
+  BE->>ST: Sink 등록(HTTPS webhook)
+  ST-->>BE: SINK_CONFIRMATION(challenge)
+  BE-->>ST: 200 + challenge 에코
+  BE->>ST: Subscription 생성(필터: DEVICE_EVENT·capability)
+  Note over BE,ST: 운영(배치 이벤트)
+  ST->>BE: POST 이벤트 배치 (HTTP Signature)
+  BE->>BE: 서명 검증(rsa-sha256·digest·date<5m, 공개키 동적 fetch)
+  BE->>ACL: deviceEvent 정규화 → Device/Anomaly
+  ACL->>NOTI: 이상·임계치 판정(§6.3)
+  NOTI->>NOTI: 빈도·동의 게이트(R26·R20·R19)
+```
+
+> 폴링(MVP)과 구독(실)은 같은 내부 기기 이벤트로 정규화 → 이상감지 불변. 상세: `architecture.md` §10.
+
 ---
 
 ## FE

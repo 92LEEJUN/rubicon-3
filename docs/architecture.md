@@ -115,7 +115,7 @@ flowchart TB
 
 | Port / 저장소 | MVP | 실 전환 시 |
 |------|-----|-----------|
-| SmartThings (STP) | 개인 API(PAT) 실연동 + 일부 Mock 시나리오 | 기업 API 확장 |
+| SmartThings (STP) | 스파이크=PAT, **MVP 실연동=OAuth** + 일부 Mock | 조직=Enterprise(Service Account) |
 | CS 데이터 (CSDataP) | 실데이터 일부 적재 | 전체 CS 연동 |
 | 제품정보 (CatP) | 실데이터 일부 | 전체 카탈로그 |
 | O2O 주문 (O2OP) | **Mock** (주문 성공/실패·취소/환불 시뮬레이션, R21) | 실제 주문/결제 연동 |
@@ -145,6 +145,32 @@ flowchart TB
 - 소스 커버리지는 부분적일 수 있다(최종 일관성·누락) → null 허용·폴백(R13, `data-model.md` §0).
 - 즉 **계약(Port 시그니처·타입)은 고정**돼 있고, **"어떤 소스 + 필드 매핑 표·적재 파이프라인"** 은
   Real 어댑터 구현 시 확정한다(MVP는 Mock/부분 실데이터). 인터페이스 위 도메인 작업은 그 전에 병렬로 진행 가능.
+
+#### 공개 문서 조사 결과 (2026-06, 스파이크 입력)
+
+**SmartThings (`DevicePort`)** — [Devices API](https://developer.smartthings.com/docs/api/public)·[Health](https://developer.smartthings.com/docs/devices/health)·[Capabilities](https://developer.smartthings.com/docs/devices/capabilities/)
+- **연결 상태(Health)**: `ONLINE`·`UNHEALTHY`·`OFFLINE` → `Device.status` 연결성 매핑.
+- **상태(`GET /devices/{id}/status`)**: capability별 **attributes**(상태) + **commands**. 예: `filterStatus`(냉장고 필터 정상/교체) → `Consumable`/`Anomaly(CONSUMABLE)`, `washerOperatingState`/`dishwasherOperatingState`(machineState·jobState) → `Device.status`·`metrics`.
+- **Samsung custom capability**(`custom.*`)로 소모품 수명·오류가 노출될 수 있음. **단, 기기 오류코드(예: 4C/5C)의 API 노출은 불확실**(패널 표시 위주일 수 있음) → 이상감지(§design 6.3) **부분 검증, 스파이크에서 확인 필요**.
+- **주의**: `custom.disabledCapabilities`에 "비활성"으로 표기돼도 실제 동작하는 capability가 있음 → ACL은 맹신 말고 검증.
+
+**SmartThings 인증 3계층 (OAuth 전환 대비)**
+| 계층 | 인증 | 토큰 | 용도 |
+|------|------|------|------|
+| PAT | Personal Access Token | **24h(테스트용)** | 검증 스파이크 |
+| **OAuth 2.0** | 사용자별 인가 | 갱신형 | **MVP 실연동** |
+| Enterprise | Service Account → API Key → Access Token | 최대 1년 | 조직·대규모(R15 비범위) |
+
+- **데이터 스키마·이벤트는 3계층 공통** — 기기/capability/attribute/command 모델 동일, 이벤트도
+  `deviceId·componentId·capability·attribute` 동일 구조. **다른 건 인증·엔드포인트·이벤트 전달 방식뿐.**
+- → **교체 지점은 "토큰 획득"으로 격리**한다: `TokenProvider`(data-model §6) 뒤에 PAT/OAuth/Enterprise
+  구현을 두고, `DevicePort` 어댑터·ACL 매핑은 **그대로**. OAuth 전환 = provider 구현 교체 + 이벤트 구독 방식 교체.
+- **이벤트(실 전환)** — 개인=사용자별 구독, Enterprise=계정 단위 webhook. 페이로드(capability/attribute)는 동일
+  → 선제 파이프라인(§10) MVP 폴링을 이벤트로 바꿔도 도메인 매핑 불변.
+
+**Samsung CS (`CSKnowledgePort`)** — samsung.com/support 오류코드별 가이드(예: [4C/5C](https://www.samsung.com/us/support/troubleshoot/TSG10000997/))
+- 구조: **오류코드 → 의미 → 단계별 해결**. 예: `4C`=급수 문제 → (수도꼭지·호스 꺾임·메시필터 확인), `5C`=배수 문제 → (배수필터 청소·호스 정리).
+- **매핑이 깔끔함**: 코드별 문서 → `Solution.steps`(단계), `Source`(title·URL). 지역별 페이지라 로케일 고려.
 
 ## 6. 진입점 개요
 
@@ -287,7 +313,37 @@ flowchart LR
 
 ### Mock ↔ 실
 - **MVP** — 텔레메트리는 SmartThings 폴링/임계치, 전달은 인앱 Mock(AlertPort).
-- **실 전환** — 이벤트 스트림(예: 메시지 버스) 기반 실시간 감지 + 실 푸시 채널.
+- **실 전환** — SmartThings **이벤트 구독(webhook)** 기반 실시간 감지 + 실 푸시 채널(아래).
+
+### 실 이벤트 구독 처리 (SmartThings)
+
+폴링(MVP) 대신 **구독 webhook**으로 실시간 이벤트를 받는다. 구성·흐름·검증:
+
+**구성**
+- **Sink** — 우리 쪽 HTTPS webhook 엔드포인트(계정 단위). 1개 sink가 여러 subscription 수용.
+- **Subscription** — sink ↔ 이벤트를 **필터**로 연결. `scope: ACCOUNT | LOCATION_GROUP`.
+  - EVENT 필터: `DEVICE_EVENT`(capability 변화)·`DEVICE_HEALTH_EVENT`(online/offline)·`DEVICE_LIFECYCLE_EVENT` 등.
+  - CAPABILITY 필터: `{capability, attribute, component}`(와일드카드·`exclude` 지원).
+
+**셋업/수명주기**
+1. Sink 등록 → SmartThings가 `SINK_CONFIRMATION` challenge 전송 → 우리가 `200` + challenge 에코(검증 전엔 비활성).
+2. Subscription 생성(필터 지정).
+3. 배치 이벤트 수신.  4. sink 제거 전 subscription 삭제.
+
+**수신 페이로드(배치)** — `notificationType:"EVENT"`, `eventNotification.events[]`. 각 이벤트:
+`eventTime`·`eventType`·`deviceEvent{ deviceId, locationId, componentId, capability, attribute, value, valueType, stateChange }`.
+
+**검증(필수, 보안)** — **HTTP Signature**(`rsa-sha256`):
+- `Authorization` 헤더의 `keyId·headers·algorithm·signature` 파싱.
+- 서명 대상: `(request-target)`·`digest`(본문 SHA-256)·`date`.
+- 공개키를 `key.smartthings.com/key/{keyId}`에서 **동적 fetch**(키 로테이션 → 무한 캐시 금지), 서명 검증.
+- `date`가 **5분 초과면 거부**(리플레이 방지). 본문 `digest` 불일치면 거부(변조 탐지).
+
+**처리 흐름** — webhook 수신 → 서명 검증 → ACL이 `deviceEvent`를 도메인으로 정규화(→ `Device`/`Anomaly`/`Consumable`)
+→ 이상·임계치 판정(design §6.3) → NotificationService(빈도·동의 게이트) → AlertPort. *위 선제 파이프라인과 동일.*
+
+**교체 용이성** — **폴링(MVP)과 구독(실)은 같은 내부 "기기 이벤트"로 정규화**하므로 이상감지 로직은 불변.
+수신 엔드포인트는 `/chat`과 무관한 **인바운드 webhook ingress**(API/표현 계층, §9 인증 게이트와 별도 서명 검증).
 
 ## 11. 사용 분석 (Analytics) 파이프라인
 

@@ -92,10 +92,17 @@
   "shortcuts": [ { "label": str, "intent": str } ] }
 
 # bridge  — 카드 탭 경량 설명 모달 (컨테이너, §9)
+# 구성: 테두리(chrome) + 본문(detail 재사용) + 액션. detail에 있는 내용은 bridge 레벨에서 중복 금지.
 { "title": str,
+  "subtitle": str | None,                    # 부제(기기·카테고리·모델 등)
+  "badge": { "label": str, "level": str } | None,  # 상태/심각도: 정상|경고|위험 · 진행중|완료 · 유상|무상(R22)
   "summary": str,                            # 간단 설명 (LLM 생성 가능)
-  "detail": Template | None,                 # 다른 템플릿을 끼워 재사용(device_status·product_card 등)
-  "ctas": [Cta],                             # 즉시 행동(주문·예약·재주문 등)
+  "highlights": [ { "label": str, "value": str } ] | None,  # 핵심 지표(수명·가격·만료일 등)
+  "media": Media | None,                     # 대표 이미지 (detail에 없을 때만)
+  "detail": Template | None,                 # 본문 재사용(device_status·product_card·status_tracker 등)
+  "meta": { "source": str | None, "at": datetime | None } | None,  # 근거(R16)·시점
+  "ctas": [Cta],                             # 주력 행동(주문·예약·재주문 등)
+  "secondary": [Cta] | None,                 # 보조(나중에·"이 알림 끄기" R20)
   "escalate": { "label": str, "intent": str } | None }  # "AI에게 물어보기" → /chat(맥락 주입)
 ```
 
@@ -174,8 +181,10 @@
 홈 카드(또는 알림)를 누를 때, **간단한 정보면 풀 대화(AI 패널) 대신 경량 모달**로 설명한다(R9).
 이 모달의 응답이 `bridge` 템플릿이다.
 
-- **컨테이너** — `bridge`는 자체 `summary`(LLM 생성 가능) + **다른 템플릿을 `detail`로 끼워** 재사용한다
-  (예: 기기 카드 탭 → `bridge` 안에 `device_status`). 새 표현을 중복 정의하지 않는다.
+- **컨테이너 = 테두리(chrome) + 본문(detail) + 액션** — bridge 레벨은 `title`·`subtitle`·`badge`·`summary`·
+  `highlights`·`meta`(프레이밍)와 `ctas`·`secondary`·`escalate`(액션)를 갖고, **본문은 다른 템플릿을 `detail`로
+  끼워** 재사용한다(예: 기기 카드 → `device_status`). **`detail`에 이미 있는 내용은 bridge 레벨에서 중복 금지**
+  (예: 이미지가 `product_card`에 있으면 `media` 생략).
 - **단발성(single-shot)** — 대화 세션을 열지 않는다. 모달 안에서 끝나거나, 두 갈래 출구로 나간다:
   - **즉시 행동** — `ctas`(주문·예약·재주문 등). 되돌릴 수 없는 커밋은 `confirmation`/ActionGate(R17).
   - **에스컬레이션** — `escalate` → `/chat` 진입(화면 맥락 주입 R9-4). *알림 탭→대화(P→R 전이)와 같은 패턴.*

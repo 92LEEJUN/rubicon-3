@@ -547,3 +547,69 @@ flowchart LR
 ```
 
 > 트랜스포트 연결 상태 머신은 [BE 상태 → WebSocket 연결 상태](#websocket-연결-상태) 참조(동일 채널).
+
+---
+
+## O2O (후속)
+
+### 견적 이어보기 (reverse O2O)
+
+```mermaid
+sequenceDiagram
+  autonumber
+  actor U as 사용자
+  participant ST as 매장(오프라인)
+  participant FE
+  participant API
+  participant QP as QuotePort
+  ST-->>U: 상담/견적 + 식별자(QR/번호)
+  U->>FE: 견적번호 입력/스캔
+  FE->>API: GET 견적 (ref)
+  API->>QP: get_quote(ref)
+  QP-->>API: Quote(items·total·store)
+  API->>API: 본인 확인 · 만료/현재가 검증
+  API-->>FE: bridge/order_summary 표시
+  alt 주문 전환
+    U->>FE: [주문] (확인 R17) → Quote.status=CONVERTED
+  else 추가 질문
+    U->>FE: AI에게 물어보기 → /chat
+  end
+```
+
+### 매장 픽업 (BOPIS)
+
+```mermaid
+sequenceDiagram
+  autonumber
+  actor U as 사용자
+  participant API
+  participant SP as StorePort
+  participant ORD as OrderPort
+  participant NOTI as 알림
+  U->>API: 제품 + 픽업 선택(위치)
+  API->>SP: find_stores(geo) + check_stock(part)
+  SP-->>API: 재고 있는 매장 목록
+  alt 재고 있음
+    U->>API: 매장 선택 → 주문(PICKUP, RESERVED)
+    ORD-->>API: Order(fulfillment=PICKUP)
+    NOTI-->>U: 준비 완료(READY) 선제 알림(R20)
+    U->>API: 매장 수령 → PICKED_UP
+  else 재고 없음
+    API-->>U: 대체 매장 / 배송 전환
+  end
+```
+
+### 서비스 트리아지 (self / 기사 / 센터)
+
+```mermaid
+flowchart TD
+  S[증상 진단 R2·R3] --> W[유·무상 판별 R22]
+  W --> D{트리아지}
+  D -->|셀프 가능·안전| SELF[guide_steps + 부품 주문]
+  D -->|위험·복잡 R23| TECH[수리기사 방문 R18]
+  D -->|휴대·정밀| CENTER[서비스센터 예약]
+  D -->|불확실| AGENT[상담원 R16-2]
+  SELF -. 미해결 .-> TECH
+```
+
+> 상세 흐름·엣지: `specs/samsung-ai-concierge/design.md` §8.

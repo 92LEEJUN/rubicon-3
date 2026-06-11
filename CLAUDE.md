@@ -36,6 +36,7 @@
 - `docs/data-model.md` — 여러 스펙이 공유하는 도메인 데이터 모델·스키마·클래스 구조, Repository/Port 인터페이스 타입.
 - `docs/response-templates.md` — FE↔BE 공유 응답 표현 계약(템플릿 종류·스키마·선택/CTA 규칙).
 - `docs/frontend-architecture.md` — React Native 앱 내부 구조·결정(상태관리·네비·트랜스포트 등).
+- `docs/wireframes.md` — 저충실도 화면 명세(레이아웃·흐름). 비주얼 디자인 아님.
 - 이들은 **여러 스펙이 공유하는 진실의 출처(single source of truth)** 다.
 
 **2) 스펙 문서 (기능별, 하위) — `specs/<작업명>/`**

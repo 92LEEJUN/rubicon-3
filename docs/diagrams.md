@@ -79,7 +79,12 @@ classDiagram
     +str name
     +str step
   }
+  class Warranty {
+    +bool in_warranty
+    +Coverage scope
+  }
   User "1" --> "*" Device : owns
+  Device "1" --> "0..1" Warranty : covered_by
   User "1" --> "*" Conversation
   User "1" --> "*" Order
   Device "1" --> "*" Consumable

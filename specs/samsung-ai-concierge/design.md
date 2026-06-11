@@ -1,6 +1,6 @@
 # 설계 (Design) — 삼성 AI 컨시어지
 
-> 이 문서는 `requirements.md` 의 요구사항(이하 R1~R20)을 **어떻게** 만족시킬지 설명한다.
+> 이 문서는 `requirements.md` 의 요구사항(이하 R1~R27)을 **어떻게** 만족시킬지 설명한다.
 > 전체 아키텍처·기술 스택·Mock↔실 전략은 **기반 문서**를 따른다 — 여기서 중복 정의하지 않는다.
 > - 시스템 아키텍처: [`docs/architecture.md`](../../docs/architecture.md)
 > - 공유 데이터 모델/클래스 구조/Port·Repository 타입: [`docs/data-model.md`](../../docs/data-model.md)
@@ -16,6 +16,9 @@
 - 메인 가치 흐름: **이상 감지 → 해결 안내 → 부속품 주문** (R2·R3·R4)
 - 소모품 재주문 선제안(R5), 개인화 추천(R8)
 - 응답 템플릿·CTA(R11), 스트리밍(R14), 폴백(R13)
+- **주문 사후·CS 보강** — 취소·환불(R21), 보증 판별(R22), 안전 경고(R23), 미연동 온보딩(R24), 수리 후 확인(R25)
+- **선제(proactive) 보강** — 알림 빈도·중요도(R26), 다중 기기 우선순위(R27). 선제 파이프라인은
+  [`docs/architecture.md`](../../docs/architecture.md) §10, 시나리오 분류는 [`scenarios.md`](./scenarios.md) §4-B.
 
 컴포넌트 책임·Port/Repository 시그니처·엔티티 타입은 기반 문서를 참조한다.
 
@@ -91,6 +94,26 @@ sequenceDiagram
   A-->>U: 교체 시기 + 재주문 제안(CTA)
 ```
 
+### 2.5 주문 취소 · 환불 (R21·R17)
+```mermaid
+sequenceDiagram
+  actor U as 사용자
+  participant O as 오케스트레이터
+  participant G as ActionGatePort
+  participant Ord as 주문서비스(OrderPort)
+  U->>O: 취소 요청 (CANCEL_ORDER)
+  O->>Ord: 취소 가능 여부(상태·기간) 확인
+  alt 취소 가능
+    O->>G: 되돌릴 수 없는 행동 확인 (R17)
+    U->>O: 확인
+    O->>Ord: cancel(order_id)
+    Ord-->>O: CANCELLED → REFUNDED 진행
+    O-->>U: 환불 상태 안내
+  else 불가
+    O-->>U: 불가 사유 + 대안(핸드오프 R18)
+  end
+```
+
 ## 3. 기능 고유 설계 포인트
 
 - **의도 분류/분해** — 오케스트레이터가 입력을 `IntentType`(단일/복수)으로 분류. 3개 이상이면
@@ -102,6 +125,16 @@ sequenceDiagram
 - **템플릿/CTA** — 응답은 `Template` + `Cta`로 구조화, 클라이언트가 렌더링. 템플릿 카탈로그·data
   스키마·선택/CTA 매핑 규칙은 기반 문서 [`docs/response-templates.md`](../../docs/response-templates.md) 참조(R10·R11).
 - **확인 게이트** — 결제·주문·방문 등은 `ActionGatePort.requires_confirmation`으로 확인 후 처리(R17).
+- **주문 취소·환불** — `OrderStatus`를 `CONFIRMED→CANCELLED→REFUNDED`로 전이. 취소 CTA는 취소 가능 단계에만
+  노출, 실행은 확인 게이트(R17) 경유(R21).
+- **보증 판별** — `WarrantyPort.get_warranty`로 유·무상(`Coverage`)을 판정해 해결/주문/방문 안내에 표시.
+  불확실하면 단정 금지 → CS 확인 안내(R22).
+- **안전 경고** — `SolutionStep.safety`(caution/danger)·`pro_required`를 가이드에 표시. `danger`/`pro_required`면
+  셀프 진행 대신 기사 연결 우선(R23·R16-2·R18).
+- **미연동 온보딩** — 기기 의존 기능 접근 시 차단 대신 연동 유도 + 일반 안내 폴백, 완료 후 개인화 활성화(R24·R13-2).
+- **수리 후 확인** — 해결/주문/방문 완료 후 시스템이 해결 여부를 후속 질의(proactive). 미해결이면 재진단·핸드오프(R25).
+- **선제 알림 정책** — `Notification.priority`로 중요도 정렬·묶음, 빈도 제한(R26). 다중 기기 동시 이상은
+  심각도·안전 우선순위로 `home_summary`에 종합(R27). 전달은 옵트인·동의 게이트 통과(architecture §10).
 
 ## 4. 에러 처리 / 폴백 (R13)
 
@@ -113,6 +146,9 @@ sequenceDiagram
 | LLM 응답 지연/타임아웃 | 상태 표시 + 대기/재시도/취소 (R14) |
 | 신뢰도 낮음(TrustPort) | 경고 + 사람 연결 권유 (R16) |
 | 부품 매칭 모호 | 임의 선택 금지 → 후보 제시/확인 (R4-3) |
+| 결제/취소 실패 | 결제 보류·재시도, 취소 불가 단계면 사유 안내 + 대안 (R21) |
+| 위험 작업(R23) | 안전 경고 표시, `danger`/`pro_required`면 셀프 차단 → 기사 연결 우선 |
+| 미연동 사용자 | 기능 차단 금지 → 연동 유도 + 일반 안내 폴백 (R24·R13-2) |
 
 원칙: **어떤 단일 외부 실패도 전체 대화를 중단시키지 않는다.**
 

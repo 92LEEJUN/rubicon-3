@@ -118,7 +118,8 @@ flowchart TB
 | SmartThings (STP) | 개인 API(PAT) 실연동 + 일부 Mock 시나리오 | 기업 API 확장 |
 | CS 데이터 (CSDataP) | 실데이터 일부 적재 | 전체 CS 연동 |
 | 제품정보 (CatP) | 실데이터 일부 | 전체 카탈로그 |
-| O2O 주문 (O2OP) | **Mock** (주문 성공/실패 시뮬레이션) | 실제 주문/결제 연동 |
+| O2O 주문 (O2OP) | **Mock** (주문 성공/실패·취소/환불 시뮬레이션, R21) | 실제 주문/결제 연동 |
+| 보증 (WarrantyP) | **Mock** 샘플 보증 규칙 (R22) | 실 보증 데이터 연동 |
 | Auth/계정 (AuthP) | **Mock** 고정 사용자/기기 | 삼성 계정 SSO |
 | 신뢰성/근거 (TrustP) | **Mock** 고정 규칙/샘플 출처 | 실제 grounding·평가 |
 | 행동 확인 (ActP) | 확인 UX는 실제, 처리만 Mock | 실 결제/주문 커밋 |

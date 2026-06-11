@@ -39,6 +39,13 @@ class BackendClient:
     async def place_order(self, payload: dict) -> httpx.Response:
         return await self._client.post("/internal/orders", json=payload)
 
+    async def list_orders(self, user_id: Optional[str] = None) -> httpx.Response:
+        params = {"user_id": user_id} if user_id else None
+        return await self._client.get("/internal/orders", params=params)
+
+    async def list_bookings(self) -> httpx.Response:
+        return await self._client.get("/internal/bookings")
+
     async def booking_slots(self, visit_type: str = "REPAIR") -> httpx.Response:
         return await self._client.get("/internal/bookings/slots", params={"visit_type": visit_type})
 

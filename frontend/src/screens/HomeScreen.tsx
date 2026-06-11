@@ -1,24 +1,24 @@
-/** S1 홈 (변형 B, wireframes §2) — 브리핑 카드 스택(스와이프) + 2열 작은 카드 + 하단 고정 채팅바.
+/** S1 홈 (변형 B, wireframes §2) — 브리핑 카드 스택(스와이프) + 2열 작은 카드 + 추천.
  *
- * `home_summary`(devices·alerts)에서 브리핑/타일을 파생한다(BFF /home 또는 fixtures).
- * 브리핑 카드·타일 탭 → 맥락 질문으로 채팅 진입, 하단 채팅바 탭 → 빈 채팅 진입(자유 입력).
+ * home_summary(devices·alerts·recommendations)에서 콘텐츠를 파생한다(실데이터/fixture 폴백).
+ * 하단 채팅바는 MainShell이 고정으로 렌더(홈·CS 공통). 카드/타일 탭 → 맥락 질문으로 채팅 진입.
  */
-import React, { useRef, useState } from "react";
+import React, { useState } from "react";
 import {
   NativeScrollEvent, NativeSyntheticEvent, Pressable, ScrollView,
   StyleSheet, Text, View, useWindowDimensions,
 } from "react-native";
+import { TemplateView } from "../templates";
 import { color, font, gradient, radius, shadow, space } from "../design/tokens";
-import { homeSummary } from "../fixtures/journeys";
 
 const DEVICE_KO: Record<string, string> = { washer: "세탁기", refrigerator: "냉장고", air_purifier: "공기청정기" };
 const DEVICE_ICON: Record<string, string> = { washer: "🧺", refrigerator: "❄️", air_purifier: "🌀" };
 const CONS_KO: Record<string, string> = { drain_filter: "배수 필터", water_filter: "정수필터", hepa_filter: "HEPA 필터" };
+const won = (n: number) => `₩${Number(n).toLocaleString("ko-KR")}`;
 
 type Briefing = { badge: string; title: string; desc: string; cta: string; ask: string };
-type Tile = { icon: string; tint: string; title: string; sub: string; ok?: boolean; warn?: boolean; ask: string };
+type Tile = { icon: string; tint: string; title: string; sub: string; ok?: boolean; ask: string };
 
-/** home_summary → 브리핑 카드(우선순위: 점검 필요 기기 → 소모품 알림). */
 function buildBriefings(data: any): Briefing[] {
   const out: Briefing[] = [];
   for (const d of data.devices ?? []) {
@@ -50,16 +50,14 @@ function buildBriefings(data: any): Briefing[] {
   return out;
 }
 
-/** home_summary → 2열 작은 카드(기기 2개 + 주문·예약 진입). */
 function buildTiles(data: any): Tile[] {
   const tiles: Tile[] = [];
-  for (const d of (data.devices ?? []).slice(0, 2)) {
+  for (const d of data.devices ?? []) {
     const ok = d.status === "ONLINE";
     tiles.push({
       icon: DEVICE_ICON[d.type] ?? "📱", tint: ok ? color.successTint : color.warningTint,
       title: `${DEVICE_KO[d.type] ?? d.type} ${ok ? "정상" : "점검"}`,
-      sub: d.model, ok, warn: !ok,
-      ask: `${DEVICE_KO[d.type] ?? d.type} 상태 확인해줘`,
+      sub: d.model, ok, ask: `${DEVICE_KO[d.type] ?? d.type} 상태 확인해줘`,
     });
   }
   tiles.push({ icon: "📦", tint: color.primaryTint, title: "부품 주문", sub: "배수 필터 ₩12,000",
@@ -69,10 +67,11 @@ function buildTiles(data: any): Tile[] {
   return tiles;
 }
 
-export function HomeScreen({ onOpenChat }: { onOpenChat?: (q?: string) => void; onGallery?: () => void }) {
-  const data = homeSummary.data as any;
+export function HomeScreen({ data, onOpenChat }:
+  { data: any; onOpenChat?: (q?: string) => void; onGallery?: () => void }) {
   const briefings = buildBriefings(data);
   const tiles = buildTiles(data);
+  const recs: any[] = data.recommendations ?? [];
   const { width } = useWindowDimensions();
   const cardW = Math.min(width, 480) - space.lg * 2;
   const [page, setPage] = useState(0);
@@ -122,14 +121,17 @@ export function HomeScreen({ onOpenChat }: { onOpenChat?: (q?: string) => void; 
             </Pressable>
           ))}
         </View>
-      </ScrollView>
 
-      {/* 하단 고정 채팅바 — 탭하면 채팅으로 펼침(자유 입력) */}
-      <Pressable testID="open-chat" accessibilityRole="button" onPress={() => onOpenChat?.()}
-                 style={styles.chatBar}>
-        <View style={styles.chatStub}><Text style={styles.chatStubText}>가전 문제·부품 주문을 물어보세요</Text></View>
-        <View style={styles.chatSend}><Text style={styles.chatSendIcon}>↑</Text></View>
-      </Pressable>
+        {/* 개인화 추천 */}
+        {recs.length ? (
+          <View testID="home-recommend">
+            <Text style={styles.label}>맞춤 추천</Text>
+            <Pressable onPress={() => onOpenChat?.("추천 제품 자세히 알려줘")} style={styles.recCard}>
+              <TemplateView template={{ kind: "recommendation_list", data: { products: recs } }} />
+            </Pressable>
+          </View>
+        ) : null}
+      </ScrollView>
     </View>
   );
 }
@@ -164,14 +166,5 @@ const styles = StyleSheet.create({
   tileTitle: { fontSize: font.size.md, fontWeight: font.weight.bold as any, color: color.text, marginTop: space.md },
   tileSub: { fontSize: font.size.xs, color: color.textMuted, marginTop: 3 },
 
-  chatBar: {
-    flexDirection: "row", alignItems: "center", gap: space.sm,
-    paddingHorizontal: space.lg, paddingTop: space.sm, paddingBottom: space.lg,
-    backgroundColor: color.surface, borderTopWidth: 1, borderTopColor: color.border,
-  },
-  chatStub: { flex: 1, backgroundColor: color.surfaceAlt, borderRadius: radius.pill, paddingHorizontal: space.lg, paddingVertical: 13 },
-  chatStubText: { color: color.textMuted, fontSize: font.size.md },
-  chatSend: { width: 46, height: 46, borderRadius: 23, backgroundColor: color.primary, alignItems: "center", justifyContent: "center",
-    ...( { backgroundImage: gradient.brand } as any ) },
-  chatSendIcon: { color: "#fff", fontSize: 20, fontWeight: font.weight.bold as any },
+  recCard: { backgroundColor: color.surface, borderRadius: 18, padding: space.lg, ...(shadow.card as any) },
 });

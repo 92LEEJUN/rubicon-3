@@ -27,6 +27,11 @@ export const homeSummary: Template = {
       { id: "alert_purifier", device_id: "dev_purifier_01", type: "consumable", severity: "info",
         detail: "HEPA 필터 교체 시기가 임박했습니다." },
     ],
+    recommendations: [
+      { id: "prod_purifier_cube", category: "air_purifier", name: "비스포크 큐브 에어 공기청정기",
+        model: "AX9500", price: 599000, specs: { coverage: "60㎡", noise: "22dB" }, in_stock: true,
+        image: svgThumb("#1FA463"), reason: "사용 패턴 추천" },
+    ],
   },
 };
 

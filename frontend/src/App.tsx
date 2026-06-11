@@ -9,8 +9,8 @@ import { j1Sections } from "./fixtures/journeys";
 export const DEMO_Q = "세탁기에서 물이 안 빠져요. 해결하고 부품도 주문할래요.";
 export type ScreenName = "home" | "support" | "chat" | "live" | "gallery";
 
-export function App({ initialScreen = "home", wsUrl }:
-  { initialScreen?: ScreenName; wsUrl?: string }) {
+export function App({ initialScreen = "home", wsUrl, apiBase, token }:
+  { initialScreen?: ScreenName; wsUrl?: string; apiBase?: string; token?: string }) {
   const [screen, setScreen] = useState<ScreenName>(initialScreen);
   const [question, setQuestion] = useState<string>(DEMO_Q);
 
@@ -24,6 +24,8 @@ export function App({ initialScreen = "home", wsUrl }:
   return (
     <MainShell
       initialTab={screen === "support" ? "support" : "home"}
+      apiBase={apiBase}
+      token={token}
       onOpenChat={(q) => { setQuestion(q ?? ""); setScreen("chat"); }}
       onGallery={() => setScreen("gallery")}
     />

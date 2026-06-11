@@ -177,6 +177,12 @@ class MockOrderAdapter:
         order.status = "CANCELLED"
         return order
 
+    def list_orders(self, user_id: Optional[str] = None) -> list[Order]:
+        orders = list(self._orders.values())
+        if user_id:
+            orders = [o for o in orders if o.user_id == user_id]
+        return sorted(orders, key=lambda o: o.created_at or datetime.min.replace(tzinfo=timezone.utc), reverse=True)
+
 
 class MockHandoffAdapter:
     """HandoffPort — 방문 예약 슬롯/예약 Mock(R18)."""
@@ -199,6 +205,9 @@ class MockHandoffAdapter:
         booking = Booking(id=bid, slot_id=slot_id, status="CONFIRMED", context_ref=context_ref)
         self._bookings[bid] = booking
         return booking
+
+    def list_bookings(self) -> list[Booking]:
+        return list(self._bookings.values())
 
 
 class MockWarrantyAdapter:

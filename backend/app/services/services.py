@@ -108,6 +108,10 @@ class OrderService:
     def cancel(self, order_id: str) -> Order:
         return self._port.cancel_order(order_id)
 
+    def history(self, user_id: Optional[str] = None) -> list[Order]:
+        """주문 이력(최신순) — 진행 추적(status_tracker)·홈/CS 노출용."""
+        return self._port.list_orders(user_id)
+
 
 class HandoffService:
     """방문/상담 핸드오프 — 슬롯·예약(R18)."""
@@ -120,6 +124,10 @@ class HandoffService:
 
     def book(self, slot_id: str, context_ref: Optional[str] = None) -> Booking:
         return self._port.book_slot(slot_id, context_ref)
+
+    def list_bookings(self) -> list[Booking]:
+        """예약 이력 — 홈/CS '진행 중' 노출용(R18)."""
+        return self._port.list_bookings()
 
 
 class NotificationService:

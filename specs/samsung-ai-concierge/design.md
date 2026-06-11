@@ -99,8 +99,8 @@ sequenceDiagram
   복귀 요청 시 복원(R6).
 - **개인화** — 추천 시 대화 이력(관심 제품)과 보유 기기를 반영하고, 보유 기기는 중복 추천 제외,
   근거를 함께 제시. 데이터 부족 시 일반 추천 폴백(R8).
-- **템플릿/CTA** — 응답은 `Template`(product_card/guide_steps/comparison/text) + `Cta`로 구조화,
-  클라이언트가 렌더링. 구매계열 CTA는 장바구니/결제, CS계열은 상담/방문(R11).
+- **템플릿/CTA** — 응답은 `Template` + `Cta`로 구조화, 클라이언트가 렌더링. 템플릿 카탈로그·data
+  스키마·선택/CTA 매핑 규칙은 기반 문서 [`docs/response-templates.md`](../../docs/response-templates.md) 참조(R10·R11).
 - **확인 게이트** — 결제·주문·방문 등은 `ActionGatePort.requires_confirmation`으로 확인 후 처리(R17).
 
 ## 4. 에러 처리 / 폴백 (R13)

@@ -24,7 +24,7 @@
 
 ```mermaid
 flowchart TB
-  subgraph Client["클라이언트 (웹)"]
+  subgraph Client["클라이언트 (앱 · React Native)"]
     Home["홈"]
     CSPage["CS 페이지"]
     Chat["AI 채팅 패널 (전역 진입)"]
@@ -88,7 +88,8 @@ flowchart TB
 - **LLM 서비스** — Claude 호출, 멀티모달 입력 처리, 응답을 **템플릿 모델**로 구조화.
 - **도메인 서비스** — 비즈니스 로직. 외부 연동은 직접 하지 않고 Port를 통한다.
 - **통합 어댑터(Port)** — 외부 시스템/민감 기능 추상화. **Mock↔실 교체 지점.**
-- **데이터 저장소** — 대화·이력(R12), 세션 맥락(R6·R7).
+- **데이터 저장소** — 대화·이력(R12), 세션 맥락(R6·R7). **Repository 인터페이스 뒤에 두어**
+  인메모리/로컬 DB(기본) ↔ Postgres+Redis(옵셔널)를 교체 가능하게 한다.
 
 ### Mock ↔ 실 기능 경계
 | Port | MVP | 실 전환 시 |
@@ -103,6 +104,7 @@ flowchart TB
 | 핸드오프 (HandoffP) | **Mock** 접수 응답 | 상담/방문 시스템 |
 | 알림 전달 (AlertP) | **Mock** 인앱 표시 | 푸시/외부 채널 |
 | 동의/프라이버시 (ConsentP) | **Mock** 동의/삭제 | 실 동의·데이터 관리 |
+| 저장소 (Repository) | **인메모리/로컬 DB** | Postgres + Redis (옵셔널) |
 
 ---
 
@@ -275,10 +277,12 @@ erDiagram
 - **응답을 템플릿 모델(데이터)로 표현** — UI 애셋 디커플링(R9·R11), 멀티모달 소스 포함(R10) 용이.
 - **LLM = Claude** — 멀티모달·구조화 출력에 적합. 기본은 비용/지연 균형 모델, 복잡 추론은 상위 모델로 라우팅(설계 시 확정).
 
-### 확인 필요 (사용자 결정)
-- **기술 스택** — 제안: 웹 프론트(React/TypeScript) + 백엔드(Node/TypeScript). 변경 가능.
-- **데이터 저장소** — 대화/세션 저장에 쓸 스토리지(예: Postgres/Redis) 선택.
-- 위 항목은 tasks 진행 전 확정한다.
+### 기술 스택 (결정됨)
+- **프론트엔드** — React Native.
+- **백엔드** — FastAPI (Python). *(Node 전환은 후속 검토.)*
+- **저장소 전략** — Repository 인터페이스 뒤에서 **인메모리/로컬 DB(기본) → Postgres + Redis(옵셔널)** 로
+  단계적 교체. 기본 구현으로 시작해 외부 의존 없이 개발/테스트 가능하게 한다.
+- **LLM** — Claude (멀티모달·구조화 출력). 기본은 비용/지연 균형 모델, 복잡 추론은 상위 모델로 라우팅.
 
 ### design 단계 입력으로 남은 검증 (후속 스파이크)
 `requirements.md` 의 "미해결 질문" 항목(O2O 주문 지원, SmartThings 이상 지표,

@@ -1,8 +1,9 @@
 name: Deploy FE to GitHub Pages
 
-# FE(react-native-web) 정적 빌드를 GitHub Pages에 배포한다(무료·외부 접속).
-# 최초 1회: 저장소 Settings → Pages → Source = "GitHub Actions" 로 설정 필요.
-# 배포 URL: https://92leejun.github.io/rubicon-3/  (라이브 채팅은 ?screen=live&ws=<BFF> 필요)
+# FE(react-native-web) 정적 빌드를 gh-pages 브랜치로 배포(클래식 방식).
+# github-pages "환경(environment)"을 쓰지 않아 환경 보호 규칙/Actions 소스 이슈를 우회한다.
+# 최초 1회: Settings → Pages → Source = "Deploy from a branch" → Branch: gh-pages /(root)
+# 배포 URL: https://92leejun.github.io/rubicon-3/
 
 on:
   push:
@@ -10,16 +11,10 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
-  pages: write
-  id-token: write
-
-concurrency:
-  group: pages
-  cancel-in-progress: true
+  contents: write   # gh-pages 브랜치 푸시용
 
 jobs:
-  build:
+  build-deploy:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -34,16 +29,9 @@ jobs:
         working-directory: frontend
         env:
           DEPLOY_BASE: /rubicon-3/
-      - uses: actions/upload-pages-artifact@v3
+      - name: Publish to gh-pages
+        uses: peaceiris/actions-gh-pages@v4
         with:
-          path: frontend/dist
-
-  deploy:
-    needs: build
-    runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    steps:
-      - id: deployment
-        uses: actions/deploy-pages@v4
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./frontend/dist
+          force_orphan: true   # gh-pages 히스토리 단순화

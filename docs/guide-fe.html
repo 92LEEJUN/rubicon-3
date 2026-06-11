@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>FE 필독 가이드 — 삼성 AI 컨시어지</title>
+<style>
+  :root{ --accent:#1d4ed8; --accent2:#3b5bdb; --ink:#16202e; --muted:#5b6b80; --line:#e3e8ef; --bg:#f5f7fb; --card:#fff; --chip:#eaf1ff; }
+  *{box-sizing:border-box} body{margin:0;font-family:system-ui,-apple-system,"Segoe UI","Apple SD Gothic Neo","Malgun Gothic",sans-serif;color:var(--ink);background:var(--bg);line-height:1.65}
+  .wrap{max-width:1000px;margin:0 auto;padding:0 20px 80px}
+  a{color:var(--accent);text-decoration:none} a:hover{text-decoration:underline}
+  header.hero{background:linear-gradient(135deg,#0b1f3a,var(--accent));color:#fff;padding:38px 0 30px}
+  .hero h1{margin:0 0 6px;font-size:27px}
+  .hero .role{display:inline-block;background:rgba(255,255,255,.16);border:1px solid rgba(255,255,255,.3);padding:3px 12px;border-radius:999px;font-size:13px;margin-bottom:10px}
+  .hero p{margin:4px 0;opacity:.93;font-size:15px}
+  .nav{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}
+  .nav a{background:rgba(255,255,255,.14);color:#fff;padding:4px 11px;border-radius:7px;font-size:13px}
+  section{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:20px 22px;margin-top:18px;box-shadow:0 1px 2px rgba(16,32,60,.03)}
+  h2{margin:0 0 12px;font-size:19px;color:#0b1f3a;display:flex;align-items:center;gap:8px}
+  h2 .n{font-size:12px;background:var(--chip);color:var(--accent);border-radius:7px;padding:2px 8px;font-weight:700}
+  .own{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  .own .box{border:1px solid var(--line);border-radius:10px;padding:12px 14px}
+  .own .yes{background:#eaf1ff;border-color:#cfe0ff} .own .no{background:#fbfcfe}
+  .own h4{margin:0 0 6px;font-size:14px} .own ul{margin:0;padding-left:18px;font-size:13.5px} .own li{margin:3px 0}
+  .docgrid{display:grid;grid-template-columns:1fr;gap:10px}
+  .doc{border:1px solid var(--line);border-radius:10px;padding:12px 14px;background:#fbfcfe}
+  .doc .f{font-family:ui-monospace,Menlo,monospace;font-size:13px;color:#0b1f3a;font-weight:700}
+  .doc .why{font-size:13.5px;color:var(--muted);margin-top:3px}
+  .doc .focus{font-size:13px;margin-top:5px}
+  .badge{display:inline-block;font-size:11px;font-weight:700;border-radius:6px;padding:1px 7px;background:var(--chip);color:var(--accent);margin-left:6px}
+  ul.flat{margin:6px 0;padding-left:20px} ul.flat li{margin:4px 0;font-size:14px}
+  code{background:#f0f3f9;border:1px solid #e2e8f2;border-radius:5px;padding:1px 5px;font-size:12.5px;font-family:ui-monospace,Menlo,monospace}
+  .callout{border-left:4px solid var(--accent);background:#eef4ff;border-radius:0 8px 8px 0;padding:10px 14px;margin:10px 0;font-size:13.5px}
+  footer{color:var(--muted);font-size:12.5px;text-align:center;margin-top:24px}
+  @media(max-width:680px){.own{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<header class="hero"><div class="wrap">
+  <span class="role">📱 Frontend (React Native)</span>
+  <h1>FE 필독 가이드</h1>
+  <p>BE 계약(템플릿 모델)을 <b>렌더</b>하는 앱. 홈·CS·전역 채팅 패널·브릿지 모달. <b>라우팅 판단은 하지 않는다.</b></p>
+  <div class="nav"><a href="#own">책임</a><a href="#docs">필독 문서</a><a href="#contract">계약</a><a href="#diag">다이어그램</a><a href="#care">주의</a></div>
+</div></header>
+
+<div class="wrap">
+  <section id="own">
+    <h2><span class="n">01</span>내 책임 / 경계</h2>
+    <div class="own">
+      <div class="box yes"><h4>✅ 내가 한다</h4><ul>
+        <li>화면(S1 홈·S2 CS·S3 채팅·S4 브릿지) 렌더</li>
+        <li>템플릿 14종 + <b>섹션 스택</b>(복합 R7) 렌더</li>
+        <li>스트리밍 표시(타이핑·점진), 멀티모달 입력</li>
+        <li>CTA 처리(대화형→/chat, 커밋→엔드포인트)</li>
+        <li>상태/훅, 분석 이벤트 발생(동의 게이트)</li>
+      </ul></div>
+      <div class="box no"><h4>🚫 내가 안 한다</h4><ul>
+        <li>LLM이냐 도메인이냐 <b>라우팅 판단</b>(BE 몫)</li>
+        <li>브릿지/패널 분기 결정(BE가 surface 반환)</li>
+        <li>비즈니스 로직·집계(API/표현 계층)</li>
+        <li>카탈로그 브라우즈 화면(없음 — 카드/챗만)</li>
+      </ul></div>
+    </div>
+  </section>
+
+  <section id="docs">
+    <h2><span class="n">02</span>필독 문서 (우선순위)</h2>
+    <div class="docgrid">
+      <div class="doc"><div class="f">docs/wireframes.md <span class="badge">화면</span></div><div class="why">렌더할 화면 구조</div><div class="focus">S1 홈·S2 CS·S3 채팅 패널·<b>S4 브릿지 모달</b>·상태 4종(로딩/빈/에러/재시도)</div></div>
+      <div class="doc"><div class="f">docs/response-templates.md <span class="badge">계약</span></div><div class="why">무엇을 렌더하나 (14종)</div><div class="focus">kind별 data 스키마·CTA 매핑·§8 인터랙션 회신·<b>§5 복합=MessageSection 섹션</b>·§9 브릿지</div></div>
+      <div class="doc"><div class="f">docs/frontend-architecture.md <span class="badge">핵심</span></div><div class="why">FE 내부 구조</div><div class="focus">§2 상태·§3 네비(카드 탭→surface)·§4 렌더러·§5 트랜스포트(WebSocket)·<b>§11 훅·reducer</b>·§10 레이아웃</div></div>
+      <div class="doc"><div class="f">docs/api-contract.md <span class="badge">계약</span></div><div class="why">서버와 주고받는 것</div><div class="focus">§2.1 WS <code>/chat</code>(<b>section 청크</b>)·§2.2 엔드포인트·§2.3 <code>/surface</code>(브릿지/패널)·§3 조용한 재인증</div></div>
+      <div class="doc"><div class="f">docs/analytics.md <span class="badge">측정</span></div><div class="why">FE가 쏠 이벤트</div><div class="focus"><code>screen_view/exit</code>·<code>cta_click</code>·<code>flow_*</code>·브릿지 퍼널. <b>동의 없으면 no-op</b>(R19)</div></div>
+      <div class="doc"><div class="f">specs/.../journeys.md <span class="badge">맥락</span></div><div class="why">실제 흐름 감각</div><div class="focus">J1~J5 구체 저니(특히 J5 복합 질문 렌더)</div></div>
+    </div>
+  </section>
+
+  <section id="contract">
+    <h2><span class="n">03</span>내가 빌드할 계약 (1:1 대응)</h2>
+    <ul class="flat">
+      <li><code>templates/</code> ← <b>response-templates</b> (kind→컴포넌트 레지스트리, 모르는 kind=text 폴백)</li>
+      <li><code>transport/</code> ← <b>api-contract §2.1</b> (ChatTransport 추상화 + WebSocket)</li>
+      <li><code>api/</code> ← <b>api-contract §2.2/2.3</b> (결정적 엔드포인트·surface)</li>
+      <li><code>types/</code> ← <b>data-model DTO</b> (ChatRequest·MessageSection·ChatResponseChunk)</li>
+      <li><code>hooks/·state/</code> ← <b>frontend-architecture §11</b> (useChat·useCardTap·useCta·useAnalytics + reducer)</li>
+    </ul>
+    <div class="callout"><b>계약 Stub로 BE 없이 개발.</b> Stub은 fixtures(<code>specs/.../fixtures/</code>)를 재생 — 같은 데이터로 통합(api-contract §5).</div>
+  </section>
+
+  <section id="diag">
+    <h2><span class="n">04</span>핵심 다이어그램 · 시나리오</h2>
+    <ul class="flat">
+      <li><b>docs/diagrams.md → FE</b>: 사용자 여정 · 화면 네비 플로우 · 컴포넌트+상태관리 · <b>메시지 렌더 파이프라인(section)</b></li>
+      <li><b>BE 상태 → WebSocket 연결 상태</b>(트랜스포트 상태머신)</li>
+      <li><b>journeys.md J5</b>: 복합 질문 → 의도별 섹션 스택 + 처리/미처리 구분</li>
+    </ul>
+  </section>
+
+  <section id="care">
+    <h2><span class="n">05</span>주의 / 알아둘 결정</h2>
+    <ul class="flat">
+      <li><b>카드 탭 → surface</b>: BE가 <code>bridge</code>(모달 S4)/<code>panel</code>(S3)을 동적 결정. FE는 surface만 보고 렌더.</li>
+      <li><b>CTA 두 경로</b>: 대화형 CTA→<code>/chat</code> 재진입(LLM 가능) / 되돌릴 수 없는 커밋→결정적 엔드포인트(LLM 미경유).</li>
+      <li><b>복합 응답=섹션</b>: 한 어시스턴트 턴에 <code>sections[]</code>(라벨·handled). 단발=1개.</li>
+      <li><b>WebSocket 우선안</b> — 스파이크 결과로 보정 가능(SSE/대안). 트랜스포트 추상화 뒤에서 교체.</li>
+      <li><b>디자인 토큰/플레이스홀더</b> — 애셋 도착 시 값만 교체.</li>
+    </ul>
+  </section>
+
+  <footer>FE 필독 가이드 · 파생 문서(온보딩용) · 단일 출처는 각 기반 문서</footer>
+</div>
+</body>
+</html>

@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>BE 도메인 필독 가이드 — 삼성 AI 컨시어지</title>
+<style>
+  :root{ --accent:#b54708; --ink:#16202e; --muted:#5b6b80; --line:#e3e8ef; --bg:#f5f7fb; --card:#fff; --chip:#fef0e6; }
+  *{box-sizing:border-box} body{margin:0;font-family:system-ui,-apple-system,"Segoe UI","Apple SD Gothic Neo","Malgun Gothic",sans-serif;color:var(--ink);background:var(--bg);line-height:1.65}
+  .wrap{max-width:1000px;margin:0 auto;padding:0 20px 80px}
+  a{color:var(--accent);text-decoration:none} a:hover{text-decoration:underline}
+  header.hero{background:linear-gradient(135deg,#3a1d06,var(--accent));color:#fff;padding:38px 0 30px}
+  .hero h1{margin:0 0 6px;font-size:27px}
+  .hero .role{display:inline-block;background:rgba(255,255,255,.16);border:1px solid rgba(255,255,255,.3);padding:3px 12px;border-radius:999px;font-size:13px;margin-bottom:10px}
+  .hero p{margin:4px 0;opacity:.93;font-size:15px}
+  .nav{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}
+  .nav a{background:rgba(255,255,255,.14);color:#fff;padding:4px 11px;border-radius:7px;font-size:13px}
+  section{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:20px 22px;margin-top:18px;box-shadow:0 1px 2px rgba(16,32,60,.03)}
+  h2{margin:0 0 12px;font-size:19px;color:#3a1d06;display:flex;align-items:center;gap:8px}
+  h2 .n{font-size:12px;background:var(--chip);color:var(--accent);border-radius:7px;padding:2px 8px;font-weight:700}
+  .own{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  .own .box{border:1px solid var(--line);border-radius:10px;padding:12px 14px}
+  .own .yes{background:#fef0e6;border-color:#fde4c9} .own .no{background:#fbfcfe}
+  .own h4{margin:0 0 6px;font-size:14px} .own ul{margin:0;padding-left:18px;font-size:13.5px} .own li{margin:3px 0}
+  .docgrid{display:grid;grid-template-columns:1fr;gap:10px}
+  .doc{border:1px solid var(--line);border-radius:10px;padding:12px 14px;background:#fbfcfe}
+  .doc .f{font-family:ui-monospace,Menlo,monospace;font-size:13px;color:#3a1d06;font-weight:700}
+  .doc .why{font-size:13.5px;color:var(--muted);margin-top:3px}
+  .doc .focus{font-size:13px;margin-top:5px}
+  .badge{display:inline-block;font-size:11px;font-weight:700;border-radius:6px;padding:1px 7px;background:var(--chip);color:var(--accent);margin-left:6px}
+  ul.flat{margin:6px 0;padding-left:20px} ul.flat li{margin:4px 0;font-size:14px}
+  code{background:#f0f3f9;border:1px solid #e2e8f2;border-radius:5px;padding:1px 5px;font-size:12.5px;font-family:ui-monospace,Menlo,monospace}
+  .callout{border-left:4px solid var(--accent);background:#fff5ec;border-radius:0 8px 8px 0;padding:10px 14px;margin:10px 0;font-size:13.5px}
+  footer{color:var(--muted);font-size:12.5px;text-align:center;margin-top:24px}
+  @media(max-width:680px){.own{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<header class="hero"><div class="wrap">
+  <span class="role">⚙️ Backend 도메인 (FastAPI)</span>
+  <h1>BE 도메인 필독 가이드</h1>
+  <p>도메인 로직 + 오케스트레이션 + 어댑터(Port/Repository). <b>외부 연동=Port, 내부 데이터=Repository.</b> Mock↔실 어댑터 교체로 단계 전환.</p>
+  <div class="nav"><a href="#own">책임</a><a href="#docs">필독 문서</a><a href="#contract">계약</a><a href="#diag">다이어그램</a><a href="#care">주의</a></div>
+</div></header>
+
+<div class="wrap">
+  <section id="own">
+    <h2><span class="n">01</span>내 책임 / 경계</h2>
+    <div class="own">
+      <div class="box yes"><h4>✅ 내가 한다</h4><ul>
+        <li>오케스트레이터(의도분류·흐름·tool 조합·스트리밍)</li>
+        <li>도메인 서비스(기기·CS·카탈로그·주문·개인화·알림)</li>
+        <li>Port/Repository 구현 + Mock↔실 어댑터(ACL)</li>
+        <li>RAG(CS 인제스천·검색)·이상 판정·부품 매칭</li>
+        <li>되돌릴 수 없는 행동 게이트(R17)·폴백(R13)</li>
+      </ul></div>
+      <div class="box no"><h4>🚫 내가 안 한다</h4><ul>
+        <li>화면 렌더 / 클라이언트 페이로드 정형화(BFF)</li>
+        <li>WebSocket 중계·인증 게이트(API/표현 계층)</li>
+        <li>(MVP) 실제 결제·SSO·실 푸시 — Mock 경계 뒤</li>
+      </ul></div>
+    </div>
+  </section>
+
+  <section id="docs">
+    <h2><span class="n">02</span>필독 문서 (우선순위)</h2>
+    <div class="docgrid">
+      <div class="doc"><div class="f">docs/data-model.md <span class="badge">핵심</span></div><div class="why">내가 구현할 타입·계약 전부</div><div class="focus">엔티티·불변식·§5 Repository·<b>§6 Port</b>·§7 예외·<b>§8 모듈 레이아웃</b>·동의 scope·TokenProvider·DeviceEvent</div></div>
+      <div class="doc"><div class="f">docs/architecture.md <span class="badge">핵심</span></div><div class="why">시스템·Mock↔실·외부 데이터</div><div class="focus">§1~4 구조·<b>§5 Mock↔실 + ACL(SmartThings·CS·제품)</b>·§10 선제(이벤트 구독)·§12 도메인 맵</div></div>
+      <div class="doc"><div class="f">docs/orchestration.md <span class="badge">핵심</span></div><div class="why">오케스트레이터 내부</div><div class="focus">파이프라인·<b>tool 레이어(API/DB/compute)</b>·의도분류(구조화+규칙)·RAG·프롬프트/캐싱</div></div>
+      <div class="doc"><div class="f">specs/.../design.md <span class="badge">결정</span></div><div class="why">왜 이렇게</div><div class="focus">§6 비즈니스 로직 결정 7종·§7 스파이크·§8 O2O 심화</div></div>
+      <div class="doc"><div class="f">specs/.../fixtures/ <span class="badge">데이터</span></div><div class="why">Mock 어댑터가 반환할 더미</div><div class="focus">user·devices·anomalies·solutions·catalog (세탁기·냉장고·공기청정기)</div></div>
+      <div class="doc"><div class="f">specs/.../requirements.md <span class="badge">요구</span></div><div class="why">무엇을/왜 (R1~R29)</div><div class="focus">수용기준(EARS)·Mock→실 마커</div></div>
+    </div>
+  </section>
+
+  <section id="contract">
+    <h2><span class="n">03</span>내가 빌드할 계약</h2>
+    <ul class="flat">
+      <li><b>Port 인터페이스</b>(data-model §6) — Device·CSKnowledge·Catalog·Order·Store·Quote·Handoff·Warranty·Auth·Trust·ActionGate·Alert·Consent·Analytics + <code>TokenProvider</code></li>
+      <li><b>Repository</b>(§5) — Conversation·Session·Order·<b>Engagement</b>(내부 데이터)</li>
+      <li><b>도메인 서비스</b> — 오케스트레이터가 인프로세스 함수로 호출, tool로 노출</li>
+      <li><b>Mock + Real</b> 두 구현, 의존성 주입 교체. 모듈 레이아웃 data-model §8.</li>
+    </ul>
+    <div class="callout">계약 테스트로 <b>Mock/실이 같은 계약</b> 만족 보장 → 교체 안전. fixtures를 Mock이 반환.</div>
+  </section>
+
+  <section id="diag">
+    <h2><span class="n">04</span>핵심 다이어그램</h2>
+    <ul class="flat">
+      <li><b>diagrams.md → BE</b>: 도메인 클래스 · 서비스/Port/어댑터 · 예외 계층</li>
+      <li><b>시퀀스</b>: 메인(이상→해결→주문) · 주문 게이트 · 선제 알림 · 핸드오프/예약 · <b>SmartThings 이벤트 구독</b> · O2O</li>
+      <li><b>상태</b>: Order · FlowState · WebSocket / <b>RAG·CS 인제스천</b> · 도메인 맵</li>
+    </ul>
+  </section>
+
+  <section id="care">
+    <h2><span class="n">05</span>주의 / 알아둘 결정</h2>
+    <ul class="flat">
+      <li><b>내부=Repository / 외부=Port</b> — "전부 API가 아니다". 오케스트레이터→도메인은 함수 호출.</li>
+      <li><b>외부 데이터 3종 성격</b> — SmartThings=실시간 이벤트(구독·서명검증) / CS=정적 배치 인제스천 / 제품=demand-driven(by-id·매칭, 브라우즈 없음).</li>
+      <li><b>TokenProvider</b> — PAT(스파이크)→OAuth(MVP)→Enterprise(조직). 데이터/이벤트 스키마는 공통, 토큰만 교체.</li>
+      <li><b>검증 스파이크</b>(design §7) — O2O·SmartThings 오류코드 노출·CS 매핑·부품 매핑·동의. ⚠️ ST 오류코드 API 노출 불확실.</li>
+      <li><b>되돌릴 수 없는 커밋</b>은 LLM 경로 밖 + ActionGate(R17).</li>
+    </ul>
+  </section>
+
+  <footer>BE 도메인 필독 가이드 · 파생 문서(온보딩용) · 단일 출처는 각 기반 문서</footer>
+</div>
+</body>
+</html>

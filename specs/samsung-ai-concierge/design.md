@@ -124,7 +124,9 @@ sequenceDiagram
   근거를 함께 제시. 데이터 부족 시 일반 추천 폴백(R8).
 - **확인 정보(Engagement)** — 열람/무시/관심을 `EngagementRepository`에 기록(R29). 추천·알림 생성 시
   `has_seen`/`dismissed`로 **중복 제시 방지**, `interests`로 개인화 신호 반영(R8·R26). 분석(R28)과 달리
-  **앱 동작을 바꾸는 내부 도메인 상태**다(`architecture.md` §12). 동의·삭제는 R19.
+  **앱 동작을 바꾸는 내부 도메인 상태**다(`architecture.md` §12). `Consent.scopes`에 `engagement`가 있을 때만 기록·활용(R19).
+- **금액 분해** — `order_summary`는 `subtotal·shipping_fee·tax·discount·total`로 분해 표시(C, response-templates §3). MVP는 Mock 값.
+- **브릿지 surface** — 카드 탭은 `POST /surface`로 BE가 `bridge`(모달)/`panel`(대화) 동적 판단(api-contract §2.3, response-templates §9).
 - **템플릿/CTA** — 응답은 `Template` + `Cta`로 구조화, 클라이언트가 렌더링. 템플릿 카탈로그·data
   스키마·선택/CTA 매핑 규칙은 기반 문서 [`docs/response-templates.md`](../../docs/response-templates.md) 참조(R10·R11).
 - **확인 게이트** — 결제·주문·방문 등은 `ActionGatePort.requires_confirmation`으로 확인 후 처리(R17).
@@ -149,9 +151,10 @@ sequenceDiagram
 | LLM 응답 지연/타임아웃 | 상태 표시 + 대기/재시도/취소 (R14) |
 | 신뢰도 낮음(TrustPort) | 경고 + 사람 연결 권유 (R16) |
 | 부품 매칭 모호 | 임의 선택 금지 → 후보 제시/확인 (R4-3) |
-| 결제/취소 실패 | 결제 보류·재시도, 취소 불가 단계면 사유 안내 + 대안 (R21) |
+| 결제/취소 실패 (I) | **일반 폴백 재사용** — 보류 안내 + 재시도 CTA. 취소 불가 단계면 사유 안내 + 대안 (R13·R21) |
 | 위험 작업(R23) | 안전 경고 표시, `danger`/`pro_required`면 셀프 차단 → 기사 연결 우선 |
 | 미연동 사용자 | 기능 차단 금지 → 연동 유도 + 일반 안내 폴백 (R24·R13-2) |
+| 세션 토큰 만료 (L) | **조용한 재인증** — 백그라운드 재발급 + 흐름 유지, 실패 시에만 재로그인 안내 (api-contract §3) |
 
 원칙: **어떤 단일 외부 실패도 전체 대화를 중단시키지 않는다.**
 
@@ -236,6 +239,21 @@ sequenceDiagram
 
 ## 7. 후속 검증 (Spike)
 
-- 아키텍처·기술 스택·데이터 모델 결정은 기반 문서(`docs/architecture.md`, `docs/data-model.md`)에 기록.
-- **후속 검증 스파이크** — `requirements.md` "미해결 질문"(O2O 주문 지원, SmartThings 이상 지표,
-  CS 구조, 제품-부품 매핑, 개인화 동의)을 확인해 본 설계와 기반 문서를 보정한다.
+**스파이크 = 구현 전, 리스크 큰 가정을 타임박스로 찔러보고 확인하는 조사.** 버리는 코드/조사이며,
+"가능/불가/부분"으로 답해 설계를 보정한다. 우리 설계는 아래 가정 위에 서 있어, 틀리면 해당 설계가 바뀐다.
+
+### A. API/데이터 검증 스파이크 (`requirements.md` 미해결 질문)
+| 검증 질문 | 방법 | 합격 기준 | 틀리면 영향받는 설계 |
+|-----------|------|-----------|----------------------|
+| O2O가 실제 주문/연결 지원? 인증·데이터는? | 샘플 주문 호출 | 주문 생성/연결 성공 | 주문 흐름(R4)·`OrderPort` 실 전환·R21 |
+| SmartThings 개인 API가 이상 지표(오류코드·소모품 수명) 제공? | PAT로 기기 덤프 | 이상 판정에 쓸 지표 존재 | 이상 감지(§6.3)·`DevicePort` |
+| CS 데이터 구조·기기↔해결법 매칭 범위? | 데이터 샘플 검토 | 매칭 가능 + 출처 확보 | 해결 가이드(R3)·RAG(§6.2)·R22 |
+| 제품정보 기기↔부품 매핑 수준? | 샘플 매핑 시도 | 정확 매칭/후보 산출 | 부품 매칭(R4)·`CatalogPort` |
+| 개인화/Engagement 저장·보존·동의 처리? | 정책·범위 확인 | 동의 scope·보존 정책 확정 | R8·R29·R19 |
+
+### B. WebSocket 트랜스포트 스파이크 (`docs/frontend-architecture.md` §5)
+| 검증 질문 | 방법 | 합격 기준 | 틀리면 |
+|-----------|------|-----------|--------|
+| RN에서 WS 스트리밍·재연결·백그라운드 전환이 안정적? | `/chat` 왕복 PoC | 끊김 없는 스트리밍·자동 재연결 | SSE/대안으로 보정 |
+
+- 결과는 본 설계와 기반 문서(`architecture.md`·`data-model.md`)에 **보정 반영**한다.

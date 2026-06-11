@@ -1,0 +1,12 @@
+{
+  "name": "mvp-concierge-e2e",
+  "version": "0.1.0",
+  "private": true,
+  "description": "E2E 풀테스트 — FE(웹) ↔ BFF ↔ BE 실 스택 J1~J5(Playwright).",
+  "scripts": {
+    "test": "playwright test"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.49.1"
+  }
+}

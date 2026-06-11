@@ -5,8 +5,10 @@ import { App } from "./App";
 
 function Root() {
   const params = new URLSearchParams(typeof location !== "undefined" ? location.search : "");
-  const screen = params.get("screen") === "chat" ? "chat" : "home";
-  return <App initialScreen={screen} />;
+  const raw = params.get("screen");
+  const screen = raw === "chat" ? "chat" : raw === "live" ? "live" : "home";
+  const wsUrl = params.get("ws") || undefined;
+  return <App initialScreen={screen} wsUrl={wsUrl} />;
 }
 
 AppRegistry.registerComponent("ConciergeApp", () => Root);

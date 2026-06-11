@@ -22,6 +22,10 @@ def create_app(backend: Optional[BackendClient] = None) -> FastAPI:
     app = FastAPI(title="MVP 컨시어지 — BFF (클라이언트 표면)")
     app.state.backend = backend or BackendClient()
 
+    @app.get("/health")
+    def health():
+        return {"status": "ok"}
+
     # ── 결정적 조회(§2.2) — 인증 게이트 ────────────────────────────────────
     @app.get("/devices")
     async def list_devices(user: str = Depends(require_auth), be: BackendClient = Depends(_backend)):
@@ -71,7 +75,9 @@ def create_app(backend: Optional[BackendClient] = None) -> FastAPI:
     @app.websocket("/chat")
     async def chat(ws: WebSocket):
         await ws.accept()
-        if ws_user(ws.headers.get("authorization")) is None:
+        # 브라우저 WebSocket은 헤더를 못 보내므로 쿼리 토큰(?token=)도 허용(api-contract §3).
+        token = ws.headers.get("authorization") or ws.query_params.get("token")
+        if ws_user(token) is None:
             await ws.send_json({"type": "error", "code": "unauthorized",
                                 "fallback": {"kind": "text", "data": {"message": "인증이 필요합니다."}}})
             await ws.close()

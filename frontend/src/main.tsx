@@ -3,7 +3,7 @@ import React from "react";
 import { AppRegistry } from "react-native";
 import { App, type ScreenName } from "./App";
 
-const SCREENS: ScreenName[] = ["home", "chat", "live", "gallery"];
+const SCREENS: ScreenName[] = ["home", "support", "chat", "live", "gallery"];
 
 function Root() {
   const params = new URLSearchParams(typeof location !== "undefined" ? location.search : "");

@@ -39,6 +39,7 @@ const page = await browser.newPage({ viewport: { width: 390, height: 844 }, devi
 
 const SHOTS = [
   { name: "home", screen: "home" },
+  { name: "support", screen: "support" },
   { name: "chat-j1", screen: "chat" },
   { name: "gallery", screen: "gallery" },
 ];

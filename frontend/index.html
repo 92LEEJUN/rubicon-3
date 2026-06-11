@@ -7,6 +7,10 @@
     <style>
       html, body, #root { height: 100%; margin: 0; }
       body { background: #f5f6f8; }
+      /* RN-web가 #root 안에 만드는 앱 컨테이너가 뷰포트 높이를 꽉 채우도록 —
+         그래야 내부 ScrollView가 스크롤되고 하단 채팅바가 화면에 고정된다. */
+      #root { display: flex; flex-direction: column; }
+      #root > * { flex: 1 1 auto; min-height: 0; }
     </style>
   </head>
   <body>

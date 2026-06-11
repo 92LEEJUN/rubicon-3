@@ -79,7 +79,12 @@ classDiagram
     +str name
     +str step
   }
+  class Warranty {
+    +bool in_warranty
+    +Coverage scope
+  }
   User "1" --> "*" Device : owns
+  Device "1" --> "0..1" Warranty : covered_by
   User "1" --> "*" Conversation
   User "1" --> "*" Order
   Device "1" --> "*" Consumable
@@ -389,7 +394,7 @@ flowchart TD
   CO --> CD[동의 범위 안내 / 거부]
 ```
 
-### 오케스트레이션 파이프라인
+### 오케스트레이션 파이프라인 (Reactive)
 
 ```mermaid
 flowchart LR
@@ -401,6 +406,23 @@ flowchart LR
   F --> G[Template 생성]
   G --> H[스트리밍 전달]
 ```
+
+### 선제(Proactive) 파이프라인
+
+```mermaid
+flowchart LR
+  T["기기 텔레메트리<br/>(폴링 / 이벤트)"] --> M[이상·임계치 판정]
+  M --> N[알림 생성·집약]
+  N --> F{빈도·중요도<br/>R26}
+  F --> PRI[우선순위·다중기기<br/>R27]
+  PRI --> G{옵트인·동의<br/>R20·R19}
+  G -->|허용| A[AlertPort 전달]
+  G -->|거부| X[발송 안 함]
+  A --> U[사용자]
+  U -. 탭 → reactive .-> CHAT["/chat"]
+```
+
+> 상세: `docs/architecture.md` §10 · `scenarios.md` §4-B.
 
 ---
 

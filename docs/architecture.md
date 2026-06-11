@@ -118,7 +118,8 @@ flowchart TB
 | SmartThings (STP) | 개인 API(PAT) 실연동 + 일부 Mock 시나리오 | 기업 API 확장 |
 | CS 데이터 (CSDataP) | 실데이터 일부 적재 | 전체 CS 연동 |
 | 제품정보 (CatP) | 실데이터 일부 | 전체 카탈로그 |
-| O2O 주문 (O2OP) | **Mock** (주문 성공/실패 시뮬레이션) | 실제 주문/결제 연동 |
+| O2O 주문 (O2OP) | **Mock** (주문 성공/실패·취소/환불 시뮬레이션, R21) | 실제 주문/결제 연동 |
+| 보증 (WarrantyP) | **Mock** 샘플 보증 규칙 (R22) | 실 보증 데이터 연동 |
 | Auth/계정 (AuthP) | **Mock** 고정 사용자/기기 | 삼성 계정 SSO |
 | 신뢰성/근거 (TrustP) | **Mock** 고정 규칙/샘플 출처 | 실제 grounding·평가 |
 | 행동 확인 (ActP) | 확인 UX는 실제, 처리만 Mock | 실 결제/주문 커밋 |
@@ -257,3 +258,32 @@ flowchart TD
 ### MVP 판단
 단일 클라이언트(RN) + Mock 중심 + 단일 배포라 **지금 분리 이득은 없다**(계층·운영 복잡도만 증가).
 **이음새만 지켜두고 통합 유지**, 위 트리거 발생 시 재검토한다.
+
+## 10. 선제(Proactive) 파이프라인
+
+§8 라우팅은 **사용자가 시작하는(reactive)** 요청을 다룬다. 반대로 **시스템이 먼저 시작하는(proactive)**
+경로 — 이상 감지·소모품 선제안·알림(R2·R5·R20·R26·R27) — 는 별도 파이프라인이다.
+(시나리오 분류는 `specs/samsung-ai-concierge/scenarios.md` §4-B.)
+
+```mermaid
+flowchart LR
+  T["기기 텔레메트리<br/>(MVP: 폴링 / 실: 이벤트 스트림)"] --> M[이상·임계치 판정<br/>DeviceService, design §6.3]
+  M --> N[알림 생성·집약<br/>NotificationService]
+  N --> F{빈도·중요도<br/>R26}
+  F --> PRI[우선순위·다중기기 묶음<br/>R27]
+  PRI --> G{옵트인·동의<br/>R20 · R19}
+  G -->|허용| A[AlertPort 전달<br/>인앱 / 푸시]
+  G -->|거부| X[발송 안 함]
+  A --> U[사용자]
+  U -.탭 → reactive.-> CHAT["/chat (§8)"]
+```
+
+### 원칙
+1. **트리거는 사용자가 아니라 이벤트/임계치.** 백그라운드 모니터링이 전제다(reactive와 근본적으로 다름).
+2. **동의·빈도 게이트 필수** — `opted_in`(R20)·`Consent`(R19)·빈도/중요도(R26)를 통과해야 전달. 과하면 신뢰 하락.
+3. **다중 동시 이상은 묶어서**(R27) — 심각도·안전 우선순위로 정렬, `home_summary`로 종합.
+4. **proactive → reactive 전이** — 알림을 탭하면 §8의 `/chat`으로 들어가 대화가 이어진다(맥락 주입).
+
+### Mock ↔ 실
+- **MVP** — 텔레메트리는 SmartThings 폴링/임계치, 전달은 인앱 Mock(AlertPort).
+- **실 전환** — 이벤트 스트림(예: 메시지 버스) 기반 실시간 감지 + 실 푸시 채널.

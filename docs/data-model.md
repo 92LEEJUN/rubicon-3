@@ -60,8 +60,9 @@ class AnomalyType(str, Enum):
 class Severity(str, Enum):               # 순서 의미 있음: info < warning < critical
     INFO = "info"; WARNING = "warning"; CRITICAL = "critical"
 
-class OrderStatus(str, Enum):            # 전이: DRAFT → CONFIRMED | FAILED (역전이 금지)
-    DRAFT = "draft"; CONFIRMED = "confirmed"; FAILED = "failed"   # MVP: Mock
+class OrderStatus(str, Enum):            # 전이: DRAFT→CONFIRMED|FAILED, CONFIRMED→CANCELLED→REFUNDED (R21)
+    DRAFT = "draft"; CONFIRMED = "confirmed"; FAILED = "failed"
+    CANCELLED = "cancelled"; REFUNDED = "refunded"               # MVP: Mock
 
 class ServiceRequestType(str, Enum):
     AGENT = "agent"; VISIT = "visit"
@@ -74,10 +75,18 @@ class IntentType(str, Enum):
 class NotificationType(str, Enum):
     ANOMALY = "anomaly"; CONSUMABLE_REORDER = "consumable_reorder"
 
+class SafetyLevel(str, Enum):            # 작업 위험도 (R23). 순서: none < caution < danger
+    NONE = "none"; CAUTION = "caution"; DANGER = "danger"
+
+class Coverage(str, Enum):               # 보증 유·무상 (R22)
+    FREE = "free"; PAID = "paid"; UNKNOWN = "unknown"
+
 class CtaType(str, Enum):
     ADD_TO_CART = "add_to_cart"; CHECKOUT = "checkout"
     CONNECT_AGENT = "connect_agent"; REQUEST_VISIT = "request_visit"
     REORDER = "reorder"
+    CANCEL_ORDER = "cancel_order"        # R21
+    CONFIRM_RESOLVED = "confirm_resolved" # R25 수리 후 확인
 ```
 
 ## 3. 도메인 엔티티
@@ -87,6 +96,7 @@ erDiagram
   USER ||--o{ DEVICE : owns
   USER ||--o{ CONVERSATION : has
   CONVERSATION ||--o{ MESSAGE : contains
+  DEVICE ||--o| WARRANTY : covered_by
   DEVICE ||--o{ ANOMALY : raises
   ANOMALY ||--o{ SOLUTION : resolved_by
   SOLUTION ||--o{ PART : requires
@@ -141,6 +151,8 @@ class SolutionStep:
     order: int                           # 1부터 연속, 유일
     instruction: str
     media: list[Media] = []              # 시각 자료 (R10)
+    safety: SafetyLevel = SafetyLevel.NONE   # 위험 작업 경고 (R23)
+    pro_required: bool = False           # 셀프 부적절 → 기사 연결 우선 (R23)
 
 class Solution:
     id: Id
@@ -149,6 +161,7 @@ class Solution:
     sources: list[Source]                # 근거 (R16). 비어있으면 신뢰도 낮음 취급
     required_parts: list[Id]             # 존재하는 Part.id
     escalation_needed: bool              # 사람 연결 필요 (R18)
+    coverage: Coverage = Coverage.UNKNOWN    # 보증 유·무상 판별 (R22)
 
 class Part:
     id: Id
@@ -168,6 +181,13 @@ class Order:
     items: list[OrderItem]               # 1개 이상
     status: OrderStatus                  # MVP: Mock. 전이 규칙 준수
     confirmed_at: datetime | None        # CONFIRMED 일 때만 존재 (R17)
+    cancelled_at: datetime | None = None # CANCELLED 일 때 (R21)
+
+class Warranty:                          # 보증 (R22)
+    device_id: Id                        # 존재하는 Device 참조
+    in_warranty: bool
+    expires_at: datetime | None
+    scope: str | None = None             # 보증 범위 설명. MVP: Mock
 
 class ServiceRequest:                    # 사람 핸드오프 (R18)
     id: Id
@@ -195,6 +215,7 @@ class Notification:                      # 선제 알림 (R5·R20)
     body: str
     channel: str                         # MVP: "in_app"
     opted_in: bool                       # False면 발송 금지 (R20)
+    priority: Severity = Severity.INFO   # 빈도·중요도 정렬/묶음 (R26·R27)
 
 class Consent:                           # 프라이버시 (R19)
     user_id: Id
@@ -242,7 +263,9 @@ class Conversation:
 - **Device** — `consumables[].name` 유일, `life_remaining/threshold ∈ [0,1]`.
 - **Anomaly/Solution** — `Anomaly.device_id`·`Solution.required_parts`·`anomaly_id`는 **존재하는 참조**여야 한다(또는 명시적 null).
 - **Solution** — `steps` 1개 이상, `step.order`는 1부터 연속. `sources` 비면 `escalation_needed=True` 권장.
-- **Order** — `items` 1개 이상, 상태 전이는 `DRAFT→CONFIRMED|FAILED`만. `CONFIRMED`는 `confirmed_at` 필수(R17 확인 없이는 CONFIRMED 금지).
+- **Order** — `items` 1개 이상. 상태 전이는 `DRAFT→CONFIRMED|FAILED`, `CONFIRMED→CANCELLED→REFUNDED`만(역전이 금지). `CONFIRMED`는 `confirmed_at`, `CANCELLED`는 `cancelled_at` 필수(R17·R21).
+- **Warranty** — `device_id`는 존재하는 Device 참조. `in_warranty=False`면 유상(`Coverage.PAID`) 취급(R22).
+- **SolutionStep** — `safety=DANGER`이거나 `pro_required=True`면 셀프 진행 대신 기사 연결을 우선 안내(R23).
 - **Message** — `TEXT`면 `text` 필수, `IMAGE/VIDEO`면 `media` 필수. 생성 후 불변.
 - **Conversation** — `active_flow`와 `suspended_flow`는 동시에 같은 흐름을 가리키지 않는다. 채팅 전환 시 `active→suspended` 이동.
 - **Notification** — `opted_in=False`면 전달하지 않는다.
@@ -337,6 +360,10 @@ class CatalogPort(Protocol):                           # R4  제품정보
 class OrderPort(Protocol):                             # R4  O2O  MVP: Mock
     def add_to_cart(self, items: list[OrderItem]) -> Order: ...
     def checkout(self, order: Order) -> Order: ...     # 멱등 키 고려(중복 결제 방지)
+    def cancel(self, order_id: Id) -> Order: ...        # 취소→환불 상태전이 (R21)
+
+class WarrantyPort(Protocol):                          # R22  MVP: Mock
+    def get_warranty(self, device_id: Id) -> Warranty: ...
 
 class TrustPort(Protocol):                             # R16  MVP: Mock
     def evaluate(self, answer: str, sources: list[Source]) -> tuple[bool, float]: ...

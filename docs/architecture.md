@@ -170,9 +170,21 @@ flowchart TB
 - **이벤트(실 전환)** — 개인=사용자별 구독, Enterprise=계정 단위 webhook. 페이로드(capability/attribute)는 동일
   → 선제 파이프라인(§10) MVP 폴링을 이벤트로 바꿔도 도메인 매핑 불변.
 
-**Samsung CS (`CSKnowledgePort`)** — samsung.com/support 오류코드별 가이드(예: [4C/5C](https://www.samsung.com/us/support/troubleshoot/TSG10000997/))
-- 구조: **오류코드 → 의미 → 단계별 해결**. 예: `4C`=급수 문제 → (수도꼭지·호스 꺾임·메시필터 확인), `5C`=배수 문제 → (배수필터 청소·호스 정리).
-- **매핑이 깔끔함**: 코드별 문서 → `Solution.steps`(단계), `Source`(title·URL). 지역별 페이지라 로케일 고려.
+**Samsung CS (`CSKnowledgePort`)** — samsung.com/support는 **이미 구조화**돼 있어 그 구조를 그대로 흡수한다(예: [4C/5C](https://www.samsung.com/us/support/troubleshoot/TSG10000997/)).
+- **증상 기반 내비**(오류코드 / 표시등 / 아이콘)로 진입. 단일 문서 구조: **문제(오류코드+설명) → 원인 → 번호 단계 → 서비스 연결**.
+- **콘텐츠 타입 → 도메인 매핑** (거의 1:1):
+
+| CS 콘텐츠 | 우리 타입 |
+|-----------|-----------|
+| 오류코드 + 설명 | `Anomaly(type=ERROR_CODE)` / `Solution.anomaly_id` (코드=키) |
+| 원인 + 번호 단계 | `Solution.steps`(`SolutionStep.order/instruction`) |
+| 이미지/영상 | `SolutionStep.media`(R10) |
+| "서비스 요청" 안내 | `Solution.escalation_needed`(R18) |
+| 필요 부품/소모품 | `Solution.required_parts`(R4) |
+| 문서 출처(URL) | `Source(title·ref)`(R16) |
+| 아이콘/표시등 가이드 | 기기 상태 해석(보조) |
+
+- **로케일** — 지역별 페이지 → `Source`에 로케일 보관. CS는 정적·구조적이라 **RAG 인제스천이 쉬움**(orchestration §5).
 
 ## 6. 진입점 개요
 

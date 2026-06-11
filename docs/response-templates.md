@@ -55,9 +55,11 @@
   "anomalies": [ { "type": str, "severity": "info|warning|critical", "detail": str } ],
   "consumables": [ { "name": str, "life_remaining": float } ] }
 
-# order_summary
+# order_summary  (금액 분해 — C)
 { "items": [ { "part": PartRef, "qty": int, "price": int } ],
-  "total": int, "requires_confirmation": bool }   # R17
+  "subtotal": int, "shipping_fee": int, "tax": int, "discount": int,
+  "total": int,                                # = subtotal + shipping_fee + tax - discount
+  "requires_confirmation": bool }              # R17. 각 금액 ≥ 0 (data-model §0)
 
 # handoff_card
 { "reason": str, "options": ["agent" | "visit"], "context_ref": Id }

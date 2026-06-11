@@ -248,7 +248,7 @@ class Notification:                      # 선제 알림 (R5·R20)
 
 class Consent:                           # 프라이버시 (R19)
     user_id: Id
-    scopes: list[str]                    # 허용 범위 ("analytics" 포함 시 분석 수집 허용, R28)
+    scopes: list[str]                    # 허용 scope 키 (아래 §동의 scope). 키 없으면 해당 기능 비활성
     updated_at: datetime
 
 class AnalyticsEvent:                    # 사용 분석 이벤트 (R28). 명세: docs/analytics.md
@@ -306,8 +306,21 @@ class Conversation:
 - **Message** — `TEXT`면 `text` 필수, `IMAGE/VIDEO`면 `media` 필수. 생성 후 불변.
 - **Conversation** — `active_flow`와 `suspended_flow`는 동시에 같은 흐름을 가리키지 않는다. 채팅 전환 시 `active→suspended` 이동.
 - **Notification** — `opted_in=False`면 전달하지 않는다.
-- **Engagement** — append-only. 동의 범위(`Consent.scopes`) 안에서만 활용하고, 삭제 요청 시 cascade(R19·R29).
+- **Engagement** — append-only. `Consent.scopes`에 `engagement`가 있을 때만 기록·활용, 삭제 시 cascade(R19·R29).
 - **User** — `addresses` 중 `default=True`는 최대 1개.
+
+### 동의 scope (R19)
+
+`Consent.scopes`의 키. 각 기능은 자기 키가 있어야 개인 데이터를 쓴다(없으면 비활성·폴백).
+
+| scope 키 | 게이트 대상 | 관련 |
+|----------|-------------|------|
+| `device_data` | SmartThings 기기 데이터 사용 | R2·R5·R15 |
+| `personalization` | 대화 이력 기반 개인화 추천 | R8 |
+| `engagement` | 확인 정보(열람·무시·관심) 기록·활용 | R29 |
+| `analytics` | 사용 분석 이벤트 수집 | R28 |
+
+> 선제 알림 수신은 scope가 아니라 `Notification.opted_in`으로 별도 제어(R20).
 
 ## 4. API DTO (Pydantic, 예시)
 

@@ -77,11 +77,24 @@ FE의 **구조화된 호출**(조회·커밋)은 LLM 미경유로 직행(archite
 - `/orders` POST는 `confirmed=false`거나 게이트 미통과면 **`409`(`ConfirmationRequired`)** 반환(R17). 클라이언트는 `confirmation` 템플릿으로 확인 후 재요청.
 - 목록은 모두 **커서 페이지네이션**(`Page`, data-model §5).
 
+### 2.3 카드 탭 — surface 결정 (브릿지 vs 패널)
+카드 탭은 **BE가 surface를 동적 판단**한다(response-templates §9). bridge는 단발이라 `/chat`이 아닌 전용 호출.
+
+```python
+POST /surface   요청 { "card_type": str, "ref": Id, "screen_context": dict | None }
+  → { "surface": "bridge", "template": <bridge> }            # 간단 → 모달(S4)
+  → { "surface": "panel",  "conversation_id": Id }            # 복잡 → 대화 패널(S3) 진입
+```
+- `bridge.summary`는 LLM 생성 가능(가벼운 단발). 무거운 추론은 `surface: panel`로 넘긴다.
+- 에스컬레이션(`bridge.escalate`)·복잡 분기는 §2.1 `/chat`으로 이어진다.
+
 ## 3. 인증 / 세션
 
 - 인증 토큰은 헤더로 전달(`Authorization`), **도메인 모델에 저장 안 함**(architecture NFR). MVP는 AuthP Mock.
 - `session_id` 로 대화 맥락(FlowState)을 식별. 세션은 TTL 휘발성 저장(Redis 후보).
 - WebSocket 연결 시 토큰 검증(인증 게이트 = API/표현 계층, architecture §9).
+- **세션 토큰 만료(조용한 재인증, L)** — 대화 중 만료되면 **백그라운드로 토큰을 재발급**하고 진행 흐름을
+  유지한다. 재발급 실패 시에만 재로그인을 안내(R13). 사용자 흐름을 끊지 않는다.
 
 ## 4. 에러 / 폴백 (R13)
 

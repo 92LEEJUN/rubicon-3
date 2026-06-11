@@ -109,7 +109,7 @@ frontend/
 │  │  ├─ Home/                 # S1
 │  │  ├─ Support/              # S2 (CS)
 │  │  └─ ChatPanel/            # S3 (전역 오버레이)
-│  ├─ templates/               # kind → 컴포넌트 레지스트리 (§4, 13종)
+│  ├─ templates/               # kind → 컴포넌트 레지스트리 (§4, 14종)
 │  ├─ hooks/                   # 커스텀 훅 (§11)
 │  ├─ transport/               # ChatTransport 추상화 + WebSocket 구현 (§5)
 │  ├─ state/                   # 서버상태(쿼리)·UI/세션 store + reducer (§2·§11)

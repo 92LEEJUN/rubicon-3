@@ -11,8 +11,10 @@
 """
 from __future__ import annotations
 
+import json
+
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel
 
 from ..container import build_container
@@ -28,6 +30,13 @@ _orch = Orchestrator(container=_container)
 
 
 # ── 요청 모델 ────────────────────────────────────────────────────────────────
+class TurnRequest(BaseModel):
+    session_id: str = "s1"
+    text: str
+    media: list = []
+    screen_context: dict | None = None
+
+
 class OrderRequest(BaseModel):
     user_id: str = "usr_01"
     part_ids: list[str]
@@ -47,7 +56,7 @@ class SurfaceRequest(BaseModel):
 
 # ── 대화(WS) — 섹션 스트림 ──────────────────────────────────────────────────
 @app.websocket("/internal/turn")
-async def turn(ws: WebSocket) -> None:
+async def turn_ws(ws: WebSocket) -> None:
     await ws.accept()
     try:
         while True:
@@ -57,6 +66,15 @@ async def turn(ws: WebSocket) -> None:
                 await ws.send_json(chunk)
     except WebSocketDisconnect:
         return
+
+
+@app.post("/internal/turn")
+def turn_http(req: TurnRequest) -> StreamingResponse:
+    """BFF 중계용 HTTP 스트림(NDJSON) — 한 줄당 청크 1개(§2.1 봉투)."""
+    def gen():
+        for chunk in _orch.stream_turn(req.text, req.screen_context):
+            yield json.dumps(chunk, ensure_ascii=False) + "\n"
+    return StreamingResponse(gen(), media_type="application/x-ndjson")
 
 
 # ── 결정적 조회(HTTP) ────────────────────────────────────────────────────────

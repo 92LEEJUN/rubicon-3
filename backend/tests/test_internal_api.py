@@ -75,6 +75,17 @@ def test_surface_complex_returns_panel():
 
 
 # ── WS 스트림(§2.1) ─────────────────────────────────────────────────────────
+def test_http_turn_streams_ndjson():
+    import json
+    r = client.post("/internal/turn", json={"text": "세탁기 물이 안 빠져요. 부품도 주문할래요"})
+    assert r.status_code == 200
+    assert r.headers["content-type"].startswith("application/x-ndjson")
+    chunks = [json.loads(line) for line in r.text.splitlines() if line.strip()]
+    assert chunks[-1]["type"] == "done"
+    assert any(c["type"] == "section" and c["section"]["template"]["kind"] == "guide_steps"
+               for c in chunks)
+
+
 def test_ws_turn_streams_sections():
     with client.websocket_connect("/internal/turn") as ws:
         ws.send_json({"session_id": "s1", "text": "세탁기에서 물이 안 빠져요. 부품도 주문할래요"})

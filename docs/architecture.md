@@ -309,3 +309,27 @@ flowchart LR
 3. **체류** — `screen_view`/`screen_exit` dwell, 메시지·템플릿 노출.
 4. **동의·가명화 필수**(R19) — `Consent.scopes`에 `analytics` 없으면 수집 안 함, 식별자는 가명화. opt-out 즉시 중단.
 5. **비차단** — 분석 emit이 사용자 흐름을 지연·중단시키지 않는다(실패해도 무시).
+
+## 12. 도메인 맵 (Bounded Context)
+
+제품은 여러 도메인으로 구성된다. **외부 시스템 연동은 Port(어댑터), 내부 데이터는 Repository** 로 다룬다
+(api-contract §1의 "전부 API가 아니다"와 정합).
+
+| 도메인 | 책임 | 구현 | 외부/내부 |
+|--------|------|------|-----------|
+| User/Identity | 프로필·선호·주소·연동 | `AuthPort` + `User`/`Consent` | 외부(인증)+내부 |
+| **Engagement(확인 정보)** | 열람·무시·관심 상태 (R29) | **`EngagementRepository`** | **내부(DB)** |
+| Device/IoT | 기기·상태·이상 | `DevicePort`(SmartThings) | 외부 |
+| Catalog/Product | 제품·부품·스펙 | `CatalogPort` | 외부 |
+| Commerce/O2O | 장바구니·주문·취소(R21) | `OrderPort` | 외부 |
+| CS/Knowledge | 해결·근거·보증(R22) | `CSKnowledgePort`·`WarrantyPort` | 외부 |
+| Personalization | 추천(관심·보유 반영) | 서비스 + Engagement·이력 | 내부(조합) |
+| Notification | 선제 알림(R5·R26) | `AlertPort` + 정책 | 외부(전달) |
+| Conversation/Session | 대화·흐름·맥락 | `Conversation*`/`Session*` Repository | 내부 |
+| Analytics | 사용 측정(R28) | `AnalyticsPort` | 외부(sink) |
+
+### 원칙
+- **Engagement vs Analytics 구분** — Analytics(R28)는 측정용 fire-and-forget(앱 동작 불변), **Engagement(R29)는
+  앱 동작을 바꾸는 조회 가능한 도메인 상태**(중복 방지·관심 반영). 별개 도메인이다.
+- **내부 데이터는 Repository** — Engagement·Conversation·이력은 외부 Port가 아니라 내부 저장소.
+  Personalization은 Engagement·이력을 **조합**하는 내부 도메인이다.

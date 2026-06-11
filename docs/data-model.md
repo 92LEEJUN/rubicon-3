@@ -398,6 +398,6 @@ backend/
 │  ├─ repositories/
 │  │  ├─ memory/               # 기본(인메모리)
 │  │  └─ sql/                  # 옵셔널(Postgres+Redis)
-│  └─ llm/                     # Claude 클라이언트, 템플릿 구조화
+│  └─ llm/                     # LLM 클라이언트, 템플릿 구조화
 └─ tests/                      # 단위·계약·통합·폴백
 ```

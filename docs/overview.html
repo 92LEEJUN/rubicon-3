@@ -206,7 +206,7 @@
           <tr><td>프론트엔드</td><td><b>React Native</b></td><td>앱 (홈·CS·전역 채팅 패널)</td></tr>
           <tr><td>백엔드</td><td><b>FastAPI (Python)</b></td><td>단일 진입점 겸 오케스트레이션</td></tr>
           <tr><td>저장소</td><td>인메모리/로컬 → Postgres+Redis(옵셔널)</td><td>Repository 인터페이스로 교체</td></tr>
-          <tr><td>LLM</td><td><b>Claude</b></td><td>멀티모달·구조화 출력, 비용/지연별 모델 라우팅</td></tr>
+          <tr><td>LLM</td><td><b>범용 LLM</b> <span class="small">(provider-agnostic)</span></td><td>멀티모달·tool 호출·구조화 출력, 비용/지연별 모델 라우팅</td></tr>
         </table>
         <p class="small">상세: <code>docs/architecture.md</code></p>
       </div>
@@ -470,7 +470,7 @@ error     { code, fallback }</pre>
   <!-- ORCHESTRATION -->
   <section id="orch">
     <h2><span class="n">08</span>LLM 오케스트레이션</h2>
-    <p class="lead">의도 처리 → tool 호출 → 근거(RAG) → 응답 생성 → 스트리밍. Claude 단일 Messages API + tool use·구조화 출력 기반.</p>
+    <p class="lead">의도 처리 → tool 호출 → 근거(RAG) → 응답 생성 → 스트리밍. 단일 LLM 호출의 tool 호출·구조화 출력 기반.</p>
 
     <h3>처리 파이프라인</h3>
 <pre>수신 → ① 의도 분류·분해(하이브리드) → ② 흐름 반영(FlowState)
@@ -488,7 +488,7 @@ error     { code, fallback }</pre>
           <tr><td><code>get_history</code></td><td><b>DB</b>(Repository)</td></tr>
           <tr><td><code>create_order</code></td><td><b>Port</b> O2O + ActionGate(R17)</td></tr>
         </table>
-        <p class="small">의도 분류=구조화 출력 + 규칙 가드레일 / RAG=검색→근거 주입→출처 표기. 프롬프트 캐싱·adaptive thinking으로 비용·지연 최적화. 상세: <code>docs/orchestration.md</code></p>
+        <p class="small">의도 분류=구조화 출력 + 규칙 가드레일 / RAG=검색→근거 주입→출처 표기. 프롬프트 캐싱·추론 깊이 조절로 비용·지연 최적화. 상세: <code>docs/orchestration.md</code></p>
       </div>
     </details>
   </section>
@@ -496,7 +496,7 @@ error     { code, fallback }</pre>
   <!-- BE DIAGRAMS -->
   <section id="be">
     <h2><span class="n">09</span>BE 다이어그램 — 클래스 · 시퀀스 · 상태</h2>
-    <p class="lead">백엔드를 클래스/시퀀스/상태/파이프라인으로 시각화. <span class="small">(다이어그램은 Mermaid로 렌더 — 인터넷 연결 필요)</span></p>
+    <p class="lead">백엔드를 클래스/시퀀스/상태/파이프라인으로 시각화. <span class="small">(Mermaid 렌더 — 인터넷 필요)</span><br/>전체 다이어그램 모음(추가 시퀀스·DFD·FE 포함): <code>docs/diagrams.md</code> (GitHub에서 렌더).</p>
 
     <h3>도메인 클래스 다이어그램</h3>
     <div class="mermaid">
@@ -629,7 +629,7 @@ sequenceDiagram
   participant FE
   participant API as API/표현
   participant O as 오케스트레이터
-  participant LLM as Claude
+  participant LLM as LLM
   participant DEV as DevicePort
   participant CS as CSKnowledgePort(RAG)
   U->>FE: "세탁기 소리나요" (+사진)
@@ -751,7 +751,7 @@ flowchart LR
 ├─ adapters/      # mock/ · real/
 ├─ repositories/  # memory/ · sql/
 ├─ models/        # domain·dto·enums·errors
-└─ llm/           # Claude 클라이언트·템플릿 구조화</pre>
+└─ llm/           # LLM 클라이언트·템플릿 구조화</pre>
         <p class="diagcap">상세: <code>docs/orchestration.md</code> · <code>docs/data-model.md §8</code></p>
       </div>
     </details>
@@ -806,6 +806,7 @@ flowchart LR
       <div class="doccard"><div class="f">docs/api-contract.md</div><div class="d">외부 노출 API(WS·엔드포인트)·API/DB 경계·Mock 전략</div></div>
       <div class="doccard"><div class="f">docs/orchestration.md</div><div class="d">오케스트레이터 내부(의도·tool·RAG·스트리밍)</div></div>
       <div class="doccard"><div class="f">CLAUDE.md</div><div class="d">작업 규칙(스펙 워크플로우·문서 계층·브랜치)</div></div>
+      <div class="doccard"><div class="f">docs/diagrams.md</div><div class="d">시각화 모음(파생) — BE·공통·FE 클래스·시퀀스·상태·흐름. GitHub mermaid 렌더</div></div>
     </div>
     <p class="small" style="margin-top:14px">스펙: <code>specs/samsung-ai-concierge/</code> — requirements + design 완료, tasks 예정.</p>
   </section>

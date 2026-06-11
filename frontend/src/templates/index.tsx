@@ -158,6 +158,63 @@ function HomeSummary({ data }: { data: any }) {
   );
 }
 
+function StatusTracker({ data }: { data: any }) {
+  return (
+    <View>
+      <Title>{data.title ?? "진행 상태"}</Title>
+      {(data.steps ?? []).map((s: any, i: number) => (
+        <View key={i} style={styles.trackRow}>
+          <View style={[styles.dot, s.done ? styles.dotDone : null]}>
+            <Caption>{s.done ? "✓" : String(i + 1)}</Caption>
+          </View>
+          <Body muted={!s.done}>{s.label}</Body>
+        </View>
+      ))}
+    </View>
+  );
+}
+
+function Bridge({ data }: { data: any }) {
+  const summary = data.summary ?? {};
+  return (
+    <View>
+      <Badge label="빠른 보기" tone="primary" />
+      <View style={{ height: space.sm }} />
+      {summary.device ? <DeviceStatus data={summary} /> : <Body>{summary.message ?? data.message ?? ""}</Body>}
+    </View>
+  );
+}
+
+function HandoffCard({ data }: { data: any }) {
+  return (
+    <View>
+      <View style={styles.rowBetween}>
+        <Title>{data.title ?? "방문 수리 예약"}</Title>
+        <Badge label={data.visit_type === "REPAIR" ? "출장 수리" : "상담"} tone="primary" />
+      </View>
+      <Body muted>{data.message ?? "전문 기사의 방문 수리를 예약할 수 있어요."}</Body>
+    </View>
+  );
+}
+
+function Booking({ data }: { data: any }) {
+  const fmt = (iso: string) => {
+    try { const d = new Date(iso); return `${d.getMonth() + 1}/${d.getDate()} ${String(d.getHours()).padStart(2, "0")}:00`; }
+    catch { return iso; }
+  };
+  return (
+    <View>
+      <Title>방문 시간 선택</Title>
+      {(data.slots ?? []).map((s: any, i: number) => (
+        <View key={i} style={styles.slotRow}>
+          <Body>{fmt(s.start)} ~ {fmt(s.end)}</Body>
+          <Badge label="선택 가능" tone="success" />
+        </View>
+      ))}
+    </View>
+  );
+}
+
 export const REGISTRY: Record<string, React.ComponentType<{ data: any }>> = {
   text: TextTemplate,
   device_status: DeviceStatus,
@@ -167,6 +224,10 @@ export const REGISTRY: Record<string, React.ComponentType<{ data: any }>> = {
   confirmation: Confirmation,
   recommendation_list: RecommendationList,
   home_summary: HomeSummary,
+  status_tracker: StatusTracker,
+  bridge: Bridge,
+  handoff_card: HandoffCard,
+  booking: Booking,
 };
 
 /** kind → 컴포넌트. 미등록은 text 폴백(§7). */
@@ -192,5 +253,10 @@ const styles = StyleSheet.create({
   amountRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingVertical: 2 },
   recRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginTop: space.sm },
   deviceRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingVertical: space.sm,
+    borderBottomWidth: 1, borderBottomColor: color.border },
+  trackRow: { flexDirection: "row", alignItems: "center", gap: space.md, marginTop: space.sm },
+  dot: { width: 24, height: 24, borderRadius: 12, backgroundColor: color.surfaceAlt, alignItems: "center", justifyContent: "center" },
+  dotDone: { backgroundColor: color.successTint },
+  slotRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingVertical: space.sm,
     borderBottomWidth: 1, borderBottomColor: color.border },
 });

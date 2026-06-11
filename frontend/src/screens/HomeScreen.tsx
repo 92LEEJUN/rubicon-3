@@ -6,7 +6,7 @@ import { TemplateView } from "../templates";
 import { color, space } from "../design/tokens";
 import { homeSummary } from "../fixtures/journeys";
 
-export function HomeScreen({ onOpenChat }: { onOpenChat?: () => void }) {
+export function HomeScreen({ onOpenChat, onGallery }: { onOpenChat?: () => void; onGallery?: () => void }) {
   return (
     <View style={styles.root} testID="screen-home">
       <ScrollView contentContainerStyle={styles.content}>
@@ -20,6 +20,9 @@ export function HomeScreen({ onOpenChat }: { onOpenChat?: () => void }) {
           <View style={{ height: space.sm }} />
           <Button label="AI 컨시어지에게 물어보기" testID="open-chat" onPress={onOpenChat} />
         </Card>
+        {onGallery ? (
+          <Button label="응답 템플릿 갤러리 보기" variant="secondary" testID="open-gallery" onPress={onGallery} />
+        ) : null}
       </ScrollView>
     </View>
   );

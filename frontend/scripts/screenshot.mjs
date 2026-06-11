@@ -40,6 +40,7 @@ const page = await browser.newPage({ viewport: { width: 390, height: 844 }, devi
 const SHOTS = [
   { name: "home", screen: "home" },
   { name: "chat-j1", screen: "chat" },
+  { name: "gallery", screen: "gallery" },
 ];
 for (const s of SHOTS) {
   await page.goto(`http://localhost:${PORT}/?screen=${s.screen}`, { waitUntil: "networkidle" });

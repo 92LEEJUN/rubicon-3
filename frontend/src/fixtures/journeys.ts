@@ -83,3 +83,51 @@ export const confirmation: Template = {
     summary: { subtotal: 12000, shipping_fee: 3000, tax: 0, discount: 0, total: 15000 },
   },
 };
+
+export const statusTracker: Template = {
+  kind: "status_tracker",
+  data: {
+    title: "주문 진행", steps: [
+      { label: "주문 확정", done: true },
+      { label: "상품 준비", done: true },
+      { label: "배송 중", done: false },
+      { label: "배송 완료", done: false },
+    ],
+  },
+};
+
+export const bridge: Template = {
+  kind: "bridge",
+  data: { summary: {
+    device: { id: "dev_fridge_01", type: "refrigerator", model: "RF28R7351SR", status: "ONLINE" },
+    anomalies: [{ id: "alert_fridge", type: "consumable", severity: "warning", detail: "정수필터 수명 15% 남음(임계치 20%)." }],
+  } },
+};
+
+export const handoffCard: Template = {
+  kind: "handoff_card",
+  data: { title: "방문 수리 예약", visit_type: "REPAIR",
+    message: "셀프 점검으로 해결되지 않아 출장 수리를 권장해요." },
+};
+
+export const booking: Template = {
+  kind: "booking",
+  data: { slots: [
+    { id: "slot_1_10", start: "2026-06-13T10:00:00Z", end: "2026-06-13T12:00:00Z" },
+    { id: "slot_1_14", start: "2026-06-13T14:00:00Z", end: "2026-06-13T16:00:00Z" },
+  ] },
+};
+
+/** 템플릿 갤러리(시각 카탈로그) — kind별 대표 섹션. */
+export const gallerySections: MessageSection[] = [
+  ...j1Sections,
+  j5UnhandledHepa,
+  recommendation,
+  { label: "주문 확인", intent: "order", handled: true, ctas: [], template: confirmation },
+  { label: "진행 추적", intent: "order", handled: true, ctas: [], template: statusTracker },
+  { label: "빠른 보기(브릿지)", intent: "device_status", handled: true,
+    ctas: [{ label: "재주문", action: "commit", kind: "order", payload: { part_ids: ["part_water_filter"] } }], template: bridge },
+  { label: "핸드오프", intent: "general", handled: true,
+    ctas: [{ label: "방문 예약", action: "chat", kind: "handoff" }], template: handoffCard },
+  { label: "예약 슬롯", intent: "general", handled: true, ctas: [], template: booking },
+];

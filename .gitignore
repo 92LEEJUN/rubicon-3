@@ -1,0 +1,40 @@
+# --- Secrets / env ---
+.env
+.env.*
+!.env.example
+
+# --- Python (BE / BFF) ---
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# --- Node / FE (Expo, React Native) ---
+node_modules/
+.expo/
+.expo-shared/
+dist/
+web-build/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# --- Test artifacts ---
+playwright-report/
+test-results/
+coverage/
+__screenshots__/*.tmp.png
+
+# --- OS / editor ---
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp

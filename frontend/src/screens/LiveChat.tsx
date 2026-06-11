@@ -3,12 +3,24 @@ import React, { useMemo, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { Caption, Title } from "../components/primitives";
 import { MessageView } from "../components/message";
-import { WebSocketTransport } from "../transport";
+import { ResilientTransport } from "../transport";
 import { useChat } from "../state/useChat";
 import { color, radius, space } from "../design/tokens";
+import { j1Sections } from "../fixtures/journeys";
+import type { Chunk } from "../types/contract";
+
+/** BE 미연결 시 폴백 스크립트 — 자연어 인트로 + J1 섹션. */
+function fallbackChunks(): Chunk[] {
+  return [
+    { type: "delta", text: "지금은 데모 모드예요. 예시 응답을 보여드릴게요." } as Chunk,
+    ...j1Sections.map((section) => ({ type: "section", section } as Chunk)),
+    { type: "flow", active_flow: "troubleshoot" } as Chunk,
+    { type: "done", message_id: "msg_demo" } as Chunk,
+  ];
+}
 
 export function LiveChat({ wsUrl }: { wsUrl: string }) {
-  const transport = useMemo(() => new WebSocketTransport(wsUrl), [wsUrl]);
+  const transport = useMemo(() => new ResilientTransport(wsUrl, () => fallbackChunks()), [wsUrl]);
   const { state, send } = useChat(transport);
   const [text, setText] = useState("");
   const [sent, setSent] = useState<string | null>(null);

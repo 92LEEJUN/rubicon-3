@@ -116,13 +116,15 @@ def get_device(device_id: str):
 
 @app.get("/internal/home")
 def home_summary():
-    """홈 aggregation — 기기 + 선제 알림(동의/중복 게이트 통과분)."""
+    """홈 aggregation — 기기 + 선제 알림 + 개인화 추천(동의/중복 게이트 통과분)."""
     user = _container.user
     alerts = _container.notification.pending_alerts(user)
+    recs = _container.catalog.recommend(user)
     return Template(kind="home_summary", data={
         "user": user.display_name,
         "devices": [d.model_dump(mode="json") for d in _container.device.list_devices()],
         "alerts": [a.model_dump(mode="json") for a in alerts],
+        "recommendations": [p.model_dump(mode="json") for p in recs],
     }).model_dump(mode="json")
 
 
@@ -130,6 +132,19 @@ def home_summary():
 def recommend():
     products = _container.catalog.recommend(_container.user)
     return [p.model_dump(mode="json") for p in products]
+
+
+# ── 이력 조회(HTTP) — 주문/예약 진행(R12·R18) ───────────────────────────────
+@app.get("/internal/orders")
+def list_orders(user_id: str | None = None):
+    """주문 이력(최신순) — 진행 추적/홈·CS 노출용."""
+    return [o.model_dump(mode="json") for o in _container.order.history(user_id)]
+
+
+@app.get("/internal/bookings")
+def list_bookings():
+    """예약 이력 — 홈/CS '진행 중' 노출용."""
+    return [b.model_dump(mode="json") for b in _container.handoff.list_bookings()]
 
 
 # ── 커밋(HTTP) — 주문 게이트(R17) ───────────────────────────────────────────

@@ -4,6 +4,11 @@
  */
 import type { MessageSection, Template } from "../types/contract";
 
+/** 데모용 썸네일(데이터 URI SVG) — 오프라인·정적 배포에서도 이미지 렌더 확인용. */
+const svgThumb = (bg: string) =>
+  "data:image/svg+xml," +
+  encodeURIComponent(`<svg xmlns='http://www.w3.org/2000/svg' width='64' height='64'><rect width='64' height='64' rx='12' fill='${bg}'/><circle cx='32' cy='26' r='12' fill='white' opacity='0.9'/><rect x='16' y='42' width='32' height='8' rx='4' fill='white' opacity='0.7'/></svg>`);
+
 export const homeSummary: Template = {
   kind: "home_summary",
   data: {
@@ -22,6 +27,11 @@ export const homeSummary: Template = {
       { id: "alert_purifier", device_id: "dev_purifier_01", type: "consumable", severity: "info",
         detail: "HEPA 필터 교체 시기가 임박했습니다." },
     ],
+    recommendations: [
+      { id: "prod_purifier_cube", category: "air_purifier", name: "비스포크 큐브 에어 공기청정기",
+        model: "AX9500", price: 599000, specs: { coverage: "60㎡", noise: "22dB" }, in_stock: true,
+        image: svgThumb("#1FA463"), reason: "사용 패턴 추천" },
+    ],
   },
 };
 
@@ -30,7 +40,8 @@ export const j1Sections: MessageSection[] = [
   {
     label: "기기 상태", intent: "device_status", handled: true, ctas: [],
     template: { kind: "device_status", data: {
-      device: { id: "dev_washer_01", type: "washer", model: "WF45T6000AW", status: "UNHEALTHY" },
+      device: { id: "dev_washer_01", type: "washer", model: "WF45T6000AW", status: "UNHEALTHY",
+        consumables: [{ name: "drain_filter", life_remaining: 0.4, threshold: 0.2 }] },
       anomalies: [{ id: "ano_washer_5c", type: "error_code", severity: "warning",
         detail: "5C — 배수가 원활하지 않습니다." }],
     } },
@@ -41,7 +52,8 @@ export const j1Sections: MessageSection[] = [
       solution_id: "sol_washer_5c", coverage: "unknown", required_parts: ["part_drain_filter"],
       steps: [
         { order: 1, instruction: "배수 호스가 꺾이거나 눌리지 않았는지 확인하세요.", safety: "none" },
-        { order: 2, instruction: "전원을 끄고 하단 배수 필터를 분리해 이물질을 청소하세요.", safety: "caution" },
+        { order: 2, instruction: "전원을 끄고 하단 배수 필터를 분리해 이물질을 청소하세요.", safety: "caution",
+          media: [{ type: "video", title: "필터 청소 영상" }] },
         { order: 3, instruction: "배수 호스를 배수구에 15~20cm 깊이로 정리해 다시 연결하세요.", safety: "none" },
       ],
       sources: [{ title: "삼성 세탁기 4C/5C 오류 해결", ref: "https://www.samsung.com/us/support/troubleshoot/TSG10000997/", confidence: 0.9 }],
@@ -51,7 +63,8 @@ export const j1Sections: MessageSection[] = [
   {
     label: "부품 주문", intent: "order", handled: true,
     template: { kind: "product_card", data: {
-      id: "part_drain_filter", name: "세탁기 배수 필터", sku: "DC97-16513A", price: 12000, in_stock: true } },
+      id: "part_drain_filter", name: "세탁기 배수 필터", sku: "DC97-16513A", price: 12000, in_stock: true,
+      image: svgThumb("#0381FE") } },
     ctas: [{ label: "주문하기", action: "commit", kind: "order", payload: { part_ids: ["part_drain_filter"] } }],
   },
 ];
@@ -72,7 +85,8 @@ export const recommendation: MessageSection = {
   label: "추천", intent: "recommend", handled: true,
   template: { kind: "recommendation_list", data: {
     products: [{ id: "prod_purifier_cube", category: "air_purifier", name: "비스포크 큐브 에어 공기청정기",
-      model: "AX9500", price: 599000, specs: { coverage: "60㎡", noise: "22dB" }, in_stock: true }] } },
+      model: "AX9500", price: 599000, specs: { coverage: "60㎡", noise: "22dB" }, in_stock: true,
+      image: svgThumb("#1FA463"), reason: "사용 패턴 추천" }] } },
   ctas: [{ label: "자세히", action: "chat", kind: "explain" }],
 };
 
@@ -81,6 +95,7 @@ export const confirmation: Template = {
   data: {
     order: { id: "ord_0001", status: "DRAFT", items: [{ part_id: "part_drain_filter", name: "세탁기 배수 필터", unit_price: 12000, qty: 1 }] },
     summary: { subtotal: 12000, shipping_fee: 3000, tax: 0, discount: 0, total: 15000 },
+    delivery_eta: "6/13(금) 도착", address: "서울 강남구 …", payment_method: "삼성카드 ****1234",
   },
 };
 
@@ -88,11 +103,20 @@ export const statusTracker: Template = {
   kind: "status_tracker",
   data: {
     title: "주문 진행", steps: [
-      { label: "주문 확정", done: true },
-      { label: "상품 준비", done: true },
-      { label: "배송 중", done: false },
-      { label: "배송 완료", done: false },
+      { label: "주문 확정", done: true, at: "6/11 14:20" },
+      { label: "상품 준비", done: true, at: "6/11 17:05" },
+      { label: "배송 중", done: false, at: "예정 6/12" },
+      { label: "배송 완료", done: false, at: "예정 6/13" },
     ],
+  },
+};
+
+// 인터랙션 — 선택지(choices)
+export const choicesTemplate: Template = {
+  kind: "choices",
+  data: {
+    question: "어떤 배수 필터인가요? 모델에 맞는 부품을 찾아드릴게요.",
+    options: [{ label: "A형 — 드럼세탁기" }, { label: "B형 — 통돌이세탁기" }, { label: "잘 모르겠어요" }],
   },
 };
 
@@ -130,4 +154,5 @@ export const gallerySections: MessageSection[] = [
   { label: "핸드오프", intent: "general", handled: true,
     ctas: [{ label: "방문 예약", action: "chat", kind: "handoff" }], template: handoffCard },
   { label: "예약 슬롯", intent: "general", handled: true, ctas: [], template: booking },
+  { label: "선택지", intent: "troubleshoot", handled: true, ctas: [], template: choicesTemplate },
 ];

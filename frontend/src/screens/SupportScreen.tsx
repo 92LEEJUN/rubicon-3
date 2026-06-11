@@ -2,8 +2,9 @@
 import React from "react";
 import { Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { Badge, Body, Caption, Card, Title } from "../components/primitives";
+import { TemplateView } from "../templates";
 import { color, radius, space } from "../design/tokens";
-import { homeSummary } from "../fixtures/journeys";
+import { homeSummary, statusTracker } from "../fixtures/journeys";
 
 const DEVICE_KO: Record<string, string> = { washer: "세탁기", refrigerator: "냉장고", air_purifier: "공기청정기" };
 
@@ -21,8 +22,10 @@ const FAQ = [
   { q: "공기청정기 HEPA 필터 교체", tone: "neutral" as const },
 ];
 
-export function SupportScreen({ onAsk }: { onAsk?: (q: string) => void }) {
-  const devices = (homeSummary.data as any).devices ?? [];
+export function SupportScreen({ onAsk, data }: { onAsk?: (q: string) => void; data?: any }) {
+  const d0 = data ?? (homeSummary.data as any);
+  const devices = d0.devices ?? [];
+  const recs: any[] = d0.recommendations ?? [];
   return (
     <View style={styles.root} testID="screen-support">
       <ScrollView contentContainerStyle={styles.content}>
@@ -65,6 +68,20 @@ export function SupportScreen({ onAsk }: { onAsk?: (q: string) => void }) {
             </Pressable>
           ))}
         </Card>
+
+        <Caption>진행 중 · 최근 활동</Caption>
+        <Pressable testID="cs-activity" onPress={() => onAsk?.("내 주문 진행 상태 알려줘")}>
+          <Card><TemplateView template={statusTracker} /></Card>
+        </Pressable>
+
+        {recs.length ? (
+          <>
+            <Caption>맞춤 추천</Caption>
+            <Pressable testID="cs-recommend" onPress={() => onAsk?.("추천 제품 자세히 알려줘")}>
+              <Card><TemplateView template={{ kind: "recommendation_list", data: { products: recs } }} /></Card>
+            </Pressable>
+          </>
+        ) : null}
       </ScrollView>
     </View>
   );

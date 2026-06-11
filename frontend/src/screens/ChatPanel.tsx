@@ -7,7 +7,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Animated, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { SectionView } from "../components/message";
-import { MockTransport, WebSocketTransport } from "../transport";
+import { MockTransport, ResilientTransport } from "../transport";
 import { useChat } from "../state/useChat";
 import { color, font, radius, shadow, space } from "../design/tokens";
 import type { Chunk, ClientMessage, Cta, MessageSection } from "../types/contract";
@@ -37,7 +37,7 @@ export function ChatPanel({ question, sections, flow = null, wsUrl, onClose }:
   { question: string; sections: MessageSection[]; flow?: string | null; wsUrl?: string; onClose?: () => void }) {
   const transport = useMemo(
     () => (wsUrl
-      ? new WebSocketTransport(wsUrl)
+      ? new ResilientTransport(wsUrl, (_m: ClientMessage) => toChunks(sections, flow))
       : new MockTransport((_m: ClientMessage) => toChunks(sections, flow))),
     [wsUrl, sections, flow],
   );

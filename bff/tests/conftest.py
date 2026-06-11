@@ -3,6 +3,12 @@
 FE↔BFF↔BE를 실제 HTTP 계약으로 묶어 검증한다(api-contract §5 계약 테스트).
 별도 네트워크/서버 없이 같은 fixtures로 합치를 확인.
 """
+import os
+
+# 결정적 경로 고정 — backend/.env 의 LLM_BACKED=1 이 BE 인프로세스로 새어들어와
+# 실제 OpenAI를 타지 않도록, BE 앱 import(=load_dotenv) 전에 미리 끈다.
+os.environ["LLM_BACKED"] = ""
+
 import httpx
 import pytest
 from fastapi.testclient import TestClient

@@ -52,6 +52,14 @@ def create_app(backend: Optional[BackendClient] = None) -> FastAPI:
         body.setdefault("user_id", user)
         return await relay(lambda: be.place_order(body))
 
+    @app.get("/orders")
+    async def list_orders(user: str = Depends(require_auth), be: BackendClient = Depends(_backend)):
+        return await relay(lambda: be.list_orders(user))
+
+    @app.get("/bookings")
+    async def list_bookings(user: str = Depends(require_auth), be: BackendClient = Depends(_backend)):
+        return await relay(be.list_bookings)
+
     # ── 예약(§2.2, R18) ─────────────────────────────────────────────────────
     @app.get("/bookings/slots")
     async def booking_slots(visit_type: str = "REPAIR", user: str = Depends(require_auth),

@@ -307,7 +307,7 @@ flowchart TD
 
 §8 라우팅은 **사용자가 시작하는(reactive)** 요청을 다룬다. 반대로 **시스템이 먼저 시작하는(proactive)**
 경로 — 이상 감지·소모품 선제안·알림(R2·R5·R20·R26·R27) — 는 별도 파이프라인이다.
-(시나리오 분류는 `specs/samsung-ai-concierge/scenarios.md` §4-B.)
+(시나리오 분류는 `specs/samsung-ai-concierge/scenarios/classification.md`.)
 
 ```mermaid
 flowchart LR

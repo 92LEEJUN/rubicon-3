@@ -115,7 +115,7 @@ flowchart TB
 
 | Port / 저장소 | MVP | 실 전환 시 |
 |------|-----|-----------|
-| SmartThings (STP) | 개인 API(PAT) 실연동 + 일부 Mock 시나리오 | 기업 API 확장 |
+| SmartThings (STP) | 스파이크=PAT, **MVP 실연동=OAuth** + 일부 Mock | 조직=Enterprise(Service Account) |
 | CS 데이터 (CSDataP) | 실데이터 일부 적재 | 전체 CS 연동 |
 | 제품정보 (CatP) | 실데이터 일부 | 전체 카탈로그 |
 | O2O 주문 (O2OP) | **Mock** (주문 성공/실패·취소/환불 시뮬레이션, R21) | 실제 주문/결제 연동 |
@@ -153,6 +153,20 @@ flowchart TB
 - **상태(`GET /devices/{id}/status`)**: capability별 **attributes**(상태) + **commands**. 예: `filterStatus`(냉장고 필터 정상/교체) → `Consumable`/`Anomaly(CONSUMABLE)`, `washerOperatingState`/`dishwasherOperatingState`(machineState·jobState) → `Device.status`·`metrics`.
 - **Samsung custom capability**(`custom.*`)로 소모품 수명·오류가 노출될 수 있음. **단, 기기 오류코드(예: 4C/5C)의 API 노출은 불확실**(패널 표시 위주일 수 있음) → 이상감지(§design 6.3) **부분 검증, 스파이크에서 확인 필요**.
 - **주의**: `custom.disabledCapabilities`에 "비활성"으로 표기돼도 실제 동작하는 capability가 있음 → ACL은 맹신 말고 검증.
+
+**SmartThings 인증 3계층 (OAuth 전환 대비)**
+| 계층 | 인증 | 토큰 | 용도 |
+|------|------|------|------|
+| PAT | Personal Access Token | **24h(테스트용)** | 검증 스파이크 |
+| **OAuth 2.0** | 사용자별 인가 | 갱신형 | **MVP 실연동** |
+| Enterprise | Service Account → API Key → Access Token | 최대 1년 | 조직·대규모(R15 비범위) |
+
+- **데이터 스키마·이벤트는 3계층 공통** — 기기/capability/attribute/command 모델 동일, 이벤트도
+  `deviceId·componentId·capability·attribute` 동일 구조. **다른 건 인증·엔드포인트·이벤트 전달 방식뿐.**
+- → **교체 지점은 "토큰 획득"으로 격리**한다: `TokenProvider`(data-model §6) 뒤에 PAT/OAuth/Enterprise
+  구현을 두고, `DevicePort` 어댑터·ACL 매핑은 **그대로**. OAuth 전환 = provider 구현 교체 + 이벤트 구독 방식 교체.
+- **이벤트(실 전환)** — 개인=사용자별 구독, Enterprise=계정 단위 webhook. 페이로드(capability/attribute)는 동일
+  → 선제 파이프라인(§10) MVP 폴링을 이벤트로 바꿔도 도메인 매핑 불변.
 
 **Samsung CS (`CSKnowledgePort`)** — samsung.com/support 오류코드별 가이드(예: [4C/5C](https://www.samsung.com/us/support/troubleshoot/TSG10000997/))
 - 구조: **오류코드 → 의미 → 단계별 해결**. 예: `4C`=급수 문제 → (수도꼭지·호스 꺾임·메시필터 확인), `5C`=배수 문제 → (배수필터 청소·호스 정리).

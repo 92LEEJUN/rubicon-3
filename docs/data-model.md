@@ -445,6 +445,13 @@ class ConsentPort(Protocol):                           # R19  MVP: Mock
 class AnalyticsPort(Protocol):                         # R28  MVP: Mock(로컬 로그)
     def track(self, event: AnalyticsEvent) -> None: ...        # 비차단. 동의 없으면 no-op
     def track_batch(self, events: list[AnalyticsEvent]) -> None: ...  # FE 배치 전송
+
+class TokenProvider(Protocol):                         # 외부 연동 토큰 획득 (인증 교체 지점)
+    def access_token(self) -> str: ...                 # 유효 토큰 반환. 만료 시 내부에서 갱신(조용)
+# DevicePort 등 토큰이 필요한 Real 어댑터는 TokenProvider에 의존한다.
+# 구현: PatTokenProvider(스파이크) / OAuthTokenProvider(MVP 실연동) / EnterpriseTokenProvider(조직).
+# → PAT→OAuth→Enterprise 전환 = 이 provider 구현만 교체. DevicePort 인터페이스·ACL 매핑은 불변
+#   (SmartThings 데이터 스키마·이벤트는 3계층 공통, architecture §5). 토큰은 시크릿 저장소 보관(§0).
 ```
 
 각 Port는 `Mock*` 구현(MVP)과 `Real*` 구현(후속)을 가지며, 의존성 주입으로 교체한다.

@@ -118,6 +118,14 @@
   .callout.warn{border-color:var(--warn);background:#fff7ed}
   footer{color:var(--muted);font-size:12.5px;text-align:center;margin-top:26px}
 
+  /* mermaid */
+  .mermaid{background:#fff;border:1px solid var(--line);border-radius:10px;padding:14px;
+           margin:10px 0;text-align:center;overflow-x:auto}
+  .mermaid svg{max-width:100%;height:auto}
+  .dgrid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  @media(max-width:720px){.dgrid{grid-template-columns:1fr}}
+  .diagcap{font-size:12.5px;color:var(--muted);margin:2px 0 0}
+
   @media(max-width:720px){
     .cols,.docgrid{grid-template-columns:1fr}
     .rrow{grid-template-columns:1fr;text-align:center}
@@ -148,6 +156,7 @@
     <a href="#wire">와이어프레임</a>
     <a href="#api">API 계약</a>
     <a href="#orch">오케스트레이션</a>
+    <a href="#be">BE 다이어그램</a>
     <a href="#work">병렬 개발</a>
     <a href="#decide">로직 결정</a>
     <a href="#docs">문서 맵</a>
@@ -484,9 +493,273 @@ error     { code, fallback }</pre>
     </details>
   </section>
 
+  <!-- BE DIAGRAMS -->
+  <section id="be">
+    <h2><span class="n">09</span>BE 다이어그램 — 클래스 · 시퀀스 · 상태</h2>
+    <p class="lead">백엔드를 클래스/시퀀스/상태/파이프라인으로 시각화. <span class="small">(다이어그램은 Mermaid로 렌더 — 인터넷 연결 필요)</span></p>
+
+    <h3>도메인 클래스 다이어그램</h3>
+    <div class="mermaid">
+classDiagram
+  direction LR
+  class User {
+    +Id id
+    +str display_name
+    +list~Id~ linked_device_ids
+  }
+  class Device {
+    +Id id
+    +str model
+    +str status
+    +dict metrics
+  }
+  class Consumable {
+    +str name
+    +float life_remaining
+    +float threshold
+  }
+  class Anomaly {
+    +AnomalyType type
+    +Severity severity
+    +str detail
+  }
+  class Solution {
+    +bool escalation_needed
+  }
+  class SolutionStep {
+    +int order
+    +str instruction
+  }
+  class Source {
+    +str title
+    +str ref
+  }
+  class Part {
+    +str sku
+    +int price
+    +bool in_stock
+  }
+  class Order {
+    +OrderStatus status
+  }
+  class OrderItem {
+    +int qty
+  }
+  class Booking {
+    +Id slot_id
+  }
+  class Conversation {
+    +int version
+  }
+  class Message {
+    +Role role
+    +str text
+  }
+  class Template {
+    +str kind
+    +dict data
+  }
+  class Cta {
+    +CtaType type
+  }
+  class FlowState {
+    +str name
+    +str step
+  }
+  User "1" --> "*" Device : owns
+  User "1" --> "*" Conversation
+  User "1" --> "*" Order
+  Device "1" --> "*" Consumable
+  Device "1" --> "*" Anomaly
+  Anomaly "1" --> "*" Solution : resolved_by
+  Solution "1" --> "*" SolutionStep
+  Solution "1" --> "*" Source
+  Solution "*" --> "*" Part : requires
+  Order "1" --> "*" OrderItem
+  OrderItem --> Part
+  Booking --> Order
+  Conversation "1" --> "*" Message
+  Conversation --> FlowState : active/suspended
+  Message --> Template
+  Message "1" --> "*" Cta
+    </div>
+    <p class="diagcap">엔티티 관계. 상세 필드·불변식은 <code>docs/data-model.md §3</code>.</p>
+
+    <details>
+      <summary>서비스 · Port · 어댑터 (Mock↔실 교체 패턴)</summary>
+      <div class="det-body">
+        <div class="mermaid">
+classDiagram
+  direction LR
+  class Orchestrator
+  class DeviceService
+  class KnowledgeService
+  class OrderService
+  class DevicePort {
+    &lt;&lt;interface&gt;&gt;
+    +get_status()
+    +detect_anomalies()
+  }
+  class OrderPort {
+    &lt;&lt;interface&gt;&gt;
+    +add_to_cart()
+    +checkout()
+  }
+  class MockDevicePort
+  class RealDevicePort
+  class MockOrderPort
+  Orchestrator --> DeviceService
+  Orchestrator --> KnowledgeService
+  Orchestrator --> OrderService
+  DeviceService --> DevicePort
+  OrderService --> OrderPort
+  DevicePort &lt;|.. MockDevicePort
+  DevicePort &lt;|.. RealDevicePort
+  OrderPort &lt;|.. MockOrderPort
+        </div>
+        <p class="diagcap">모든 Port가 <code>Mock*</code>(MVP)/<code>Real*</code>(후속)을 의존성 주입으로 교체. 예외 계층은 <code>DomainError</code> ← NotFound/Validation/Conflict/Consent/Port/ConfirmationRequired.</p>
+      </div>
+    </details>
+
+    <h3>시퀀스 — 메인 플로우 (이상 감지 → 해결 → 주문)</h3>
+    <div class="mermaid">
+sequenceDiagram
+  autonumber
+  actor U as 사용자
+  participant FE
+  participant API as API/표현
+  participant O as 오케스트레이터
+  participant LLM as Claude
+  participant DEV as DevicePort
+  participant CS as CSKnowledgePort(RAG)
+  U->>FE: "세탁기 소리나요" (+사진)
+  FE->>API: WS /chat user_message
+  API->>O: 함수 호출
+  O->>LLM: 의도 분류(구조화 출력)
+  LLM-->>O: TROUBLESHOOT
+  O->>DEV: get_status / detect_anomalies
+  DEV-->>O: Device, Anomaly(오류코드)
+  O->>CS: find_solutions (RAG)
+  CS-->>O: Solution + Source
+  O->>LLM: 응답 생성(템플릿, 스트리밍)
+  LLM-->>O: device_status + guide_steps + product_card
+  O-->>API: delta/template/done
+  API-->>FE: 스트림 청크
+  FE-->>U: 렌더 + [장바구니][주문] CTA
+    </div>
+
+    <div class="dgrid">
+      <details>
+        <summary>시퀀스 — 주문 확인 게이트 (R17)</summary>
+        <div class="det-body">
+          <div class="mermaid">
+sequenceDiagram
+  autonumber
+  actor U as 사용자
+  participant FE
+  participant API
+  participant GATE as ActionGatePort
+  participant ORD as OrderPort
+  U->>FE: [주문] CTA
+  FE->>API: POST /orders (confirmed=false)
+  API->>GATE: requires_confirmation?
+  GATE-->>API: true
+  API-->>FE: 409 + confirmation 템플릿
+  U->>FE: [결제하기]
+  FE->>API: POST /orders (confirmed=true)
+  API->>ORD: checkout (멱등)
+  ORD-->>API: Order(CONFIRMED)
+  API-->>FE: order_summary + status_tracker
+          </div>
+        </div>
+      </details>
+      <details>
+        <summary>시퀀스 — 선제 알림 (R5/R20)</summary>
+        <div class="det-body">
+          <div class="mermaid">
+sequenceDiagram
+  autonumber
+  participant SCH as 임계치 감지
+  participant NOTI as 알림 서비스
+  participant ALERT as AlertPort
+  participant FE
+  SCH->>NOTI: 소모품 수명 &lt; threshold
+  NOTI->>NOTI: opted_in 확인(R20)
+  alt opted_in = true
+    NOTI->>ALERT: deliver(Notification)
+    ALERT-->>FE: 인앱 알림(home_summary)
+  else opted_in = false
+    NOTI--xNOTI: 발송 안 함
+  end
+          </div>
+        </div>
+      </details>
+    </div>
+
+    <div class="dgrid">
+      <details open>
+        <summary>상태 — 주문(Order) 전이</summary>
+        <div class="det-body">
+          <div class="mermaid">
+stateDiagram-v2
+  [*] --> DRAFT : add_to_cart
+  DRAFT --> CONFIRMED : checkout + 확인(R17)
+  DRAFT --> FAILED : 결제 실패
+  CONFIRMED --> [*]
+  FAILED --> [*]
+          </div>
+        </div>
+      </details>
+      <details open>
+        <summary>상태 — 대화 흐름(FlowState, R6)</summary>
+        <div class="det-body">
+          <div class="mermaid">
+stateDiagram-v2
+  [*] --> idle
+  idle --> troubleshoot : 증상 입력
+  idle --> order : 주문 의도
+  troubleshoot --> order : 부품 필요
+  troubleshoot --> suspended : 주제 전환
+  order --> suspended : 주제 전환
+  suspended --> troubleshoot : 복원
+  suspended --> order : 복원
+  troubleshoot --> idle : 완료
+  order --> idle : 완료
+          </div>
+        </div>
+      </details>
+    </div>
+
+    <details>
+      <summary>오케스트레이션 파이프라인 · BE 모듈 구조</summary>
+      <div class="det-body">
+        <div class="mermaid">
+flowchart LR
+  A[수신] --> B[의도 분류·분해]
+  B --> C[흐름 반영 FlowState]
+  C --> D{tool 선택}
+  D --> E[Port / DB / compute 실행]
+  E --> F[근거 보강 RAG]
+  F --> G[Template 생성]
+  G --> H[스트리밍 전달]
+        </div>
+<pre>backend/app/
+├─ api/           # 라우터 (DTO ↔ 서비스): chat·devices·orders
+├─ orchestrator/  # 의도분류·분해·흐름·세션
+├─ services/      # device·knowledge·catalog·order·personalization·notification
+├─ ports/         # Port 인터페이스(Protocol)
+├─ adapters/      # mock/ · real/
+├─ repositories/  # memory/ · sql/
+├─ models/        # domain·dto·enums·errors
+└─ llm/           # Claude 클라이언트·템플릿 구조화</pre>
+        <p class="diagcap">상세: <code>docs/orchestration.md</code> · <code>docs/data-model.md §8</code></p>
+      </div>
+    </details>
+  </section>
+
   <!-- WORKSTREAMS -->
   <section id="work">
-    <h2><span class="n">09</span>병렬 개발 — 세 워크스트림</h2>
+    <h2><span class="n">10</span>병렬 개발 — 세 워크스트림</h2>
     <p class="lead">세 팀이 <b>같은 계약</b>에 대고 각자 코딩한다. 막힘 방지를 위해 Mock을 2레벨로 둔다.</p>
 
     <div class="cols">
@@ -505,7 +778,7 @@ error     { code, fallback }</pre>
 
   <!-- DECISIONS -->
   <section id="decide">
-    <h2><span class="n">10</span>비즈니스 로직 결정</h2>
+    <h2><span class="n">11</span>비즈니스 로직 결정</h2>
     <p class="lead">설계 단계에서 확정한 7개 핵심 결정.</p>
     <table>
       <tr><th>#</th><th>주제</th><th>결정</th></tr>
@@ -522,7 +795,7 @@ error     { code, fallback }</pre>
 
   <!-- DOC MAP -->
   <section id="docs">
-    <h2><span class="n">11</span>문서 맵 (기반 문서 8종)</h2>
+    <h2><span class="n">12</span>문서 맵 (기반 문서 8종)</h2>
     <p class="lead">데이터 모델·공개 인터페이스·아키텍처가 바뀌면 스펙이 아니라 <b>기반 문서를 갱신</b>한다.</p>
     <div class="docgrid">
       <div class="doccard"><div class="f">docs/architecture.md</div><div class="d">시스템 아키텍처·기술 스택·라우팅·Mock↔실·BFF 책임·NFR</div></div>
@@ -554,6 +827,11 @@ error     { code, fallback }</pre>
       if(t){e.preventDefault();t.scrollIntoView({behavior:'smooth',block:'start'});}
     });
   });
+</script>
+<script type="module">
+  import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
+  mermaid.initialize({ startOnLoad: true, theme: 'neutral', securityLevel: 'loose',
+                       flowchart:{useMaxWidth:true}, sequence:{useMaxWidth:true} });
 </script>
 </body>
 </html>

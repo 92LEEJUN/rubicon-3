@@ -7,20 +7,21 @@ import type { Chunk, MessageSection, Template } from "../types/contract";
 export interface ChatState {
   status: "idle" | "streaming" | "done" | "error";
   sections: MessageSection[];
+  assistantText: string; // LLM 자연어 답변(delta 누적) — 섹션과 별개로 노출
   activeFlow: string | null;
   messageId?: string;
   error?: { code: string; message?: string; fallback?: Template };
 }
 
-export const initialChat: ChatState = { status: "idle", sections: [], activeFlow: null };
+export const initialChat: ChatState = { status: "idle", sections: [], assistantText: "", activeFlow: null };
 
 export type ChatAction = Chunk | { type: "send" } | { type: "reset" };
 
 export function chatReducer(state: ChatState, action: ChatAction): ChatState {
   switch (action.type) {
     case "send":
-      // 새 턴 시작 — 이전 섹션 비우고 스트리밍 진입
-      return { status: "streaming", sections: [], activeFlow: null };
+      // 새 턴 시작 — 이전 섹션·텍스트 비우고 스트리밍 진입
+      return { status: "streaming", sections: [], assistantText: "", activeFlow: null };
     case "reset":
       return initialChat;
     case "section":
@@ -39,6 +40,8 @@ export function chatReducer(state: ChatState, action: ChatAction): ChatState {
           : state.sections,
       };
     case "delta":
+      // LLM 자연어 토큰/덩어리 누적
+      return { ...state, status: "streaming", assistantText: state.assistantText + action.text };
     default:
       return state;
   }

@@ -4,6 +4,8 @@ OpenAI function calling으로 tool을 자유 호출하는 프로토타입 경로
 `core.Orchestrator`(결정적 섹션 생성, 테스트 가능)를 쓴다. 본 모듈은 CLI 데모에 한정한다.
 """
 import json
+import uuid
+from typing import Iterator, Optional
 
 from ..llm import MODEL, get_client
 from ..tools import TOOLS, call
@@ -83,3 +85,23 @@ def run(user_message: str, max_steps: int = 6, verbose: bool = True) -> str:
     # 루프 한계 — 마지막 한 번 더 생성
     final = get_client().chat.completions.create(model=MODEL, messages=messages)
     return final.choices[0].message.content or ""
+
+
+def stream_turn(message: str, screen_context: Optional[dict] = None) -> Iterator[dict]:
+    """LLM 자연어 답변 경로 — api-contract §2.1 봉투(delta → done).
+
+    tool-loop으로 근거(기기·해결·부품 Mock)를 모아 자연어 답변을 생성하고,
+    텍스트를 `delta` 청크로 흘린 뒤 `done`으로 종료한다(실패 시 error 폴백, R13).
+    `core.Orchestrator.stream_turn`(결정적 섹션)과 동일한 봉투 계약을 따른다.
+    """
+    try:
+        answer = run(message, verbose=False)
+    except Exception as exc:  # 전체 폴백(R13) — 대화 중단 금지
+        yield {"type": "error", "code": "orchestrator_error",
+               "fallback": {"kind": "text",
+                            "data": {"message": "일시적인 문제가 발생했어요. 잠시 후 다시 시도해 주세요."}},
+               "detail": str(exc)}
+        return
+    yield {"type": "delta", "text": answer}
+    yield {"type": "flow", "active_flow": None}
+    yield {"type": "done", "message_id": f"msg_{uuid.uuid4().hex[:8]}"}

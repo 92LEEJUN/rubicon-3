@@ -16,7 +16,7 @@ export function App({ initialScreen = "home", wsUrl }:
 
   if (screen === "live") return <LiveChat wsUrl={wsUrl || "ws://localhost:8000/chat?token=demo"} />;
   if (screen === "gallery") return <Gallery />;
-  if (screen === "chat") return <ChatPanel question={question} sections={j1Sections} flow="troubleshoot" />;
+  if (screen === "chat") return <ChatPanel question={question} sections={j1Sections} flow="troubleshoot" wsUrl={wsUrl} />;
 
   return (
     <MainShell

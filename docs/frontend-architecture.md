@@ -110,8 +110,9 @@ frontend/
 │  │  ├─ Support/              # S2 (CS)
 │  │  └─ ChatPanel/            # S3 (전역 오버레이)
 │  ├─ templates/               # kind → 컴포넌트 레지스트리 (§4, 13종)
+│  ├─ hooks/                   # 커스텀 훅 (§11)
 │  ├─ transport/               # ChatTransport 추상화 + WebSocket 구현 (§5)
-│  ├─ state/                   # 서버상태(쿼리)·UI/세션 store (§2)
+│  ├─ state/                   # 서버상태(쿼리)·UI/세션 store + reducer (§2·§11)
 │  ├─ api/                     # 결정적 엔드포인트 클라이언트 (api-contract §2.2)
 │  ├─ navigation/              # React Navigation·딥링크 (§3)
 │  ├─ design/                  # 토큰·테마 (§6)
@@ -123,12 +124,54 @@ frontend/
 - `templates/`·`api/`·`types/`는 **계약(response-templates·api-contract·data-model)** 에 1:1 대응 — 변경 시 함께 갱신.
 - `transport/`는 §5 추상화 뒤에 구현을 둬 트랜스포트 교체 가능.
 
-## 11. 후속 / 비범위 (MVP 이후)
+## 11. 상태 환원(reducer) · 커스텀 훅
+
+§2(서버/UI 상태 분리)를 구현 단위로 구체화. **상태를 어디에 둘지** + **이벤트→상태 환원 후보** + **훅 카탈로그**.
+
+### 상태 분류 — 무엇을 어디에
+| 상태 도메인 | 관리 방식 | 이유 |
+|------------|-----------|------|
+| 서버 데이터(기기·주문·이력·`home_summary`) | **Query 캐시**(React Query 계열) | 패칭·캐시·무효화·재시도 |
+| 채팅 메시지·스트리밍·`FlowState` | **reducer**(이벤트→상태) | WS 청크 누적은 이벤트 환원에 적합 |
+| WS 연결 상태 | **reducer(상태머신)** | 연결/재연결/오프라인 전이 |
+| 장바구니(주문 draft) | **reducer** | add/remove/clear 전이 |
+| 전역 UI/세션(패널·브릿지·화면맥락) | **경량 store**(Zustand 계열) | 화면 간 공유·단순 |
+| 동의·분석 opt-in | store + 보안 저장 | 수집 게이트(R19) |
+
+### 환원(reducer) 후보 — 이벤트 → 상태
+1. **채팅 스트림 환원** — WS 청크(`delta`/`template`/`flow`/`done`/`error`)를 메시지 리스트 + 스트리밍 상태로 누적(api-contract §2.1).
+2. **연결 상태머신** — connect/open/chunk/drop/background/offline → status(diagrams.md WebSocket 상태).
+3. **FlowState** — start/step/suspend/restore → `active_flow`/`suspended_flow`(R6).
+4. **장바구니** — add/remove/clear → `Order(DRAFT)`.
+5. **브릿지 surface** — open/escalate/dismiss → 모달/패널 상태(작게).
+
+> 위 5종은 **이벤트 시퀀스를 상태로 접는(reduce)** 성격이라 reducer가 자연스럽다. 나머지(서버 데이터)는 Query 캐시.
+
+### 커스텀 훅 카탈로그
+| 훅 | 책임 | 의존 계약 |
+|----|------|-----------|
+| `useChatTransport` | WS 연결·송수신·재연결 | `ChatTransport`(§5), api-contract §2.1 |
+| `useChat` | 메시지 전송·스트림 누적·흐름 | 위 + 채팅 reducer |
+| `useTemplateRenderer` | kind→컴포넌트 레지스트리·`text` 폴백 | response-templates |
+| `useCta` | CTA 처리(대화형→`/chat`, 커밋→엔드포인트+게이트) | architecture §8, R17 |
+| `useCardTap` / `useBridge` | 카드 탭→surface(브릿지/패널)·에스컬레이션 | response-templates §9 |
+| `useMultimodalInput` | 카메라/갤러리·권한·업로드 | R10 |
+| `useDevices`·`useOrders`·`useHistory`·`useHomeSummary` | 서버 데이터 조회 | api-contract §2.2 |
+| `useCart` | 장바구니 ops | 장바구니 reducer |
+| `useScreenContext` | 화면 맥락 주입(R9-4) | api-contract |
+| `useAnalytics` | 이벤트 트래킹(**동의 게이트**·비차단) | analytics.md, R19 |
+| `useConsent` | 동의 범위·opt-out | R19 |
+| `useNotifications` | 인앱 알림 표시 | R20 |
+
+> 훅은 **계약(api-contract·response-templates·analytics)** 에만 의존 → 트랜스포트/백엔드 교체에 안전.
+> `useAnalytics`는 모든 화면/CTA/흐름 훅에서 호출되지만, 동의 없으면 no-op(R19).
+
+## 12. 후속 / 비범위 (MVP 이후)
 
 - 접근성(VoiceOver·TalkBack·동적 폰트), 국제화(i18n), 실 푸시(FCM/APNs),
   OTA 업데이트(EAS/CodePush), 크래시 리포팅(Sentry), e2e 테스트(Detox), iOS/Android 차이 대응.
 
-## 12. 미해결 / 검증
+## 13. 미해결 / 검증
 
 - **WebSocket 스파이크** 결과로 §5 보정.
 - 상태관리·네비게이션 라이브러리 최종 선택(현재 우선안 수준) — 스파이크/프로토타입 후 확정.

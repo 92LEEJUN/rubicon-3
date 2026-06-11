@@ -219,8 +219,16 @@ class Notification:                      # 선제 알림 (R5·R20)
 
 class Consent:                           # 프라이버시 (R19)
     user_id: Id
-    scopes: list[str]                    # 허용 범위
+    scopes: list[str]                    # 허용 범위 ("analytics" 포함 시 분석 수집 허용, R28)
     updated_at: datetime
+
+class AnalyticsEvent:                    # 사용 분석 이벤트 (R28). 명세: docs/analytics.md
+    name: str                            # 택소노미 이벤트명 (예: "cta_click")
+    ts: datetime                         # UTC
+    session_id: Id
+    user_ref: str | None                 # 가명화 식별자(원본 식별자 아님, R19)
+    props: dict                          # 이벤트별 속성 (예: {"cta": "checkout"})
+    context: dict                        # screen·flow·flow_step·correlation_id
 ```
 
 ### 대화/메시지 (세션·이력 R6·R7·R12)
@@ -383,6 +391,10 @@ class ConsentPort(Protocol):                           # R19  MVP: Mock
     def get_consent(self, user_id: Id) -> Consent: ...
     def revoke(self, user_id: Id, scope: str) -> None: ...
     def delete_data(self, user_id: Id) -> None: ...    # 연관 데이터까지(cascade)
+
+class AnalyticsPort(Protocol):                         # R28  MVP: Mock(로컬 로그)
+    def track(self, event: AnalyticsEvent) -> None: ...        # 비차단. 동의 없으면 no-op
+    def track_batch(self, events: list[AnalyticsEvent]) -> None: ...  # FE 배치 전송
 ```
 
 각 Port는 `Mock*` 구현(MVP)과 `Real*` 구현(후속)을 가지며, 의존성 주입으로 교체한다.

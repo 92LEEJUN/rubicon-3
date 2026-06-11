@@ -176,6 +176,18 @@ class ServiceRequest:                    # 사람 핸드오프 (R18)
     context_ref: Id                      # Conversation.id 등 (존재 참조)
     created_at: datetime
 
+class BookingSlot:                       # 방문 예약 슬롯 (R18)
+    id: Id
+    start: datetime; end: datetime       # start < end
+    available: bool
+
+class Booking:                           # 확정된 방문 예약 (VISIT 핸드오프의 스케줄 형태)
+    id: Id
+    user_id: Id
+    slot_id: Id                          # 존재하는 BookingSlot 참조
+    context_ref: Id                      # Conversation.id
+    created_at: datetime
+
 class Notification:                      # 선제 알림 (R5·R20)
     id: Id
     user_id: Id
@@ -262,6 +274,19 @@ class IntentResult(BaseModel):           # 복합 질문 (R7)
 class OrderRequest(BaseModel):
     items: list[OrderItem] = Field(min_length=1)
     confirmed: bool                      # 행동 확인 (R17). False면 주문 진행 거부
+
+class InteractionReply(BaseModel):       # 대화형 CTA 회신 (response-templates §8)
+    conversation_id: Id
+    ref: Id                              # 원본 메시지/템플릿
+    kind: str                            # "choices" | "confirmation" | "booking"
+    payload: dict                        # 선택/확정 값 (예: {"option_id": ...})
+
+class CartRequest(BaseModel):
+    items: list[OrderItem] = Field(min_length=1)
+
+class BookingRequest(BaseModel):         # 방문 예약 슬롯 확정 (R18)
+    slot_id: Id
+    context_ref: Id
 ```
 
 ## 5. Repository 인터페이스
@@ -270,6 +295,10 @@ class OrderRequest(BaseModel):
 > 제약: 조회는 **부재 시 None**(예외 금지), 저장은 **멱등**, 목록은 **페이지네이션** 지원.
 
 ```python
+class Page(Generic[T]):                   # 커서 기반 페이지네이션 결과
+    items: list[T]
+    next_cursor: str | None              # None이면 마지막 페이지
+
 class ConversationRepository(Protocol):
     def get(self, conversation_id: Id) -> Conversation | None: ...
     def save(self, conversation: Conversation) -> None: ...   # version 충돌 시 ConflictError
@@ -317,6 +346,8 @@ class ActionGatePort(Protocol):                        # R17  확인 UX 실/처�
 
 class HandoffPort(Protocol):                           # R18  MVP: Mock
     def handoff(self, req_type: ServiceRequestType, context_ref: Id) -> ServiceRequest: ...
+    def list_slots(self, user_id: Id) -> list[BookingSlot]: ...     # 방문 예약 가능 슬롯
+    def book_slot(self, slot_id: Id, context_ref: Id) -> Booking: ... # 멱등(중복 예약 방지)
 
 class AlertPort(Protocol):                             # R20  MVP: Mock(in_app)
     def deliver(self, notification: Notification) -> None: ...   # opted_in=False면 no-op

@@ -26,6 +26,8 @@
 
 ### 2.1 대화 — WebSocket `/chat`
 자연어·멀티모달·인터랙션 회신의 단일 양방향 채널(트랜스포트 결정은 `frontend-architecture.md` §5).
+아래는 WS 봉투(`type` 판별자)이며, 본문은 data-model DTO에 대응한다:
+`user_message`≈`ChatRequest`, `interaction_reply`≈`InteractionReply`, 청크≈`ChatResponseChunk`(data-model §4).
 
 **클라이언트 → 서버 메시지**
 ```python
@@ -56,17 +58,24 @@ FE의 **구조화된 호출**(조회·커밋)은 LLM 미경유로 직행(archite
 > 단순 조회뿐이다. **대화형 CTA**(제안 칩, `choices`/`confirmation`/`booking` 회신, 설명 요청)는
 > §2.1 `/chat`으로 재진입해 **LLM을 탈 수 있다.** "CTA = 결정적"이 아니라 "**커밋 = 결정적**"이다.
 
-| 엔드포인트 | 메서드 | 용도 | 요구사항 |
-|------------|--------|------|----------|
-| `/cart` | POST/GET/DELETE | 장바구니 담기·조회 | R4 |
-| `/orders` | POST | 주문/결제 확정(ActionGate) | R4·R17 |
-| `/orders/{id}` | GET | 주문 상태·이력 | R12 |
-| `/bookings` | POST | 방문 예약 슬롯 확정 | R18 |
-| `/devices` | GET | 기기 목록·상태 | R2 |
-| `/handoff` | POST | 상담원 연결 접수 | R18 |
-| `/history` | GET | 대화·주문 이력(페이지네이션) | R12 |
+요청/응답 본문은 **`docs/data-model.md`의 DTO/엔티티 타입을 그대로** 쓴다(중복 정의 금지). 엔드포인트별 계약:
 
-> 도메인 엔드포인트의 요청/응답 스키마 필드는 `docs/data-model.md` 타입을 그대로 쓴다.
+| 엔드포인트 | 메서드 | 요청 | 응답 | 요구사항 |
+|------------|--------|------|------|----------|
+| `/devices` | GET | – | `list[Device]` | R2 |
+| `/devices/{id}` | GET | – | `Device` (+ `[Anomaly]`) | R2·R5 |
+| `/cart` | GET | – | `Order`(DRAFT) | R4 |
+| `/cart` | POST | `CartRequest` | `Order`(DRAFT) | R4 |
+| `/cart/items/{part_id}` | DELETE | – | `Order`(DRAFT) | R4 |
+| `/orders` | POST | `OrderRequest`(`confirmed=true`) | `Order` / `409 ConfirmationRequired` | R4·R17 |
+| `/orders/{id}` | GET | – | `Order` (상태·이력) | R12 |
+| `/bookings/slots` | GET | – | `list[BookingSlot]` | R18 |
+| `/bookings` | POST | `BookingRequest` | `Booking` | R18 |
+| `/handoff` | POST | `{type, context_ref}` | `ServiceRequest` | R18 |
+| `/history` | GET | `?limit&cursor` | `Page[Conversation \| Order]` | R12 |
+
+- `/orders` POST는 `confirmed=false`거나 게이트 미통과면 **`409`(`ConfirmationRequired`)** 반환(R17). 클라이언트는 `confirmation` 템플릿으로 확인 후 재요청.
+- 목록은 모두 **커서 페이지네이션**(`Page`, data-model §5).
 
 ## 3. 인증 / 세션
 
@@ -80,7 +89,24 @@ FE의 **구조화된 호출**(조회·커밋)은 LLM 미경유로 직행(archite
 - 표준 에러 형태: `{ "code": str, "message": str, "fallback": Template | None }`.
 - 되돌릴 수 없는 행동(R17)은 `confirmation` 게이트를 통과해야 커밋한다.
 
-## 5. 비범위
+## 5. Mock / 스텁 — 병렬 개발
+
+세 워크스트림(FE · API/표현 계층 · BE 도메인)이 **서로 막히지 않고** 병렬 개발하도록, Mock을 **두 레벨**로 둔다.
+
+| 레벨 | 무엇 | 누가 쓰나 | 출처 |
+|------|------|-----------|------|
+| **Port 레벨 Mock** | 외부 어댑터(SmartThings·O2O 등) 가짜 구현 | BE 도메인 | data-model §6, architecture §5 |
+| **계약 레벨 Stub 서버** | API 경계(`/chat` WS·도메인 엔드포인트)를 고정 응답으로 흉내 | FE · API 계층 | **이 문서 + response-templates + data-model DTO** |
+
+**계약 Stub 서버 규칙**
+- **이 계약을 단일 출처로** 따른다 → FE가 stub에, 실 BE가 같은 계약에 수렴해 **계약 드리프트를 방지**한다.
+- `/chat` WS stub: 스크립트된 청크 시퀀스(`delta`→`template`→`done`)를 재생하고, `interaction_reply`는 다음 시나리오로 진행/에코.
+- 엔드포인트 stub: data-model **불변식을 만족하는 fixture**(`Device`·`Order`·`Booking` 샘플) 반환. `/orders`는 `confirmed` 분기·`409`도 흉내.
+- 구현은 별도 경량 서비스 또는 FE 개발용 mock(MSW 류)·BE의 `Mock*` 어댑터 재사용 중 택1.
+
+**계약 테스트** — FE↔stub와 실 BE↔동일 계약을 같은 fixture/스키마로 검증해, 통합 시 합치를 보장한다(테스트 디렉터리는 data-model §8 `tests/`).
+
+## 6. 비범위
 
 - 실제 결제·인증 프로토콜 세부(SSO 등)는 실 전환 시. MVP는 Mock 경계(architecture §5).
 - Rate limit·버저닝 정책은 후속.

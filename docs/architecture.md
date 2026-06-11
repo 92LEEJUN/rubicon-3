@@ -126,6 +126,7 @@ flowchart TB
 | 핸드오프 (HandoffP) | **Mock** 접수 응답 | 상담/방문 시스템 |
 | 알림 전달 (AlertP) | **Mock** 인앱 표시 | 푸시/외부 채널 |
 | 동의/프라이버시 (ConsentP) | **Mock** 동의/삭제 | 실 동의·데이터 관리 |
+| 사용 분석 (AnalyticsP) | **Mock** 로컬 로그 (R28) | 분석 플랫폼/웨어하우스 연동 |
 | 저장소 (Repository) | **인메모리/로컬 DB** | Postgres + Redis (옵셔널) |
 
 ### 공개 데이터 소스 / ACL 매핑 (Real 어댑터)
@@ -287,3 +288,24 @@ flowchart LR
 ### Mock ↔ 실
 - **MVP** — 텔레메트리는 SmartThings 폴링/임계치, 전달은 인앱 Mock(AlertPort).
 - **실 전환** — 이벤트 스트림(예: 메시지 버스) 기반 실시간 감지 + 실 푸시 채널.
+
+## 11. 사용 분석 (Analytics) 파이프라인
+
+제품 개선을 위해 **이탈(퍼널)·구매 기여(attribution)·체류(engagement)** 를 측정한다(R28).
+FE/BE가 같은 이벤트 택소노미(`docs/analytics.md`)를 쓰고, `AnalyticsPort`로 흘려보낸다.
+
+```mermaid
+flowchart LR
+  FE["FE 이벤트<br/>screen_view·dwell·cta_click·flow_*"] -->|배치 전송| AP[AnalyticsPort]
+  BE["BE 이벤트<br/>order_confirmed·notification_*"] --> AP
+  CONS{동의·가명화<br/>R19} --> AP
+  AP --> SINK["sink<br/>(MVP: 로컬 로그 / 실: 분석 플랫폼·웨어하우스)"]
+  SINK --> F[퍼널·전환·리텐션 분석]
+```
+
+### 원칙
+1. **FlowState 전이 = 퍼널 단계** — 이탈은 `flow_start/step/complete/abandon`로 거의 공짜로 측정.
+2. **CTA + 상관관계 ID = 구매 기여** — `cta_click` → `order_confirmed`를 `correlation_id`로 잇는다.
+3. **체류** — `screen_view`/`screen_exit` dwell, 메시지·템플릿 노출.
+4. **동의·가명화 필수**(R19) — `Consent.scopes`에 `analytics` 없으면 수집 안 함, 식별자는 가명화. opt-out 즉시 중단.
+5. **비차단** — 분석 emit이 사용자 흐름을 지연·중단시키지 않는다(실패해도 무시).

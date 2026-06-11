@@ -34,8 +34,9 @@
 
 - **kind → 컴포넌트 레지스트리(맵)** 로 렌더. 모르는 kind·스키마 불일치 → `text` 폴백(`response-templates.md` §7).
 - `Message` = `text` + `template` + `ctas` + `media` 합성 렌더.
-- **CTA 핸들러** — 구조화 액션은 결정적 엔드포인트 호출(`architecture.md` §8). `confirmation`/`booking` 확정은 ActionGate(R17).
-- **인터랙션 회신**(`choices`·`confirmation`·`booking`)은 선택값을 후속 요청으로 전송(`response-templates.md` §8).
+- **CTA 핸들러 — 두 경로**(`architecture.md` §8): **대화형 CTA**(제안 칩·`choices` 등 회신·설명 요청)는
+  `/chat`으로 전송, **되돌릴 수 없는 커밋**(결제·주문·예약 확정)은 결정적 엔드포인트 + ActionGate(R17).
+- **인터랙션 회신**(`choices`·`confirmation`·`booking`)은 선택값을 `/chat` 후속 요청으로 전송(`response-templates.md` §8).
 - 템플릿 추가 시: 레지스트리에 컴포넌트 등록 + 폴백 유지.
 
 ## 5. 스트리밍 트랜스포트 (상세 결정)

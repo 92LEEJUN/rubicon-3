@@ -89,7 +89,9 @@ generate  → Claude로 답변 + 출처 표기(TrustP)
 
 ## 8. 안전 / 폴백
 
-- 되돌릴 수 없는 행동은 LLM 경로 밖 결정적 처리 + 확인(R17, architecture §8).
+- **되돌릴 수 없는 커밋만** LLM 경로 밖 결정적 처리 + 확인(R17, architecture §8). 대화형 CTA 회신
+  (`choices` 등)은 `/chat`으로 재진입해 파이프라인(§2)을 다시 타며 **LLM을 탈 수 있다.**
+  커밋 *주변*의 요약·후속 제안 생성도 LLM이 담당한다.
 - 외부/LLM 실패는 부분 degradation으로 흡수, 최소 `text` 응답 보장(R13).
 - Claude `stop_reason: "refusal"` 등 예외 응답은 폴백 처리 후 사용자에게 안전하게 안내.
 

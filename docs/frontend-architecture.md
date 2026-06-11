@@ -36,7 +36,8 @@
 ## 4. 템플릿 렌더러
 
 - **kind → 컴포넌트 레지스트리(맵)** 로 렌더. 모르는 kind·스키마 불일치 → `text` 폴백(`response-templates.md` §7).
-- `Message` = `text` + `template` + `ctas` + `media` 합성 렌더.
+- `Message` = `text`(리드) + **`sections[]`**(섹션별 `template`+`ctas`+`label`) + `media` 합성 렌더.
+  복합 응답(R7)은 섹션을 **순서대로 세로 스택**, 각 섹션에 의도 라벨·미처리(`handled:false`) 표시.
 - **CTA 핸들러 — 두 경로**(`architecture.md` §8): **대화형 CTA**(제안 칩·`choices` 등 회신·설명 요청)는
   `/chat`으로 전송, **되돌릴 수 없는 커밋**(결제·주문·예약 확정)은 결정적 엔드포인트 + ActionGate(R17).
 - **인터랙션 회신**(`choices`·`confirmation`·`booking`)은 선택값을 `/chat` 후속 요청으로 전송(`response-templates.md` §8).
@@ -140,7 +141,7 @@ frontend/
 | 동의·분석 opt-in | store + 보안 저장 | 수집 게이트(R19) |
 
 ### 환원(reducer) 후보 — 이벤트 → 상태
-1. **채팅 스트림 환원** — WS 청크(`delta`/`template`/`flow`/`done`/`error`)를 메시지 리스트 + 스트리밍 상태로 누적(api-contract §2.1).
+1. **채팅 스트림 환원** — WS 청크(`delta`/`section`/`flow`/`done`/`error`)를 메시지 + **섹션 리스트**(복합 R7) + 스트리밍 상태로 누적(api-contract §2.1).
 2. **연결 상태머신** — connect/open/chunk/drop/background/offline → status(diagrams.md WebSocket 상태).
 3. **FlowState** — start/step/suspend/restore → `active_flow`/`suspended_flow`(R6).
 4. **장바구니** — add/remove/clear → `Order(DRAFT)`.

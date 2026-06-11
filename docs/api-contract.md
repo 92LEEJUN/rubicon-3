@@ -44,12 +44,14 @@
 
 **서버 → 클라이언트 스트림 청크** (점진적 전달, R14)
 ```python
-{ "type": "delta", "text": str }                            # 텍스트 토큰
-{ "type": "template", "template": Template }                # 구조화 출력(완성 단위)
+{ "type": "delta", "text": str }                            # 리드/섹션 텍스트 토큰
+{ "type": "section", "section": MessageSection }            # 섹션 1개(복합이면 의도 순서대로 여러 번)
 { "type": "flow", "active_flow": str | None }               # 흐름 상태(R6)
-{ "type": "done", "message_id": Id, "ctas": [Cta] }         # 메시지 종료
+{ "type": "done", "message_id": Id }                        # 메시지 종료(누적 sections로 확정)
 { "type": "error", "code": str, "fallback": Template }      # 폴백(R13)
 ```
+> **복합 질문(R7)** — 의도별 `section` 청크를 **우선순위 순서대로** 보낸다. 각 `section`은 `label·intent·
+> template·ctas·handled`(미처리=`handled:false`). FE는 섹션을 순서대로 누적·렌더(`response-templates.md` §5).
 
 ### 2.2 결정적 HTTP 엔드포인트 (조회·커밋)
 FE의 **구조화된 호출**(조회·커밋)은 LLM 미경유로 직행(architecture §8). 응답은 **`Template`/상태**로 정형화.

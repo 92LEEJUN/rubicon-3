@@ -1,4 +1,7 @@
 """BFF WS /chat — BE 섹션 스트림 중계·인터랙션 회신·인증·폴백(api-contract §2.1)."""
+from fastapi.testclient import TestClient
+
+from gateway.main import create_app
 from tests.conftest import AUTH
 
 
@@ -60,3 +63,20 @@ def test_chat_fallback_when_backend_down(broken_client):
         c = ws.receive_json()
     assert c["type"] == "error"
     assert c["fallback"]["kind"] == "text"
+
+
+# ── 증분 포워딩: 부분 전송 후 스트림 실패 → 마지막 청크 전달 + stream_interrupted ──
+def test_chat_stream_interrupted_after_partial():
+    class _PartialBackend:
+        async def turn_stream(self, payload):
+            yield {"type": "section", "section": {"intent": "troubleshoot", "handled": True,
+                                                  "template": {"kind": "text", "data": {}}}}
+            raise RuntimeError("mid-stream boom")
+
+    client = TestClient(create_app(_PartialBackend()))
+    with client.websocket_connect("/chat", headers=AUTH) as ws:
+        ws.send_json({"type": "user_message", "text": "세탁기 상태 알려줘"})
+        first = ws.receive_json()
+        err = ws.receive_json()
+    assert first["type"] == "section"          # 부분 청크는 이미 전달됨(버퍼링 아님)
+    assert err["type"] == "error" and err["code"] == "stream_interrupted"

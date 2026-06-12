@@ -55,12 +55,15 @@ class BackendClient:
     async def surface(self, payload: dict) -> httpx.Response:
         return await self._client.post("/internal/surface", json=payload)
 
-    # ── 대화 스트림(NDJSON) — 청크 리스트로 수집 ────────────────────────────
-    async def turn_chunks(self, payload: dict) -> list[dict]:
-        out: list[dict] = []
+    # ── 대화 스트림(NDJSON) ─────────────────────────────────────────────────
+    async def turn_stream(self, payload: dict):
+        """청크를 **도착 즉시 yield**(증분 포워딩, operations §9). 버퍼링하지 않는다."""
         async with self._client.stream("POST", "/internal/turn", json=payload) as r:
             r.raise_for_status()
             async for line in r.aiter_lines():
                 if line.strip():
-                    out.append(json.loads(line))
-        return out
+                    yield json.loads(line)
+
+    async def turn_chunks(self, payload: dict) -> list[dict]:
+        """전체 청크 수집(비스트리밍 호출용). 스트림 위에 구현."""
+        return [chunk async for chunk in self.turn_stream(payload)]

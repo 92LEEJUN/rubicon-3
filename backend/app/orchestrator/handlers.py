@@ -110,17 +110,21 @@ def handle_order(c: Container, user: User, message: str,
 
 
 def handle_recommend(c: Container, user: User, message: str) -> list[MessageSection]:
-    products = c.catalog.recommend(user)
-    if not products:
+    items = c.recommendation.recommend(user)   # 추천 코어(근거·동의차등·보유제외)
+    if not items:
         return [MessageSection(
             label=LABELS["recommend"], intent="recommend",
             template=Template(kind="text", data={"message": "지금은 추천드릴 제품이 없습니다."}),
             handled=False)]
+    personalized = items[0].personalized
     return [MessageSection(
         label=LABELS["recommend"], intent="recommend",
         template=Template(kind="recommendation_list", data={
-            "products": [p.model_dump(mode="json") for p in products]}),
-        ctas=[Cta(label="자세히", action="chat", kind="explain")])]
+            # 각 제품에 추천 근거(reason) 부착, 개인화 여부 표시(일반 폴백 고지)
+            "products": [{**it.product.model_dump(mode="json"), "reason": it.reason} for it in items],
+            "personalized": personalized}),
+        ctas=[Cta(label="왜 추천?", action="chat", kind="explain"),
+              Cta(label="비교", action="chat", kind="compare")])]
 
 
 def handle_general(c: Container, user: User, message: str) -> list[MessageSection]:

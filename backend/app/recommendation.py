@@ -49,20 +49,15 @@ class RecommendationService:
         if self._engagement:  # 이미 본/무시한 추천 억제(R29, 요구 3-3)
             products = [p for p in products if not self._engagement.has_seen(user.id, p.id)]
 
-        if "device_data" in scopes:  # 보유 기기 중복 제외(요구 3-1·4-3)
-            owned_models, owned_types = self._owned(user)
-            products = [p for p in products
-                        if p.model not in owned_models and p.category not in owned_types]
+        if "device_data" in scopes:  # 보유 제품(같은 모델) 중복 추천 방지(요구 3-1·4-3)
+            owned_models = self._owned_models(user)
+            products = [p for p in products if p.model not in owned_models]
 
         return [RecommendationItem(product=p, personalized=personalized,
                                    reason=self._reason(p, personalized)) for p in products]
 
-    def _owned(self, user: User) -> tuple[set, set]:
-        models, types = set(), set()
-        for d in self._device.list_devices():
-            if d.id in user.linked_device_ids:
-                models.add(d.model); types.add(d.type)
-        return models, types
+    def _owned_models(self, user: User) -> set:
+        return {d.model for d in self._device.list_devices() if d.id in user.linked_device_ids}
 
     @staticmethod
     def _reason(p: Product, personalized: bool) -> str:

@@ -28,6 +28,7 @@ class _Dev:
 
 
 _PRODUCTS = [
+    Product(id="p_owned", category="washer", name="보유 세탁기", model="WF45", price=800000),  # 보유 모델
     Product(id="p_washer", category="washer", name="세탁기 신형", model="WF99", price=900000),
     Product(id="p_air", category="air_purifier", name="공기청정기", model="AX60", price=300000),
 ]
@@ -46,11 +47,12 @@ def _svc(eng=None):
 
 
 # ── 추천 코어 제외 ───────────────────────────────────────────────────────────
-def test_excludes_owned_category_when_device_data():
+def test_excludes_owned_model_when_device_data():
     items = _svc().recommend(_user())
-    cats = {it.product.category for it in items}
-    assert "washer" not in cats          # 보유 세탁기 카테고리 제외(요구 3-1)
-    assert "air_purifier" in cats
+    models = {it.product.model for it in items}
+    assert "WF45" not in models          # 보유 제품(같은 모델) 제외(요구 3-1)
+    assert "WF99" in models               # 같은 카테고리 신형은 추천(업셀 허용)
+    assert "AX60" in models
 
 
 def test_excludes_seen_via_engagement():
@@ -65,14 +67,14 @@ def test_no_personalization_general_fallback():
     items = _svc().recommend(_user(scopes=()))   # 동의 없음
     assert items and all(it.personalized is False for it in items)
     assert "개인화 제한" in items[0].reason       # 일반 추천 고지(요구 4-2)
-    # device_data 없음 → 보유 제외 미적용 → washer도 후보
-    assert any(it.product.category == "washer" for it in items)
+    # device_data 없음 → 보유 제외 미적용 → 보유 모델(WF45)도 후보
+    assert any(it.product.model == "WF45" for it in items)
 
 
 def test_device_data_only_owned_exclusion_but_not_personalized():
     items = _svc().recommend(_user(scopes=("device_data",)))
     assert all(it.personalized is False for it in items)          # personalization 없음
-    assert all(it.product.category != "washer" for it in items)   # 보유 제외는 적용(요구 4-3)
+    assert all(it.product.model != "WF45" for it in items)        # 보유 모델 제외는 적용(요구 4-3)
 
 
 # ── 트리거 ───────────────────────────────────────────────────────────────────

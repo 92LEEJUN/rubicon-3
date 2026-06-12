@@ -107,3 +107,17 @@
 - **병합 = 하이브리드(2c)** — 근거(섹션 데이터)는 결정적으로 보존하고, **연결문구(인트로/전환)만 LLM**. 결정적 병합(2a)의 무환각·근거보존 + 자연어 흐름을 절충(2b 신서사이저의 환각·지연 회피).
 - **통합** — `core.Orchestrator`(결정적 섹션 백본)가 capability+merge의 골격, `runtime`의 LLM 워커는 그 위의 agent capability. `LLM_BACKED`/`MULTIAGENT` 토글은 "어떤 capability가 LLM-backed인가"로 수렴(후속 리팩터).
 - 근거·후보안·기각: **ADR-0043**.
+
+## 12. capability 구조 상세 (ADR-0045)
+
+§11 통합 구조를 동작 수준으로 닫은 상세. 4축 확정.
+
+- **① 출력 = 2채널** — capability는 api-contract §2.1 청크 방출: **delta**(자유 내러티브, 프롬프트 포함/금지 규율로 통제) + **section**(구조화 아티팩트: 카드·리스트·`confirmation`, FE 렌더·커밋 게이트 보존). 순수 free delta(템플릿·커밋 약화)·순수 섹션(자연어 약함) 모두 기각.
+  - **포함**: tool 근거·출처(R16)·위험 경고(R23)·추천 근거(R8)·커밋 전 확인(R17).
+  - **금지**: 가격/사양/재고/해결책 날조·시스템/대기/순번(ops §11)·동의 밖/민감(R19)·무확인 커밋.
+- **② 플래너 = LLM 동적 DAG + 룰 검증** — LLM이 `{steps:[{capability, depends_on, parallel_group}]}` 제안 → 룰이 검증(레지스트리 capability만·사이클 금지·우선순위 정렬·무효시 룰 폴백). 플래너 mock으로 결정적 테스트.
+- **③ capability 간 데이터 = turn 블랙보드** — 턴 스코프 `ctx`에 산출(required_parts·device_status·candidates) write/read. `carried_parts`의 일반형.
+- **④ 스트리밍/리뷰** — 빠른 결정적 capability(device_status) 먼저 방출(프리페치 ≤2s) → agent → 병합 delta. 커밋 안전은 structured `confirmation`+ActionGate(R17/409)로 보장(스트림 버퍼링 불요).
+- **레지스트리** — `{name: Capability(kind=agent|tool, intents, tools, prompt?, deps_hint, priority, emits)}`, 추가=한 엔트리.
+
+> 구현(runtime/core 수렴)은 별도 스펙 후보. 근거·기각: ADR-0045.

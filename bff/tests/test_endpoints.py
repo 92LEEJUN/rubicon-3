@@ -19,6 +19,16 @@ def test_device_detail_relayed(client):
     assert r.json()["found"] is True
 
 
+# ── 이어가기(컴패니언 §1) ────────────────────────────────────────────────────
+def test_resume_requires_auth(client):
+    assert client.get("/resume").status_code == 401
+
+
+def test_resume_relayed(client):
+    body = client.get("/resume?fresh=true", headers=AUTH).json()
+    assert body["has_context"] is False        # fresh → 깨끗한 시작
+
+
 def test_device_not_found_status_preserved(client):
     assert client.get("/devices/없는기기", headers=AUTH).status_code == 404
 

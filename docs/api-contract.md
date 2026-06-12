@@ -78,6 +78,7 @@ FE의 **구조화된 호출**(조회·커밋)은 LLM 미경유로 직행(archite
 | `/bookings` | POST | `BookingRequest` | `Booking` | R18 |
 | `/handoff` | POST | `{type, context_ref}` | `ServiceRequest` | R18 |
 | `/history` | GET | `?limit&cursor` | `Page[Conversation \| Order]` | R12 |
+| `/resume` | GET | `?fresh` | `ResumePayload`(`has_context`·`summary`·`facts`·`elapsed_label`·`suspended_flow`) | 컴패니언 §1 |
 
 - `/orders` POST는 `confirmed=false`거나 게이트 미통과면 **`409`(`ConfirmationRequired`)** 반환(R17). 클라이언트는 `confirmation` 템플릿으로 확인 후 재요청.
 - 목록은 모두 **커서 페이지네이션**(`Page`, data-model §5).

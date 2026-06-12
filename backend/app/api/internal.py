@@ -48,11 +48,35 @@ async def _stream_turn(text: str, screen_context: dict | None) -> AsyncIterator[
     아니면 결정적 섹션(동기 제너레이터, I/O 없음·즉시)."""
     if _llm_backed():
         from ..orchestrator.legacy import astream_turn as _llm_astream
-        async for chunk in _llm_astream(text, screen_context):
+        memory = _container.companion.context(_container.user.id)  # 이어가기 주입(§0.4)
+        async for chunk in _llm_astream(text, screen_context, memory=memory):
             yield chunk
     else:
         for chunk in _orch.stream_turn(text, screen_context):
             yield chunk
+
+
+def _collect_assistant(chunk: dict, parts: list[str]) -> None:
+    """스트림 청크에서 어시스턴트 텍스트를 모은다(컴팩션 기록용)."""
+    t = chunk.get("type")
+    if t == "delta":
+        parts.append(chunk.get("text", ""))
+    elif t == "section":
+        label = (chunk.get("section") or {}).get("label")
+        if label:
+            parts.append(f"[{label}]")  # 상세 추출은 컴패니언 §0.3
+
+
+async def _stream_and_record(text: str, screen_context: dict | None) -> AsyncIterator[dict]:
+    """턴 스트림 + 종료 후 컴팩션 기록(turn 루프 배선, tasks §0.4). 기록 실패는 무시(비차단)."""
+    parts: list[str] = []
+    async for chunk in _stream_turn(text, screen_context):
+        _collect_assistant(chunk, parts)
+        yield chunk
+    try:
+        _container.companion.record_turn(_container.user.id, text, " ".join(p for p in parts if p))
+    except Exception:
+        pass
 
 
 # ── 요청 모델 ────────────────────────────────────────────────────────────────
@@ -88,7 +112,7 @@ async def turn_ws(ws: WebSocket) -> None:
         while True:
             msg = await ws.receive_json()
             text = msg.get("text", "")
-            async for chunk in _stream_turn(text, msg.get("screen_context")):
+            async for chunk in _stream_and_record(text, msg.get("screen_context")):
                 await ws.send_json(chunk)
     except WebSocketDisconnect:
         return
@@ -99,9 +123,15 @@ def turn_http(req: TurnRequest) -> StreamingResponse:
     """BFF 중계용 HTTP 스트림(NDJSON) — 한 줄당 청크 1개(§2.1 봉투). 비동기 제너레이터로
     스트리밍(이벤트 루프 비차단 — 스레드-당-턴 점유 제거)."""
     async def gen():
-        async for chunk in _stream_turn(req.text, req.screen_context):
+        async for chunk in _stream_and_record(req.text, req.screen_context):
             yield json.dumps(chunk, ensure_ascii=False) + "\n"
     return StreamingResponse(gen(), media_type="application/x-ndjson")
+
+
+@app.get("/internal/resume")
+def resume(fresh: bool = False):
+    """이어가기(컴패니언 §1) — 영속 메모리·상대 시간 복원. fresh면 '새로 시작'."""
+    return _container.companion.resume(_container.user.id, fresh=fresh).model_dump(mode="json")
 
 
 # ── 결정적 조회(HTTP) ────────────────────────────────────────────────────────

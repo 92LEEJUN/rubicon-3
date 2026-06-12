@@ -72,6 +72,12 @@ def create_app(backend: Optional[BackendClient] = None) -> FastAPI:
         body = await request.json()
         return await relay(lambda: be.create_booking(body))
 
+    # ── 이어가기(컴패니언 §1) — 패널 열기 시 복원 맥락 ──────────────────────
+    @app.get("/resume")
+    async def resume(fresh: bool = False, user: str = Depends(require_auth),
+                     be: BackendClient = Depends(_backend)):
+        return await relay(lambda: be.resume(fresh))
+
     # ── 카드 탭 surface(§2.3) ───────────────────────────────────────────────
     @app.post("/surface")
     async def surface(request: Request, user: str = Depends(require_auth),

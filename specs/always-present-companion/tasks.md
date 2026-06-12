@@ -8,14 +8,15 @@
 - [x] 0.2 `CompactionService` — N턴 트리거 + 롤링 요약 + 사실 추출(주문ID·오류코드) + rehydrate(`working_context`). 결정적 `RuleBasedCompactor` _(ADR-0040)_ — `app/compaction.py`, 테스트 `tests/test_compaction.py`
   - 손실 위험 항목(주문ID·오류코드)은 facts로 보존 ✓ (기기모델·동의는 명시 facts로)
 - [ ] 0.3 `LLMCompactor` 실 요약 프롬프트·**구조화 facts 추출 스키마** 확정 + **토큰 임계(~70%) 트리거**(현재 N턴) _(구현 단계)_
-- [ ] 0.4 오케스트레이터 턴 루프 배선 — 턴 후 `maybe_compact`, 다음 턴에 `working_context` 주입
+- [x] 0.4 오케스트레이터 턴 루프 배선 — 턴 후 `record_turn`(→`maybe_compact`), 다음 턴에 `context()`(요약+사실) **LLM 주입** — `app/companion.py`·`api/internal.py`(`_stream_and_record`)·`orchestrator/legacy.py`(`_memory_note`)
+  - 사실은 **매 턴 즉시 추출**(최근 턴 사실 누락 방지), 요약은 임계 시 컴팩션
 
 ## 1. Resume (이어가기) _(요구 1·4·5)_
-- [ ] 1.1 `ResumeService.resume(user_id)` — user 메모리 rehydrate + open-loop 조회 → `ResumePayload`
-- [ ] 1.2 TTL 만료 후 영속 메모리 복원 경로(working 없음 → durable에서) _(요구 1.2)_
-- [ ] 1.3 `elapsed` 상대 시간 산출·인사 반영 _(요구 5)_
-- [ ] 1.4 '새로 시작' 분기(메모리 비주입) _(요구 1.3)_
-- [ ] 1.5 패널 open(R9) 시 resume 템플릿 노출(FE)
+- [x] 1.1 `CompanionService.resume(user_id)` → `ResumePayload`(summary·facts·elapsed·suspended_flow) + `GET /internal/resume`·BFF `/resume` _(요구 1·4)_
+- [x] 1.2 영속 메모리 기반 복원 — working 세션과 무관하게 user 메모리에서 _(요구 1.2)_
+- [x] 1.3 `elapsed_label` 상대 시간(방금·어제·지난주) _(요구 5)_
+- [x] 1.4 '새로 시작' 분기(`fresh=true`, 메모리 비주입) _(요구 1.3)_
+- [ ] 1.5 패널 open(R9) 시 resume 템플릿 노출(FE) + `suspended_flow` 소스(FlowState 영속) 연결
 
 ## 2. OpenLoop (미해결 스레드) _(요구 2)_
 - [ ] 2.1 `OpenLoop` 모델 + Repository(상태·우선순위·해소 시점)

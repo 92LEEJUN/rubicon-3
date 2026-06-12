@@ -87,7 +87,7 @@ LLM·외부 호출 비용을 줄이는 캐시 계층. 각 캐시는 **키·TTL·
 - **컴팩션 트리거** — 컨텍스트 토큰 임계(예: 70%) 또는 N턴마다: 오래된 verbatim → 요약 흡수 + 사실 추출.
 - **영속/휘발 분리(§13 보정)** — working 맥락(`sess:{sid}`)은 휘발(TTL) 가능하되, **구조화 사실 + 롤링 요약은 영속(DB, R12)**. 재방문 시 영속분을 **rehydrate** → TTL이 지나도 이어지는 느낌.
 - **대안 기각** — 슬라이딩 윈도우(단순 절단)는 옛 맥락 참조 시 끊김 → 채택 X. 대화 RAG(전 이력 검색)는 후속 확장 후보. (근거·대안: ADR-0040.)
-- **구현** — `backend/app/compaction.py`(`CompactionService` + `RuleBasedCompactor` 결정적/`LLMCompactor` 실, ADR-0020) · `app/repositories/conversation_memory.py`(user 단위). 남은 작업: LLM 요약 프롬프트·구조화 facts 스키마·토큰 임계 트리거·턴 루프 배선(`specs/always-present-companion/tasks.md` §0).
+- **구현** — `backend/app/compaction.py`(`CompactionService`·`RuleBasedCompactor`/`LLMCompactor`, ADR-0020) · `app/repositories/conversation_memory.py`(user 단위) · `app/companion.py`(턴 기록·컴팩션·이어가기). 턴 루프 배선·이어가기 `GET /resume` 완료, LLM 주입 적용. 남은: LLM 요약 프롬프트·구조화 facts 스키마·토큰 임계 트리거(`specs/always-present-companion/tasks.md` §0.3·1.5).
 
 ## 5. 관측성 / 비용 추적
 

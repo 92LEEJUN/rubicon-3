@@ -70,14 +70,34 @@ async def aclassify(user_message: str) -> dict:
     return json.loads(resp.choices[0].message.content)
 
 
-async def arun(user_message: str, max_steps: int = 6, verbose: bool = False) -> str:
+def _memory_note(memory: Optional[dict]) -> Optional[dict]:
+    """워킹 컨텍스트(요약+사실)를 system 노트로 — 이어가기 주입(ADR-0040, 컴패니언 §0.4)."""
+    if not memory:
+        return None
+    summary = (memory.get("summary") or "").strip()
+    facts = memory.get("facts") or {}
+    if not summary and not facts:
+        return None
+    parts = []
+    if summary:
+        parts.append(f"요약: {summary}")
+    if facts:
+        parts.append(f"사실: {facts}")
+    return {"role": "system", "content": "[이전 대화 맥락 — 이어서 응대]\n" + "\n".join(parts)}
+
+
+async def arun(user_message: str, max_steps: int = 6, verbose: bool = False,
+               memory: Optional[dict] = None) -> str:
     """LLM tool-loop — 비동기(서빙 경로). 실행은 순차 유지(출력 동일)."""
     intent = await aclassify(user_message)
     if verbose:
         print(f"[의도] {intent}")
 
-    messages = [{"role": "system", "content": SYSTEM},
-                {"role": "user", "content": user_message}]
+    messages = [{"role": "system", "content": SYSTEM}]
+    note = _memory_note(memory)
+    if note:
+        messages.append(note)
+    messages.append({"role": "user", "content": user_message})
 
     for _ in range(max_steps):
         resp = await achat_completion(
@@ -107,15 +127,16 @@ def run(user_message: str, max_steps: int = 6, verbose: bool = True) -> str:
     return asyncio.run(arun(user_message, max_steps=max_steps, verbose=verbose))
 
 
-async def astream_turn(message: str, screen_context: Optional[dict] = None) -> AsyncIterator[dict]:
+async def astream_turn(message: str, screen_context: Optional[dict] = None,
+                       memory: Optional[dict] = None) -> AsyncIterator[dict]:
     """LLM 자연어 답변 경로(비동기) — api-contract §2.1 봉투(delta → done).
 
     tool-loop으로 근거(기기·해결·부품 Mock)를 모아 자연어 답변을 생성하고,
     텍스트를 `delta` 청크로 흘린 뒤 `done`으로 종료한다(실패 시 error 폴백, R13).
-    `core.Orchestrator.stream_turn`(결정적 섹션)과 동일한 봉투 계약을 따른다.
+    `memory`(이전 맥락 요약+사실)가 있으면 이어가기로 주입한다(컴패니언 §0.4).
     """
     try:
-        answer = await arun(message, verbose=False)
+        answer = await arun(message, verbose=False, memory=memory)
     except Exception as exc:  # 전체 폴백(R13) — 대화 중단 금지
         yield {"type": "error", "code": "orchestrator_error",
                "fallback": {"kind": "text",

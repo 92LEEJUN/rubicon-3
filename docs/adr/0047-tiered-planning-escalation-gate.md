@@ -1,6 +1,6 @@
 # ADR-0047: 티어드 플래닝 + 에스컬레이션 게이트 (LLM 플래너 레이턴시 예산)
 
-- **상태**: 채택 (capability-orchestrator §9 선행)
+- **상태**: **대체됨** → [ADR-0048](0048-llm-planner-single-router.md)(LLM 플래너 단일 라우터). 폐기 사유는 ADR-0048 "게이트를 닫은 사유(상세)" 참조 — 휴리스틱 임계 취약성·이중 경로 복잡성·목적지 추가로 전제 변화.
 - **관련**: ADR-0046(조언형/행동형), ADR-0017(턴 내 병렬 보류), `specs/capability-orchestrator/`(요구사항 4·11), `test-findings.md`(F1·F2)
 
 ## 배경

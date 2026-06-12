@@ -15,6 +15,7 @@ from .repositories import (
     InMemoryConversationMemoryRepository,
     InMemoryConversationStore,
     InMemoryEngagementRepository,
+    InMemoryOpenLoopRepository,
 )
 from .services import (
     CatalogService,
@@ -45,9 +46,10 @@ def build_container() -> Container:
     engagement = InMemoryEngagementRepository()
     conversation_memory = InMemoryConversationMemoryRepository()
     conversation_store = InMemoryConversationStore()
+    open_loops = InMemoryOpenLoopRepository()
     # MVP=결정적 컴팩터(LLM 없이 테스트 가능). 실 전환 시 LLMCompactor로 교체(ADR-0020).
     compaction = CompactionService(RuleBasedCompactor())
-    companion = CompanionService(conversation_memory, conversation_store, compaction)
+    companion = CompanionService(conversation_memory, conversation_store, compaction, open_loops)
     device = DeviceService(mock.MockDeviceAdapter())
     knowledge = KnowledgeService(mock.MockCSKnowledgeAdapter(), mock.MockWarrantyAdapter())
     catalog = CatalogService(mock.MockCatalogAdapter(), engagement)

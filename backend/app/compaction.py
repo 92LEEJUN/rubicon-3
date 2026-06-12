@@ -62,16 +62,34 @@ class RuleBasedCompactor:
                                   summarized_through=memory.summarized_through)
 
 
-class LLMCompactor:
-    """실 경로 — LLM으로 롤링 요약을 갱신, 사실은 규칙 추출 재사용(손실 방지).
+# 구조화 facts 추출 스키마(LLM 실 경로) — 규칙 추출(주문ID·오류코드)과 합쳐 이중 보존.
+_FACTS_SCHEMA = {
+    "type": "json_schema",
+    "json_schema": {
+        "name": "memory_facts",
+        "schema": {
+            "type": "object",
+            "properties": {
+                "devices": {"type": "array", "items": {"type": "string"}},          # 기기/모델
+                "unresolved_issues": {"type": "array", "items": {"type": "string"}},  # 미해결 이슈
+            },
+            "required": ["devices", "unresolved_issues"],
+            "additionalProperties": False,
+        },
+        "strict": True,
+    },
+}
 
-    facts 구조화 추출 스키마는 구현 단계에서 확정(요약은 LLM, 핵심 식별자는 규칙으로 이중 보존).
-    """
+
+class LLMCompactor:
+    """실 경로 — LLM으로 롤링 요약 갱신 + 구조화 facts 추출, 핵심 식별자는 규칙으로 이중 보존."""
 
     _SYSTEM = ("이전 대화 요약을 갱신한다. 핵심만 간결히. "
                "주문ID·기기모델·미해결 이슈는 빠뜨리지 마라.")
 
     def fold(self, memory: ConversationMemory, turns: list[dict]) -> ConversationMemory:
+        import json
+
         from .llm import MODEL, chat_completion
         convo = "\n".join(f"{t.get('role')}: {t.get('text', '')}" for t in turns)
         resp = chat_completion(model=MODEL, messages=[
@@ -79,11 +97,29 @@ class LLMCompactor:
             {"role": "user", "content": f"기존 요약:\n{memory.summary}\n\n새 대화:\n{convo}\n\n갱신된 요약:"},
         ])
         summary = (resp.choices[0].message.content or memory.summary).strip()
+
         facts = {k: (list(v) if isinstance(v, list) else v) for k, v in memory.facts.items()}
         for t in turns:
-            _merge_facts(facts, t)  # 핵심 식별자는 규칙으로도 보존
+            _merge_facts(facts, t)  # 규칙: 주문ID·오류코드(결정적 보존)
+        try:  # 구조화 추출(기기·미해결) — 실패해도 규칙 사실은 보존
+            fresp = chat_completion(model=MODEL, response_format=_FACTS_SCHEMA, messages=[
+                {"role": "system", "content": "대화에서 기기/모델과 미해결 이슈를 추출한다."},
+                {"role": "user", "content": convo}])
+            extracted = json.loads(fresp.choices[0].message.content)
+            for key in ("devices", "unresolved_issues"):
+                bucket = facts.setdefault(key, [])
+                for v in extracted.get(key, []):
+                    if v not in bucket:
+                        bucket.append(v)
+        except Exception:
+            pass
         return ConversationMemory(summary=summary, facts=facts,
                                   summarized_through=memory.summarized_through)
+
+
+def _est_tokens(messages: list[dict]) -> int:
+    """대략 토큰 추정(문자/4 휴리스틱) — provider 무관 근사."""
+    return sum(len(m.get("text", "")) for m in messages) // 4
 
 
 @dataclass
@@ -91,10 +127,21 @@ class CompactionService:
     """트리거 판정 + 컴팩션 + 워킹 컨텍스트 조립(rehydrate)."""
     compactor: Compactor
     keep_recent: int = DEFAULT_KEEP_RECENT
+    max_tokens: int = 0          # >0이면 토큰 임계 모드(70% 초과 시 압축), 0이면 턴수 모드
+    token_ratio: float = 0.7
 
     def should_compact(self, memory: ConversationMemory, messages: list[dict]) -> bool:
-        """흡수 안 된 메시지가 최근 keep_recent를 넘으면 압축."""
-        return (len(messages) - memory.summarized_through) > self.keep_recent
+        """흡수 안 된(unfolded) 메시지가 최근 keep_recent를 넘고, 임계를 초과하면 압축.
+
+        토큰 모드(max_tokens>0): unfolded 추정 토큰 > max_tokens*token_ratio(~70%).
+        턴수 모드(기본): unfolded 개수 > keep_recent.
+        """
+        unfolded = messages[memory.summarized_through:]
+        if len(unfolded) <= self.keep_recent:
+            return False  # 최근 keep_recent는 항상 verbatim
+        if self.max_tokens > 0:
+            return _est_tokens(unfolded) > int(self.max_tokens * self.token_ratio)
+        return True
 
     def compact(self, memory: ConversationMemory, messages: list[dict]) -> ConversationMemory:
         """summarized_through .. (len-keep_recent) 구간을 요약으로 접는다."""

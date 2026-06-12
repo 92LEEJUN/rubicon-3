@@ -91,6 +91,18 @@ class CompanionService:
                     opened_at=existing.opened_at if existing else now, last_touch=now))
 
     # ── 미해결 스레드 (§2) ───────────────────────────────────────────────────
+    def track_loop(self, user_id: str, kind: str, ref: str, label: str,
+                   priority: int = 0, *, now: Optional[datetime] = None) -> OpenLoop:
+        """외부(추천 등)에서 open-loop 멱등 생성/갱신. 해소된 건 되살리지 않음."""
+        now = now or datetime.now(timezone.utc)
+        existing = self.open_loops_repo.get(user_id, ref)
+        if existing and existing.status != "open":
+            return existing
+        loop = OpenLoop(id=f"loop_{ref}", kind=kind, ref=ref, label=label, priority=priority,
+                        opened_at=existing.opened_at if existing else now, last_touch=now)
+        self.open_loops_repo.upsert(user_id, loop)
+        return loop
+
     def open_loops(self, user_id: str) -> list[OpenLoop]:
         return self.open_loops_repo.list_open(user_id)
 

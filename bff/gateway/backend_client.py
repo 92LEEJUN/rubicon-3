@@ -81,6 +81,9 @@ class BackendClient:
     async def reengagement(self) -> httpx.Response:
         return await self._client.get("/internal/reengagement")
 
+    async def recommendations(self) -> httpx.Response:
+        return await self._client.get("/internal/recommendations")
+
     async def reengagement_deliver(self) -> httpx.Response:
         return await self._client.post("/internal/reengagement/deliver")
 

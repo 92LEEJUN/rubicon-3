@@ -67,7 +67,16 @@
 - [ ] 9.3 통합 시나리오 — 소모품 수명 임박 → 선제 추천(게이트 통과) → 탭 → /chat 비교 → 장바구니 → 주문(기여 추적) _(요구 1·2·5·6)_
 - [ ] 9.4 통합 시나리오 — 추천 보류 → open-loop → 재방문 resume → 주문 후 닫힘 _(요구 7)_
 
-## 진행 메모
-<!-- 구현 중 설계와 달라진 점, 결정 사항을 기록한다. 변경 시 design.md(또는 docs/·신규 ADR)도 함께 갱신한다. -->
+## 진행 메모 (구현)
+**구현됨** — `backend/app/recommendation.py`(`RecommendationService` 추천 코어: 보유/seen 제외·동의 차등·근거 / `triggers` 소모품·관심 / `enqueue_preemptive`→컴패니언 open-loop) + `companion.track_loop`(공개 생성) + container 배선 + `GET /internal/recommendations`·`POST /internal/recommendations/preemptive` + BFF `/recommendations` + `tests/test_recommendation.py`(7종). **백엔드 142·BFF 37 통과.**
+
+핵심: **새 영속 엔티티 0**(Product·Engagement·OpenLoop 조합), 선제는 **컴패니언 ReEngagement 게이트 재사용**(ADR-0042, 신규 선제 인프라 없음). 동의 차등(personalization/device_data scope별)·보유 제외·중복 억제 결정적 테스트.
+
+**남은(부분/후속)**:
+- 5 반응형 표현(recommendation_list/product_comparison 템플릿 직렬화)·대화형 CTA 재진입·bridge 분기는 표현 레이어(FE/오케스트레이터) 연결 후속
+- 6 전환 기여(correlation_id 추적)·analytics 이벤트 배선 후속
+- 9.3·9.4 통합 시나리오, 선제 전달 스케줄/이벤트 합류(이벤트 vs 스케줄)는 신규 ADR 후보
+
+<!-- 변경 시 docs/도 함께 갱신(CLAUDE.md 규칙). -->
 - 데이터 모델·공개 인터페이스·아키텍처가 실제로 바뀌면 스펙이 아니라 `docs/`(data-model·operations·analytics 등)를 갱신하고 여기서 참조한다(CLAUDE.md 규칙).
 - 선제 추천 트리거를 컴패니언 `ReEngagementService`에 합류시키는 방식(이벤트 vs 스케줄) 확정 시 신규 ADR 후보.

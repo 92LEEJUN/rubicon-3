@@ -11,6 +11,7 @@ from .adapters import mock
 from .companion import CompanionService
 from .compaction import CompactionService, RuleBasedCompactor
 from .domain import User
+from .recommendation import RecommendationService
 from .reengagement import ReEngagementService
 from .repositories import (
     InMemoryConversationMemoryRepository,
@@ -38,6 +39,7 @@ class Container:
     compaction: CompactionService
     companion: CompanionService
     reengagement: ReEngagementService
+    recommendation: RecommendationService
     device: DeviceService
     knowledge: KnowledgeService
     catalog: CatalogService
@@ -69,6 +71,8 @@ def build_container() -> Container:
     handoff = HandoffService(mock.MockHandoffAdapter())
     notification = NotificationService(device, engagement)
     triage = TriageService(warranty_adapter)
+    # 추천 코어 — CatalogPort·Engagement·DeviceService만 의존(선제는 컴패니언 게이트 재사용).
+    recommendation = RecommendationService(catalog_adapter, engagement, device)
     return Container(
         user=User.model_validate(fx.USER),
         engagement=engagement,
@@ -76,6 +80,7 @@ def build_container() -> Container:
         compaction=compaction,
         companion=companion,
         reengagement=reengagement,
+        recommendation=recommendation,
         device=device,
         knowledge=knowledge,
         catalog=catalog,

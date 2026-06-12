@@ -191,6 +191,20 @@ def reengagement_deliver():
     return cand.model_dump(mode="json")
 
 
+@app.get("/internal/recommendations")
+def recommendations():
+    """반응형 추천(컴패니언·비전 2) — 추천 코어 산출(개인화·동의 차등). recommendation_list 매핑용."""
+    items = _container.recommendation.recommend(_container.user)
+    return {"items": [it.model_dump(mode="json") for it in items]}
+
+
+@app.post("/internal/recommendations/preemptive")
+def recommendations_preemptive():
+    """선제 추천 등록 — 트리거를 open-loop로 적재(전달은 컴패니언 게이트가 규율, ADR-0042)."""
+    n = _container.recommendation.enqueue_preemptive(_container.user, _container.companion)
+    return {"enqueued": n}
+
+
 @app.post("/internal/open-loops/{ref}/resolve")
 def resolve_open_loop(ref: str):
     """미해결 스레드 해소(§2.3) — R25 해결확인·주문 배송완료 등."""

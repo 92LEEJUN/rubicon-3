@@ -85,6 +85,7 @@ FE의 **구조화된 호출**(조회·커밋)은 LLM 미경유로 직행(archite
 | `/history` | GET | `?limit&cursor` | `Page[Conversation \| Order]` | R12 |
 | `/resume` | GET | `?fresh` | `ResumePayload`(`has_context`·`summary`·`facts`·`open_loops[]`·`elapsed_label`·`suspended_flow`) | 컴패니언 §1·§2 |
 | `/reengagement` | GET | – | `ReEngagement`(`primary_ref`·`primary_label`·`kind`·`also_count`·`message`) \| `{}` | 컴패니언 §3(ADR-0042) |
+| `/recommendations` | GET | – | `{items: [RecommendationItem(product·reason·personalized)]}` | 제품추천(반응형·동의 차등) |
 | `/reengagement/deliver` | POST | – | `ReEngagement` \| `{}` (전달 확정 + 재노출 억제) | 컴패니언 §3.3 |
 | `/open-loops/{ref}/{action}` | POST | `action`=`resolve`\|`dismiss` | `OpenLoop` / `404` | 컴패니언 §2.3 |
 

@@ -109,3 +109,10 @@ def test_resume_after_turn_records_context():
     r = c.get("/internal/resume").json()
     assert r["has_context"] is True
     assert r["elapsed_label"] is not None
+
+
+def test_reengagement_endpoint_returns_dict():
+    c = TestClient(app)
+    r = c.get("/internal/reengagement")
+    assert r.status_code == 200
+    assert isinstance(r.json(), dict)          # 게이트 미통과면 {}

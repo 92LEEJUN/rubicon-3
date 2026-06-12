@@ -58,6 +58,9 @@ class BackendClient:
     async def resume(self, fresh: bool = False) -> httpx.Response:
         return await self._client.get("/internal/resume", params={"fresh": str(fresh).lower()})
 
+    async def reengagement(self) -> httpx.Response:
+        return await self._client.get("/internal/reengagement")
+
     # ── 대화 스트림(NDJSON) ─────────────────────────────────────────────────
     async def turn_stream(self, payload: dict):
         """청크를 **도착 즉시 yield**(증분 포워딩, operations §9). 버퍼링하지 않는다."""

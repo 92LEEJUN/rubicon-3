@@ -285,3 +285,12 @@ class ResumePayload(_Base):
     open_loops: list[OpenLoop] = Field(default_factory=list)  # 열린 미해결 스레드(요구 2.2)
     elapsed_label: Optional[str] = None  # "방금"·"어제"·"지난주" 등 상대 시간(요구 5)
     suspended_flow: Optional[str] = None  # 보류 흐름(ADR-0028)이 있으면 이어가기 후보
+
+
+class ReEngagement(_Base):
+    """선제 재관여 — 엄격 게이트 통과분(컴패니언 spec 요구 3, ADR-0042)."""
+    primary_ref: str                    # 대표 open-loop ref(탭 시 이 맥락으로 이어가기)
+    primary_label: str
+    kind: OpenLoopKind
+    also_count: int = 0                 # 묶음(R27) — 대표 외 추가 건수
+    message: str = ""

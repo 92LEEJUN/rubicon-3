@@ -100,13 +100,20 @@ def create_app(backend: Optional[BackendClient] = None) -> FastAPI:
                 text = msg.get("text") if msg.get("type") == "user_message" else interaction_to_text(msg)
                 payload = {"session_id": msg.get("session_id", "s1"),
                            "text": text or "", "screen_context": msg.get("screen_context")}
+                # 증분 포워딩 — 청크를 모으지 않고 도착 즉시 중계(operations §9).
+                sent_any = False
                 try:
-                    chunks = await be.turn_chunks(payload)
+                    async for chunk in be.turn_stream(payload):
+                        await ws.send_json(chunk)
+                        sent_any = True
                 except Exception:
-                    await ws.send_json({"type": "error", **fallback_body()})
+                    if sent_any:
+                        # 부분 전송 후 실패는 되돌릴 수 없으니 에러로 마감(operations §8).
+                        await ws.send_json({"type": "error", **fallback_body(
+                            "응답 생성 중 문제가 발생했어요. 다시 시도해 주세요.", "stream_interrupted")})
+                    else:
+                        await ws.send_json({"type": "error", **fallback_body()})
                     continue
-                for chunk in chunks:
-                    await ws.send_json(chunk)
         except WebSocketDisconnect:
             return
 

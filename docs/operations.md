@@ -137,7 +137,7 @@ LLM·외부 호출 비용을 줄이는 캐시 계층. 각 캐시는 **키·TTL·
 
 ## 9. 텍스트 스트리밍 (증분)
 
-- 인터랙티브 평면은 **delta 토큰 스트리밍 유지**(R14). 현재 BFF `turn_chunks`는 **청크를 다 모아 전달(버퍼링)** → **증분 포워딩(async generator)** 으로 개선해 토큰 단위 중계.
+- 인터랙티브 평면은 **delta 토큰 스트리밍 유지**(R14). ~~BFF `turn_chunks` 버퍼링~~ → **증분 포워딩 구현 완료**: BFF가 `backend_client.turn_stream`(async generator)로 **도착 즉시 WS 중계**(버퍼링 제거). 부분 전송 후 스트림 실패는 `stream_interrupted` 에러로 마감(§8).
 - Phase B에서 워커가 분리되면 **Redis 채널(세션/turn 키)** 에 delta publish → WS 서버가 구독해 흘려보냄(다중 인스턴스 동작).
 
 ## 10. 미디어 점진 표시 (플레이스홀더 → 지연 로드)

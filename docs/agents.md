@@ -68,3 +68,18 @@
 
 - 각 에이전트/tool은 **Mock으로 LLM 없이 단위 검증**(orchestration §9). Supervisor 위임 로직은 규칙 기반 분류기로 **결정적 테스트**.
 - 실제 프롬프트·평가셋·**리뷰 발동 기준·라우팅 임계**는 구현 단계에서 확정(본 문서는 구조 정의).
+
+## 10. 에이전트별 시스템 프롬프트
+
+프롬프트 **문구의 단일 출처는 `backend/app/orchestrator/prompts.py`** 다(공통 `BASE_POLICY` 프리픽스 + 역할별).
+**정책(해야/하지 말아야 할 말·어투·가드레일)의 상위 단일 출처는 `docs/llm-policy.md`** 이며, prompts.py는 이를 에이전트별로 구체화한다.
+공통 `BASE_POLICY`는 **안정 프리픽스**라 프롬프트 캐싱에 친화적이다(orchestration §6).
+
+| 에이전트 | 임무(요약) | 핵심 금지 | 출력 |
+|---|---|---|---|
+| `supervisor` | 의도 분해·우선순위·위임·조립(handled/unhandled) | 도메인 직접 추론·위임 없는 결론 | 위임 계획(구조화) |
+| `diagnosis` | 상태 조회 + 해결책 RAG + 출처 + 부품 식별 | 근거 없는 해결책·위험 셀프수리 유도·주문 실행 | device_status·guide_steps(+required_parts) |
+| `commerce` | 부품 매칭 + 주문 초안(ActionGate) + 품절 폴백 | 가격/재고 지어내기·무확인 커밋 | product_card·order_summary·confirmation |
+| `review` | (조건부) 안전·근거·정책 검수 | 새 사실 생성·무리한 재생성 | {pass, issues, action} |
+
+> 발동·라우팅 임계(리뷰 조건, 모델 라우팅)는 구현 단계에서 확정(operations §14, orchestration §10).

@@ -630,3 +630,58 @@ flowchart TD
 ```
 
 > 상세 흐름·엣지: `specs/mvp-concierge/design.md` §8.
+
+## 멀티에이전트 (agents.md)
+
+### 에이전트 그래프 (슈퍼바이저-워커 · 단일 패스)
+
+```mermaid
+flowchart TD
+  In["사용자 입력 (/chat)"] --> SUP["Supervisor 에이전트<br/>의도 분해·우선순위·위임·조립 (R7·§6.6)"]
+  SUP -->|troubleshoot| DIAG["Diagnosis 에이전트<br/>상태 + 해결책 RAG (R2·R3·R16)"]
+  SUP -->|order| COMM["Commerce 에이전트<br/>부품 매칭 + 주문 초안 (R4)"]
+  SUP -->|recommend| TR["tool get_recommendations (R8)"]
+  SUP -->|handoff| TB["tool booking (R18)"]
+  SUP -->|history| TH["tool get_history (R12)"]
+  DIAG --> TLS["tool get_device_status · search_solutions(RAG)"]
+  COMM --> TMP["tool match_parts"]
+  DIAG -. required_parts .-> COMM
+  COMM -->|되돌릴 수 없는 커밋| GATE["ActionGate 확인 (R17)"]
+  DIAG --> REV{"Review? 조건부<br/>안전 R23·커밋 R17·불확실 R16"}
+  COMM --> REV
+  REV -->|통과 / 스킵| ASM["Supervisor 조립<br/>섹션 묶음 · handled/unhandled (R7)"]
+  REV -->|위반| FB["안전 폴백 / 사람 연결 (R18)"]
+  TR --> ASM
+  TB --> ASM
+  TH --> ASM
+  ASM --> Out["다단계 스트리밍 (orchestration §10)"]
+```
+
+### 멀티에이전트 턴 시퀀스 (병렬 + 조건부 리뷰 + 다단계 스트림)
+
+```mermaid
+sequenceDiagram
+  autonumber
+  actor U as 사용자
+  participant SUP as Supervisor
+  participant DIAG as Diagnosis
+  participant COMM as Commerce
+  participant REV as Review(조건부)
+  U->>SUP: 복합 입력(해결 + 주문)
+  SUP->>SUP: 의도 분해·우선순위 (R7·§6.6)
+  par 독립 워커 병렬(fan-out)
+    SUP->>DIAG: 위임(troubleshoot)
+    DIAG-->>U: device_status·guide_steps (즉시 섹션 스트림)
+  and
+    SUP->>COMM: 위임(order)
+  end
+  DIAG-->>COMM: required_parts 전달(의존 §6.6)
+  COMM-->>U: product_card·order_summary (섹션 스트림)
+  opt 커밋/안전/불확실
+    SUP->>REV: 검수 요청
+    REV-->>SUP: 통과 / 위반(보정·폴백 R18)
+  end
+  SUP-->>U: flow + done (handled/unhandled R7)
+```
+
+> 구조·역할·프롬프트: `docs/agents.md`. 다단계 스트리밍·지연: `docs/orchestration.md` §10 · `docs/operations.md` §14.

@@ -39,6 +39,8 @@
 - `docs/wireframes.md` — 저충실도 화면 명세(레이아웃·흐름). 비주얼 디자인 아님.
 - `docs/api-contract.md` — 클라이언트↔서버 외부 노출 인터페이스(WS `/chat`·도메인 엔드포인트), API/DB 경계.
 - `docs/orchestration.md` — LLM 오케스트레이터 내부(의도 분류·tool·RAG·스트리밍).
+- `docs/operations.md` — 멀티유저 운영·스케일(동시성·병목·비용 캐싱·세션/상태 격리·개인화 컨텍스트 조립).
+- `docs/llm-policy.md` — LLM 프롬프트 정책(해야 할/하지 말아야 할 말·어투·가드레일·개인화 주입).
 - `docs/analytics.md` — 사용 분석 이벤트 택소노미(퍼널·전환 기여·체류), FE↔BE 공유 계약.
 - 이들은 **여러 스펙이 공유하는 진실의 출처(single source of truth)** 다.
 

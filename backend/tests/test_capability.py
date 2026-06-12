@@ -102,6 +102,54 @@ def test_session_isolation(container):
     assert order_secs and all(s.handled is False for s in order_secs)
 
 
+# ── 에스컬레이션 게이트(티어드 플래닝, ADR-0047) ───────────────────────────
+# 깨끗한 케이스 = 홉 0(규칙 즉답). F1·F2 장문/모호 = 홉 1(LLM 플래너 필요).
+_NO_ESCALATE = [
+    "세탁기에서 물이 안 빠져요",                          # 짧은 단일
+    "공기청정기 신제품 추천해줘",
+    "배수필터 주문해줘",
+    # J5 — 장문 복합이지만 규칙이 깨끗이 분류(troubleshoot+order)
+    "세탁기 물 안 빠지는 거 해결법 알려주고, 냉장고 정수필터랑 공기청정기 HEPA 필터도 주문해줘",
+    # A-T1 — 장문이지만 단일 의도 명확
+    "어제 저녁부터 세탁기를 돌리면 중간에 멈추면서 물이 안 빠지는 것 같아요. "
+    "안을 열어보니 물이 가득 차 있고 화면에 5C인가 하는 에러도 떴어요. 어떻게 해결하면 좋을까요?",
+    # B-T1 — 위험 장문이지만 결정적 안전 게이팅으로 처리(홉 불필요)
+    "주방에서 인덕션을 쓰는데 켜기만 하면 타는 냄새가 나고 가끔 스파크도 튀어요. 해결법 알려주세요",
+]
+_ESCALATE = [
+    # F1 — '확인해/가격'이 약한 의도로 장문을 흡수
+    "비용이 많이 들면 그냥 새로 살까 고민도 되는데, 그 배수 필터 어떤 건지 한번 확인해서 가격이랑 같이 알려주세요",
+    # F2 — 보증·예약 후속 의도(미매핑)
+    "산 지 얼마 안 됐으니까 보증으로 무상 수리가 되는지 궁금하고, 기사님 방문 예약도 가능한가요?",
+    # F2 — 설명/비교 후속 의도(미매핑)
+    "비스포크 큐브 그거 필터 교체나 소음이 어느 정도인지 더 알려주고 비교도 해줄 수 있어요?",
+    "정수필터 가격 얼마인지 알려줘",
+]
+
+
+def test_escalation_gate_keeps_clean_on_fast_path(container):
+    orch = _orch(container)
+    for msg in _NO_ESCALATE:
+        d = orch.decide(msg)
+        assert d.escalate is False, f"불필요 에스컬레이션: {msg!r} → {d.reasons}"
+
+
+def test_escalation_gate_flags_ambiguous(container):
+    orch = _orch(container)
+    for msg in _ESCALATE:
+        d = orch.decide(msg)
+        assert d.escalate is True, f"에스컬레이션 누락: {msg!r}"
+        assert d.reasons
+
+
+def test_route_falls_back_to_rule_without_planner(container):
+    # LLM 플래너 미연결 → 에스컬레이션이어도 규칙 plan으로 폴백(홉 0, 동작 불변)
+    orch = _orch(container)
+    plan = orch.route(_ESCALATE[0])
+    assert orch.last_decision.escalate is True
+    assert isinstance(plan.capabilities, list)
+
+
 # ── 봉투 패리티(요구사항 13) ────────────────────────────────────────────────
 def test_stream_emits_section_flow_done(container):
     chunks = list(_orch(container).stream_turn("세탁기 물이 안 빠져요"))

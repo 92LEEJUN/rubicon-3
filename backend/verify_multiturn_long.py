@@ -12,10 +12,12 @@ from app.orchestrator.classify import RuleBasedClassifier
 def show(orch, sid, text):
     intents = orch.classifier.classify(text)
     plan = orch.plan(text)
+    decision = orch.decide(text)
     turn = orch.build_turn(text, session_id=sid)
     oneline = " ".join(text.split())
+    hop = f"🐢 LLM홉({','.join(decision.reasons)})" if decision.escalate else "⚡ 규칙(홉0)"
     print(f"  👤 {oneline[:90]}{'…' if len(oneline) > 90 else ''}")
-    print(f"     분류 intents={intents.intents} compound={intents.is_compound} → plan={plan.capabilities}")
+    print(f"     분류 intents={intents.intents} → plan={plan.capabilities}  |  {hop}")
     for s in turn.sections:
         flag = "" if s.handled else " [unhandled]"
         item = s.template.data.get("id") or s.template.data.get("part_id") or ""

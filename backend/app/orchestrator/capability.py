@@ -237,6 +237,57 @@ def validate_plan(plan: Plan, intents: list[str], registry: dict[str, Capability
     return Plan(capabilities=kept)
 
 
+# ── 에스컬레이션 게이트(티어드 플래닝) ──────────────────────────────────────
+# 규칙 분류를 1차(홉 0)로 두고, "규칙이 부서질 신호"가 있을 때만 LLM 플래너로 올린다.
+# 목적: LLM 홉(레이턴시·비용)을 **꼭 필요한 장문·모호 턴에만** 지불(ADR-0047).
+#
+# 신호는 장문 검증 결함(test-findings F1·F2)에서 도출 — 규칙 분류기가 못 잡는 것들:
+#  · 미매핑 후속 의도(보증·예약·설명/비교/가격) → 해당 capability가 없어 누락/오라우팅(F2)
+#  · 약한 의도가 장문을 통째로 흡수(general/device_status만 잡힘, F1)
+#  · 접속사 많은데 단일 capability로 과소분할된 복합
+_WARRANTY_CUES = ("보증", "무상", "as 센터", "a/s", "에이에스")
+_BOOKING_CUES = ("예약", "기사님", "기사분", "방문 요청")
+_EXPLAIN_CUES = ("더 알려", "비교", "차이", "얼마", "가격", "왜 추천", "스펙")
+_CONJ_MARK = ("그리고", "또 ", "하고", "랑 ", "이랑 ", ",", "，")
+_SUBSTANTIVE_LEN = 45   # 이 이상이면 '장문' — 규칙 신뢰도 하락 구간
+
+
+@dataclass
+class EscalationDecision:
+    escalate: bool
+    reasons: list[str] = field(default_factory=list)
+
+    @property
+    def confidence(self) -> str:
+        return "low" if self.escalate else "high"
+
+
+def should_escalate(message: str, plan: Plan) -> EscalationDecision:
+    """규칙 plan을 LLM 플래너로 올릴지 결정(결정적). reasons로 근거를 남겨 측정 가능."""
+    t = message or ""
+    caps = set(plan.capabilities)
+    reasons: list[str] = []
+
+    # F2: 규칙에 매핑 안 된 후속 의도 단서 → capability 부재로 누락/오라우팅
+    if any(k in t for k in _WARRANTY_CUES):
+        reasons.append("warranty_cue")
+    if any(k in t for k in _BOOKING_CUES):
+        reasons.append("booking_cue")
+    if any(k in t for k in _EXPLAIN_CUES):
+        reasons.append("explain_cue")
+
+    # F1: 장문인데 약한 의도(general/device_status)만 잡힘 → 본의도 흡수 가능성
+    if len(t) >= _SUBSTANTIVE_LEN and caps and caps <= {"general", "device_status"}:
+        reasons.append("weak_capture")
+
+    # 접속사 많은 장문이 단일 capability로 과소분할
+    conj = sum(t.count(m) for m in _CONJ_MARK)
+    if conj >= 2 and len(caps) <= 1 and len(t) >= _SUBSTANTIVE_LEN:
+        reasons.append("compound_undersplit")
+
+    return EscalationDecision(escalate=bool(reasons), reasons=reasons)
+
+
 # ── 오케스트레이터 ───────────────────────────────────────────────────────────
 class CapabilityOrchestrator:
     """capability 레지스트리 기반 결정적 오케스트레이터(ADR-0043·0046 1차 골격).
@@ -245,25 +296,45 @@ class CapabilityOrchestrator:
     """
 
     def __init__(self, container: Optional[Container] = None,
-                 classifier: Optional[IntentClassifier] = None) -> None:
+                 classifier: Optional[IntentClassifier] = None,
+                 llm_planner=None) -> None:
         self.c = container or build_container()
         self.classifier = classifier or RuleBasedClassifier()
         self.registry = build_registry()
         self._sessions: dict[str, dict] = {}   # session_id → 지속 슬롯
+        # 티어드 플래닝 — 규칙 1차, 에스컬레이션 신호일 때만 LLM 플래너로(없으면 규칙 폴백).
+        self.llm_planner = llm_planner
+        self.last_decision: Optional[EscalationDecision] = None
 
     def _ordered_intents(self, message: str) -> list[str]:
         result = self.classifier.classify(message)
         return sorted(result.intents, key=lambda i: _PRIORITY.get(i, 9))
 
+    def decide(self, message: str) -> EscalationDecision:
+        """이 턴이 LLM 플래너 홉을 지불해야 하는지 판정(측정 가능, ADR-0047)."""
+        return should_escalate(message, self.plan(message))
+
     def plan(self, message: str) -> Plan:
         intents = self._ordered_intents(message)
         return validate_plan(rule_plan(intents, self.registry), intents, self.registry)
+
+    def route(self, message: str) -> Plan:
+        """규칙 plan 산출 → 에스컬레이션 판정. 신호가 있고 LLM 플래너가 붙어 있으면 그쪽으로,
+        아니면 규칙 plan 그대로(홉 0). 판정은 last_decision에 기록한다."""
+        rule = self.plan(message)
+        decision = should_escalate(message, rule)
+        self.last_decision = decision
+        if decision.escalate and self.llm_planner is not None:
+            intents = self._ordered_intents(message)
+            proposed = self.llm_planner.propose(advisory_catalog(self.registry), message)
+            return validate_plan(proposed, intents, self.registry)
+        return rule
 
     def build_turn(self, message: str, session_id: str = "s1",
                    screen_context: Optional[dict] = None) -> AssistantTurn:
         session = self._sessions.setdefault(session_id, {})
         ctx = TurnCtx(self.c, session)
-        plan = self.plan(message)
+        plan = self.route(message)
 
         sections: list[MessageSection] = []
         for name in plan.capabilities:

@@ -48,9 +48,10 @@
   - [ ] 8.2 모든 LLM 호출 `achat_completion`(async·세마포어) 경유, 순차.
   - [ ] 8.3 포함/금지 규율 프롬프트 검증. _(요구사항 2-3)_
 
-- [ ] 9. LLM 플래너 _(요구사항 4-1)_
-  - [ ] 9.1 `LLMPlanner.propose(advisory_catalog, msg, ctx)` 구조화 출력, `achat_completion`, 주입형.
-  - [ ] 9.2 propose→validate→무효/실패면 `rule_plan` 폴백.
+- [~] 9. LLM 플래너 (티어드, ADR-0047) _(요구사항 4-1, 11)_
+  - [x] 9.0 **에스컬레이션 게이트**(`should_escalate`/`EscalationDecision`/`decide`/`route`) — 규칙 1차(홉0), 장문/모호 신호일 때만 LLM. LLM 미연결 시 규칙 폴백. 코퍼스 측정(8턴 중 3턴만 홉). _완료_
+  - [ ] 9.1 `LLMPlanner.propose(advisory_catalog, msg, ctx)` 구조화 출력, `achat_completion`, 주입형(`llm_planner`로 주입).
+  - [ ] 9.2 propose→validate→무효/실패면 `rule_plan` 폴백. 결정적 섹션 먼저 스트리밍으로 홉 지연 은닉(요구사항 11-1).
 
 - [ ] 10. 복합 쿼리 + 하이브리드 병합 _(요구사항 9, 10)_
   - [ ] 10.1 조언형 fan-out, 의도별 `MessageSection`(handled/unhandled).

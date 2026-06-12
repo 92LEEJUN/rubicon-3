@@ -1,5 +1,9 @@
 # 사용 분석 / 이벤트 택소노미 (Analytics)
 
+> **상태: 계약만 정의 · 미배선(deferred).** `AnalyticsEvent`·`AnalyticsPort` 타입은 있으나
+> BE 턴 경로(오케스트레이터·내부 API)에 **이벤트 발행 싱크가 아직 없다.** 배선은 별도 작업
+> (권장: LLM prose §8~11과 함께 — 그때 퍼널·전환 신호가 의미를 가짐). 의도된 보류.
+
 > **기반 문서 (공유).** FE↔BE가 같은 이벤트명을 쓰도록 하는 **분석 이벤트 계약**(R28).
 > 타입은 `docs/data-model.md`(`AnalyticsEvent`·`AnalyticsPort`), 파이프라인은
 > `docs/architecture.md` §11, 시나리오는 `specs/mvp-concierge/scenarios/`.

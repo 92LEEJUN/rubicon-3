@@ -1,8 +1,10 @@
 """의도 분류기 — 주입 가능한 추상(IntentClassifier).
 
-- RuleBasedClassifier: 키워드 규칙(네트워크 불필요) — 테스트·오프라인 기본값.
-- OpenAIClassifier: 구조화 출력 LLM(legacy.classify) — 실 경로.
-오케스트레이터는 Protocol에만 의존하므로 둘을 교체할 수 있다(architecture.md §5).
+- RuleBasedClassifier: 키워드 규칙(네트워크 불필요). **현재 기본·유일 경로** — ADR-0048에서
+  라우팅을 LLM **플래너**가 맡으므로, 분류기는 플래너 미연결·실패 시의 **규칙 폴백**으로만 쓰인다.
+- OpenAIClassifier: 구조화 출력 LLM(legacy.classify). **사용 안 함(deprecated)** — LLM 분류는
+  플래너(ADR-0048)와 중복이라 라이브 경로에서 빠졌다. legacy 데모/대체 구현으로만 남긴다.
+오케스트레이터는 Protocol에만 의존하므로 분류기를 교체할 수 있다(architecture.md §5).
 """
 from __future__ import annotations
 
@@ -55,7 +57,8 @@ class RuleBasedClassifier:
 
 
 class OpenAIClassifier:
-    """LLM 구조화 출력 분류(실 경로). 네트워크 필요."""
+    """LLM 구조화 출력 분류. **deprecated(미사용)** — 라우팅은 LLM 플래너가 대체(ADR-0048).
+    legacy 데모/대체 구현으로만 유지. 네트워크 필요."""
 
     def classify(self, message: str) -> IntentResult:
         from .legacy import classify as _llm_classify  # 지연 import(키 없이도 모듈 로드)

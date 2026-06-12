@@ -16,13 +16,16 @@ from ..domain import (
     Booking,
     BookingSlot,
     Coverage,
+    Cta,
     DeviceStatusResult,
     Order,
     PartMatchResult,
     Product,
+    Quote,
     SolutionSearchResult,
+    Store,
 )
-from ..domain.models import Device
+from ..domain.models import Device, StoreType
 
 
 @runtime_checkable
@@ -54,10 +57,34 @@ class OrderPort(Protocol):
 @runtime_checkable
 class HandoffPort(Protocol):
     def list_slots(self, visit_type: str = "REPAIR") -> list[BookingSlot]: ...
-    def book_slot(self, slot_id: str, context_ref: Optional[str] = None) -> Booking: ...
+    def book_slot(
+        self, slot_id: str, context_ref: Optional[str] = None,
+        visit_type: str = "REPAIR", store_id: Optional[str] = None,
+    ) -> Booking: ...
     def list_bookings(self) -> list[Booking]: ...
 
 
 @runtime_checkable
 class WarrantyPort(Protocol):
     def coverage(self, device_model: str, part_id: Optional[str] = None) -> Coverage: ...
+
+
+@runtime_checkable
+class StorePort(Protocol):
+    """O2O 거점·재고(위치 기반). MVP: 후속/Mock(data-model.md §6)."""
+    def find_stores(
+        self, geo: Optional[tuple[float, float]] = None, store_type: Optional[StoreType] = None
+    ) -> list[Store]: ...
+    def check_stock(self, store_id: str, part_id: str) -> bool: ...
+
+
+@runtime_checkable
+class QuotePort(Protocol):
+    """O2O 견적 이어보기(reverse). MVP: 후속/Mock(data-model.md §6)."""
+    def get_quote(self, quote_ref: str) -> Optional[Quote]: ...
+
+
+@runtime_checkable
+class ActionGatePort(Protocol):
+    """R17 확인 UX 실/처리 Mock(ADR-0033). 되돌릴 수 없는 커밋의 확인 필요 여부 판정."""
+    def requires_confirmation(self, cta: Cta) -> bool: ...

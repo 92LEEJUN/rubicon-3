@@ -43,6 +43,26 @@ class BackendClient:
         params = {"user_id": user_id} if user_id else None
         return await self._client.get("/internal/orders", params=params)
 
+    async def get_order(self, order_id: str) -> httpx.Response:
+        return await self._client.get(f"/internal/orders/{order_id}")
+
+    async def advance_pickup(self, order_id: str, payload: dict) -> httpx.Response:
+        return await self._client.post(f"/internal/orders/{order_id}/pickup", json=payload)
+
+    # ── O2O 거점·재고·견적(§2.2) ────────────────────────────────────────────
+    async def list_stores(self, params: Optional[dict] = None) -> httpx.Response:
+        return await self._client.get("/internal/stores", params=params)
+
+    async def check_stock(self, store_id: str, part_id: str) -> httpx.Response:
+        return await self._client.get(f"/internal/stores/{store_id}/stock/{part_id}")
+
+    async def get_quote(self, quote_ref: str, user_id: Optional[str] = None) -> httpx.Response:
+        params = {"user_id": user_id} if user_id else None
+        return await self._client.get(f"/internal/quotes/{quote_ref}", params=params)
+
+    async def convert_quote(self, quote_ref: str, payload: dict) -> httpx.Response:
+        return await self._client.post(f"/internal/quotes/{quote_ref}/convert", json=payload)
+
     async def list_bookings(self) -> httpx.Response:
         return await self._client.get("/internal/bookings")
 

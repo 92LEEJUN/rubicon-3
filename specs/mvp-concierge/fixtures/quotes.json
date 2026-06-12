@@ -1,0 +1,48 @@
+{
+  "quotes": [
+    {
+      "id": "quote_active",
+      "user_id": "usr_01",
+      "source": "offline",
+      "items": [{ "part_id": "part_drain_filter", "name": "세탁기 배수 필터", "unit_price": 12000, "qty": 1 }],
+      "total": 12000,
+      "status": "ACTIVE",
+      "store_id": "store_gangnam",
+      "expires_at": "2999-12-31T00:00:00Z",
+      "created_at": "2026-06-01T00:00:00Z"
+    },
+    {
+      "id": "quote_pricedrift",
+      "user_id": "usr_01",
+      "source": "offline",
+      "items": [{ "part_id": "part_water_filter", "name": "냉장고 정수필터 HAF-QIN", "unit_price": 35000, "qty": 1 }],
+      "total": 35000,
+      "status": "ACTIVE",
+      "store_id": "store_hongdae",
+      "expires_at": "2999-12-31T00:00:00Z",
+      "created_at": "2026-06-01T00:00:00Z"
+    },
+    {
+      "id": "quote_expired",
+      "user_id": "usr_01",
+      "source": "offline",
+      "items": [{ "part_id": "part_drain_filter", "name": "세탁기 배수 필터", "unit_price": 12000, "qty": 1 }],
+      "total": 12000,
+      "status": "ACTIVE",
+      "store_id": "store_gangnam",
+      "expires_at": "2026-01-01T00:00:00Z",
+      "created_at": "2025-12-20T00:00:00Z"
+    },
+    {
+      "id": "quote_other",
+      "user_id": "usr_99",
+      "source": "offline",
+      "items": [{ "part_id": "part_hepa", "name": "공기청정기 HEPA 교체 필터", "unit_price": 45000, "qty": 1 }],
+      "total": 45000,
+      "status": "ACTIVE",
+      "store_id": "store_gangnam",
+      "expires_at": "2999-12-31T00:00:00Z",
+      "created_at": "2026-06-01T00:00:00Z"
+    }
+  ]
+}

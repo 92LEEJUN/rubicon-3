@@ -25,6 +25,8 @@ from .services import (
     KnowledgeService,
     NotificationService,
     OrderService,
+    StoreService,
+    TriageService,
 )
 
 
@@ -42,6 +44,8 @@ class Container:
     order: OrderService
     handoff: HandoffService
     notification: NotificationService
+    store: StoreService            # O2O — 거점·재고·견적(O1·O2·O5)
+    triage: TriageService          # O2O — 서비스 트리아지(O7)
 
 
 def build_container() -> Container:
@@ -54,11 +58,17 @@ def build_container() -> Container:
     companion = CompanionService(conversation_memory, conversation_store, compaction, open_loops)
     reengagement = ReEngagementService(companion, engagement)
     device = DeviceService(mock.MockDeviceAdapter())
-    knowledge = KnowledgeService(mock.MockCSKnowledgeAdapter(), mock.MockWarrantyAdapter())
-    catalog = CatalogService(mock.MockCatalogAdapter(), engagement)
-    order = OrderService(mock.MockOrderAdapter())
+    warranty_adapter = mock.MockWarrantyAdapter()
+    knowledge = KnowledgeService(mock.MockCSKnowledgeAdapter(), warranty_adapter)
+    catalog_adapter = mock.MockCatalogAdapter()
+    catalog = CatalogService(catalog_adapter, engagement)
+    # O2O — StoreService(거점·재고·견적), 픽업 알림(AlertPort), 픽업 게이트는 OrderService와 협력.
+    store = StoreService(mock.MockStoreAdapter(), mock.MockQuoteAdapter(), catalog_adapter)
+    alert = mock.MockAlertAdapter()
+    order = OrderService(mock.MockOrderAdapter(), store_service=store, alert_port=alert)
     handoff = HandoffService(mock.MockHandoffAdapter())
     notification = NotificationService(device, engagement)
+    triage = TriageService(warranty_adapter)
     return Container(
         user=User.model_validate(fx.USER),
         engagement=engagement,
@@ -72,4 +82,6 @@ def build_container() -> Container:
         order=order,
         handoff=handoff,
         notification=notification,
+        store=store,
+        triage=triage,
     )

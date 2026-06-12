@@ -28,7 +28,14 @@ from pydantic import BaseModel
 
 from ..container import build_container
 from ..domain import Template
-from ..errors import ConfirmationRequired
+from ..errors import (
+    ConfirmationRequired,
+    OutOfStock,
+    PickupTransitionError,
+    QuoteExpired,
+    QuoteForbidden,
+    QuoteNotConvertible,
+)
 from ..orchestrator import Orchestrator
 
 app = FastAPI(title="MVP 컨시어지 — BE 내부 API")
@@ -91,11 +98,28 @@ class OrderRequest(BaseModel):
     user_id: str = "usr_01"
     part_ids: list[str]
     confirmed: bool = False
+    # O2O — 픽업(BOPIS) 이행 방식·픽업 매장(O3). delivery면 store_id 무시.
+    fulfillment: str = "delivery"
+    store_id: str | None = None
 
 
 class BookingRequest(BaseModel):
     slot_id: str
     context_ref: str | None = None
+    # O2O — 센터/매장 방문(O7). visit_type=center·store_id로 거점 동반.
+    visit_type: str = "REPAIR"
+    store_id: str | None = None
+
+
+class PickupActionRequest(BaseModel):
+    action: str  # "ready" | "picked_up" | "expired"
+
+
+class ConvertRequest(BaseModel):
+    user_id: str = "usr_01"
+    confirmed: bool = False
+    fulfillment: str = "delivery"
+    store_id: str | None = None
 
 
 class SurfaceRequest(BaseModel):
@@ -220,22 +244,126 @@ def list_bookings():
     return [b.model_dump(mode="json") for b in _container.handoff.list_bookings()]
 
 
+def _confirmation_409(gate: ConfirmationRequired) -> JSONResponse:
+    """409 + confirmation 템플릿(확인용 DRAFT·금액 분해 동봉, R17)."""
+    return JSONResponse(status_code=409, content={
+        "code": "ConfirmationRequired",
+        "message": gate.message,
+        "template": Template(kind="confirmation", data={
+            "order": gate.draft.model_dump(mode="json"),
+            "summary": gate.draft.summary.model_dump(mode="json"),
+        }).model_dump(mode="json"),
+    })
+
+
+def _out_of_stock_409(err: OutOfStock) -> JSONResponse:
+    """409 — 재고 없음. 대체 매장/배송 제안(O2-2·O2-3·O4-3)."""
+    alts = _container.store.stores_with_stock(err.part_id)
+    return JSONResponse(status_code=409, content={
+        "code": "OutOfStock",
+        "message": err.message,
+        "store_id": err.store_id,
+        "part_id": err.part_id,
+        "alternatives": [s.model_dump(mode="json") for s in alts],  # 재고 있는 대체 매장
+        "delivery_available": True,                                  # 배송 전환 가능
+    })
+
+
 # ── 커밋(HTTP) — 주문 게이트(R17) ───────────────────────────────────────────
 @app.post("/internal/orders")
 def place_order(req: OrderRequest):
     try:
-        order = _container.order.checkout(req.user_id, req.part_ids, confirmed=req.confirmed)
+        if req.fulfillment == "pickup":
+            order = _container.order.checkout_pickup(
+                req.user_id, req.part_ids, req.store_id or "", confirmed=req.confirmed)
+        else:
+            order = _container.order.checkout(req.user_id, req.part_ids, confirmed=req.confirmed)
     except ConfirmationRequired as gate:
-        # 409 + confirmation 템플릿(확인용 DRAFT·금액 분해 동봉)
+        return _confirmation_409(gate)
+    except OutOfStock as err:
+        return _out_of_stock_409(err)
+    return order.model_dump(mode="json")
+
+
+@app.get("/internal/orders/{order_id}")
+def get_order(order_id: str):
+    """주문 상세 — 픽업 상태·픽업 매장 포함(O3-5·R12)."""
+    order = _container.order.get(order_id)
+    if order is None:
+        return JSONResponse(status_code=404, content={"code": "not_found", "message": "주문 없음"})
+    return order.model_dump(mode="json")
+
+
+@app.post("/internal/orders/{order_id}/pickup")
+def advance_pickup(order_id: str, req: PickupActionRequest):
+    """픽업 상태 전이 — ready/picked_up/expired. 역전이/잘못된 전이는 409(O3-6·O4)."""
+    try:
+        order = _container.order.advance_pickup(order_id, req.action)
+    except KeyError:
+        return JSONResponse(status_code=404, content={"code": "not_found", "message": "주문 없음"})
+    except PickupTransitionError as err:
         return JSONResponse(status_code=409, content={
-            "code": "ConfirmationRequired",
-            "message": gate.message,
-            "template": Template(kind="confirmation", data={
-                "order": gate.draft.model_dump(mode="json"),
-                "summary": gate.draft.summary.model_dump(mode="json"),
-            }).model_dump(mode="json"),
+            "code": "PickupTransitionError", "message": err.message,
+            "current": err.current, "requested": err.requested,
         })
     return order.model_dump(mode="json")
+
+
+# ── O2O 거점·재고(HTTP) — O1·O2 ────────────────────────────────────────────
+@app.get("/internal/stores")
+def list_stores(lat: float | None = None, lng: float | None = None, type: str | None = None):
+    geo = (lat, lng) if lat is not None and lng is not None else None
+    stores = _container.store.find_stores(geo, type)
+    return [s.model_dump(mode="json") for s in stores]
+
+
+@app.get("/internal/stores/{store_id}/stock/{part_id}")
+def check_stock(store_id: str, part_id: str):
+    return {"in_stock": _container.store.check_stock(store_id, part_id)}
+
+
+# ── O2O 견적 이어보기/전환(HTTP) — O5·O6 ───────────────────────────────────
+@app.get("/internal/quotes/{quote_ref}")
+def get_quote(quote_ref: str, user_id: str = "usr_01"):
+    """견적 조회 — 본인 403·만료 410·미발견 404. 현재가 변동은 price_changes로 고지(O5)."""
+    try:
+        quote = _container.store.get_quote(quote_ref, user_id)
+    except KeyError:
+        return JSONResponse(status_code=404, content={
+            "code": "not_found", "message": "견적을 찾지 못했습니다. 매장에 문의하거나 재견적을 받아 주세요."})
+    except QuoteForbidden as err:
+        return JSONResponse(status_code=403, content={"code": "Forbidden", "message": err.message})
+    except QuoteExpired as err:
+        return JSONResponse(status_code=410, content={"code": "QuoteExpired", "message": err.message})
+    body = quote.model_dump(mode="json")
+    body["price_changes"] = _container.store.price_changes(quote)  # 차이 고지(O5-4)
+    return body
+
+
+@app.post("/internal/quotes/{quote_ref}/convert")
+def convert_quote(quote_ref: str, req: ConvertRequest):
+    """견적 → 주문 전환 — ACTIVE만(409), 확인(409), 전환 시 CONVERTED(O6·R17)."""
+    try:
+        quote = _container.store.get_quote(quote_ref, req.user_id)
+    except KeyError:
+        return JSONResponse(status_code=404, content={
+            "code": "not_found", "message": "견적을 찾지 못했습니다."})
+    except QuoteForbidden as err:
+        return JSONResponse(status_code=403, content={"code": "Forbidden", "message": err.message})
+    except QuoteExpired as err:
+        return JSONResponse(status_code=410, content={"code": "QuoteExpired", "message": err.message})
+    try:
+        order = _container.order.convert_quote(
+            quote, confirmed=req.confirmed, fulfillment=req.fulfillment, store_id=req.store_id)
+    except ConfirmationRequired as gate:
+        body = _confirmation_409(gate)
+        return body
+    except OutOfStock as err:
+        return _out_of_stock_409(err)
+    except QuoteNotConvertible as err:
+        return JSONResponse(status_code=409, content={
+            "code": "QuoteNotConvertible", "message": err.message, "status": err.status})
+    return {"order": order.model_dump(mode="json"), "quote_status": quote.status}
 
 
 # ── 핸드오프/예약(HTTP) — R18 ────────────────────────────────────────────────
@@ -246,7 +374,10 @@ def booking_slots(visit_type: str = "REPAIR"):
 
 @app.post("/internal/bookings")
 def create_booking(req: BookingRequest):
-    return _container.handoff.book(req.slot_id, req.context_ref).model_dump(mode="json")
+    """방문 예약 — 센터 방문(O7-4)은 visit_type/store_id 동반, 맥락 전달(context_ref, O7-5)."""
+    return _container.handoff.book(
+        req.slot_id, req.context_ref, visit_type=req.visit_type, store_id=req.store_id
+    ).model_dump(mode="json")
 
 
 # ── 카드 탭 — surface 결정(§2.3) ────────────────────────────────────────────

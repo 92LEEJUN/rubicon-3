@@ -3,10 +3,13 @@
 도메인 서비스는 이 Protocol에만 의존한다. Mock(adapters.mock)·실(adapters.real) 구현을 주입한다.
 """
 from .base import (  # noqa: F401
+    ActionGatePort,
     CatalogPort,
     CSKnowledgePort,
     DevicePort,
     HandoffPort,
     OrderPort,
+    QuotePort,
+    StorePort,
     WarrantyPort,
 )

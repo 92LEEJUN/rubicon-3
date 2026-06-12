@@ -12,6 +12,7 @@
 | [`product-recommendation/`](./product-recommendation/) | **제품 추천** — 선제적 제품 판매 추천(비전 2), 컴패니언 게이트·메모리 정합 |
 | [`o2o-full/`](./o2o-full/) | **O2O 확장** — 매장 픽업(BOPIS)·재고·견적 이어보기·트리아지 |
 | [`frontend-companion/`](./frontend-companion/) | **컴패니언 FE** — resume 카드·미해결 스레드·선제 배너·증분 스트리밍 |
+| [`capability-orchestrator/`](./capability-orchestrator/) | **capability 수렴** — core/runtime/legacy 3경로를 단일 capability 레지스트리로 (스트랭글러, ADR-0043~0045) |
 
 > ⚠️ 이름이 제품명처럼 컸을 뿐, 내용은 **MVP 한 기능 줄기**다. "전부를 포괄"하는 건 `docs/`(토대)다.
 

@@ -7,8 +7,15 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Animated, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { SectionView } from "../components/message";
+import { ResumeCard } from "../components/ResumeCard";
+import { ReEngagementBanner } from "../components/ReEngagementBanner";
+import { StreamingMessage } from "../components/StreamingMessage";
 import { MockTransport, ResilientTransport } from "../transport";
 import { useChat } from "../state/useChat";
+import { useResume } from "../state/useResume";
+import { useOpenLoops } from "../state/useOpenLoops";
+import { useReEngagement } from "../state/useReEngagement";
+import { companionStore } from "../state/companionStore";
 import { color, font, radius, shadow, space } from "../design/tokens";
 import type { Chunk, ClientMessage, Cta, MessageSection } from "../types/contract";
 
@@ -33,20 +40,39 @@ const SUGGESTIONS = [
   "공기청정기 필터 주문하기",
 ];
 
-export function ChatPanel({ question, sections, flow = null, wsUrl, onClose }:
-  { question: string; sections: MessageSection[]; flow?: string | null; wsUrl?: string; onClose?: () => void }) {
+export function ChatPanel({ question, sections, flow = null, wsUrl, apiBase, token, onClose }:
+  { question: string; sections: MessageSection[]; flow?: string | null; wsUrl?: string;
+    apiBase?: string; token?: string; onClose?: () => void }) {
   const transport = useMemo(
     () => (wsUrl
       ? new ResilientTransport(wsUrl, (_m: ClientMessage) => toChunks(sections, flow))
       : new MockTransport((_m: ClientMessage) => toChunks(sections, flow))),
     [wsUrl, sections, flow],
   );
-  const { state, send, replyInteraction } = useChat(transport);
+  const { state, send, replyInteraction, resumeFromRef } = useChat(transport);
   const [messages, setMessages] = useState<ChatMsg[]>([]);
   const [text, setText] = useState("");
   const [turnSeq, setTurnSeq] = useState(0);
   const pending = useRef(false);
   const scroller = useRef<ScrollView>(null);
+
+  // 컴패니언 — 패널 open 시 resume·open-loop·선제 배너(요구 1·2·3·6).
+  const cfg = useMemo(() => ({ base: apiBase, token }), [apiBase, token]);
+  useEffect(() => {
+    companionStore.setPanelOpen(true);
+    return () => companionStore.setPanelOpen(false);
+  }, []);
+  const { resume, hasContext, startFresh, degraded } = useResume(cfg, true);
+  const loopsApi = useOpenLoops(cfg, resume?.open_loops);
+  const reeng = useReEngagement(cfg, true);
+
+  // open-loop/배너 탭 → 해당 ref 맥락으로 /chat 재진입(요구 2.2·3.3)
+  function reenter(ref?: string) {
+    if (!ref) return;
+    pending.current = true;
+    setTurnSeq((s) => s + 1);
+    resumeFromRef(ref, companionStore.get().screenContext ?? undefined);
+  }
 
   // 위로 펼쳐지는 진입(오버레이 느낌, wireframes §2 · 3.b)
   const rise = useRef(new Animated.Value(1)).current;
@@ -107,6 +133,28 @@ export function ChatPanel({ question, sections, flow = null, wsUrl, onClose }:
       </View>
 
       <ScrollView ref={scroller} style={styles.scroll} contentContainerStyle={styles.content} testID="chat-scroll">
+        {/* 선제 재관여 배너(동의·deliver 게이트는 훅에서, 요구 3·6) */}
+        {reeng.banner ? (
+          <ReEngagementBanner banner={reeng.banner} onOpen={reenter} onDismiss={reeng.dismiss} />
+        ) : null}
+
+        {/* 이어가기 카드 — 패널 상단(요구 1). has_context=false면 미표시(빈 상태). */}
+        {hasContext && resume ? (
+          <ResumeCard
+            resume={resume}
+            loops={loopsApi.loops}
+            degraded={degraded}
+            onContinue={() => companionStore.setResumeVisibility("dismissed")}
+            onStartFresh={() => { startFresh(); setMessages([]); }}
+            onOpenLoop={reenter}
+            onResolve={loopsApi.resolve}
+            onDismiss={loopsApi.dismiss}
+            isPending={loopsApi.isPending}
+            loopError={loopsApi.error}
+            onRetryLoopError={loopsApi.clearError}
+          />
+        ) : null}
+
         {empty ? (
           <View style={styles.empty} testID="chat-empty">
             <View style={styles.emptyAvatar}><Text style={styles.avatarText}>AI</Text></View>
@@ -119,11 +167,10 @@ export function ChatPanel({ question, sections, flow = null, wsUrl, onClose }:
             ? <UserMessage key={i} text={m.text} />
             : <AssistantMessage key={i} text={m.text} sections={m.sections} onCta={replyInteraction} />)}
 
-        {/* 진행 중인 어시스턴트 턴(스트리밍) */}
+        {/* 진행 중인 어시스턴트 턴 — 증분 스트리밍(요구 4) */}
         {streaming ? (
-          <AssistantMessage text={state.assistantText} sections={state.sections}
-                            onCta={replyInteraction}
-                            typing={!state.assistantText && state.sections.length === 0} />
+          <StreamingMessage text={state.assistantText} sections={state.sections}
+                            streaming onCta={replyInteraction} />
         ) : null}
       </ScrollView>
 

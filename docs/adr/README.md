@@ -72,3 +72,10 @@
 | [0031](0031-intent-hybrid-classification.md) | 의도 분류 = **LLM 구조화 + 규칙** | 채택 |
 | [0032](0032-rag-hybrid-retrieval.md) | RAG = **오류코드 매칭 + 벡터** 하이브리드 | 채택 |
 | [0035](0035-data-model-layering.md) | 데이터 모델 = **4계층 분리** | 채택 |
+
+### 분석 / 택소노미 (analytics.md)
+| # | 결정 | 상태 |
+|---|---|---|
+| [0037](0037-attribution-turn-based.md) | 전환 기여 = **turn 기반 + CTA last-touch** | 채택 |
+| [0038](0038-analytics-schema-hardening.md) | 분석 스키마 견고성(**네이밍·event_id·version·소유자**) | 채택 |
+| [0039](0039-analytics-error-events.md) | **에러/폴백 이벤트** 추가(지연=운영 분리) | 채택 |

@@ -5,7 +5,8 @@
 >
 > - **기반 문서(`docs/*.md`)** = 결정의 *결과*(현재 진실). **ADR** = 결정의 *이유와 대안*.
 > - **스펙(`specs/<작업명>/`)** = 기능별 requirements/design/tasks. ADR을 참조한다.
-> - 번호는 대략 **시간/계층 순서**(기반 → 멀티에이전트 → Phase A).
+> - 번호는 **추가 순서**다(엄밀한 시간순 아님). 0001~0018은 최근 운영/멀티에이전트/Phase A 작업,
+>   0019~0036은 그 **이전 기반 설계**(아키텍처·FE·도메인)를 소급 기록한 것 — 실제 결정 시점은 0019~0036이 더 이르다.
 
 ## 상태 범례
 `채택`(반영됨) · `구현됨`(코드 반영) · `보류`(결정 미룸/안 함) · `대체됨`
@@ -41,3 +42,33 @@
 | [0016](0016-async-execution-model.md) | 실행 모델 = **async 전환**(순차 유지) | 구현됨 |
 | [0017](0017-intra-turn-parallelism-deferred.md) | 후보1 **턴 내 병렬화** | 보류 |
 | [0018](0018-stage-timeout-abort-deferred.md) | 후보3 **단계 타임아웃·fine abort** | 보류 |
+
+### 이전 기반 설계 — 아키텍처 / 경계 (architecture.md)
+| # | 결정 | 상태 |
+|---|---|---|
+| [0019](0019-three-tier-bff-split.md) | **3계층 + BFF 독립 서비스** 분리 | 채택 |
+| [0020](0020-port-mock-real-boundary.md) | Mock↔실 = **Port/Repository + DI** | 채택 |
+| [0021](0021-tokenprovider-three-tier.md) | SmartThings 인증 = **TokenProvider 3계층** | 채택 |
+| [0024](0024-routing-be-owned.md) | 요청 라우팅 **BE 소유**, LLM미경유=커밋 한정 | 채택 |
+| [0033](0033-actiongate-confirm-real-process-mock.md) | ActionGate = **확인 실제 / 처리 Mock** | 채택 |
+| [0034](0034-provider-agnostic-llm.md) | LLM = **provider-agnostic** + 모델 라우팅 | 채택 |
+| [0036](0036-proactive-polling-to-events.md) | 선제 = **폴링→이벤트**(동일 정규화) | 채택 |
+
+### 이전 기반 설계 — 프론트엔드 (frontend-architecture.md)
+| # | 결정 | 상태 |
+|---|---|---|
+| [0022](0022-streaming-transport-websocket.md) | 스트리밍 트랜스포트 = **WebSocket**(vs SSE/fetch) | 채택 |
+| [0023](0023-fe-state-management.md) | FE 상태관리 = **React Query + Zustand** | 채택 |
+| [0027](0027-card-tap-surface.md) | 카드 탭 = **BE 동적 bridge/panel** | 채택 |
+
+### 이전 기반 설계 — 응답 표현 / 도메인 / 데이터 (response-templates·data-model·orchestration)
+| # | 결정 | 상태 |
+|---|---|---|
+| [0025](0025-structured-template-model.md) | 응답 표현 = **구조화 Template**(vs 자유텍스트) | 채택 |
+| [0026](0026-message-sections.md) | 복합 응답 = **sections[] + handled** | 채택 |
+| [0028](0028-flowstate-active-suspended.md) | FlowState = **active + suspended** | 채택 |
+| [0029](0029-engagement-vs-analytics.md) | **Engagement vs Analytics** 도메인 분리 | 채택 |
+| [0030](0030-consent-scoped.md) | 동의 = **기능별 scope 세분화** | 채택 |
+| [0031](0031-intent-hybrid-classification.md) | 의도 분류 = **LLM 구조화 + 규칙** | 채택 |
+| [0032](0032-rag-hybrid-retrieval.md) | RAG = **오류코드 매칭 + 벡터** 하이브리드 | 채택 |
+| [0035](0035-data-model-layering.md) | 데이터 모델 = **4계층 분리** | 채택 |

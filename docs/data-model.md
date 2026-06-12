@@ -306,6 +306,7 @@ class Consent:                           # 프라이버시 (R19)
 class AnalyticsEvent:                    # 사용 분석 이벤트 (R28). 명세: docs/analytics.md
     event_id: Id                         # 멱등 dedup용 UUID(배치 재전송 중복 제거)
     schema_version: int                  # 이벤트 스키마 버전(props 진화 추적)
+    sample_rate: float                   # 이 이벤트가 통과한 샘플 비율(분석 시 1/rate 재가중, ADR-0041)
     name: str                            # 택소노미 이벤트명 object_action 과거형 (예: "cta_clicked")
     ts: datetime                         # UTC
     session_id: Id
@@ -346,10 +347,16 @@ class FlowState:                         # 흐름 전환/복원 (R6)
     step: str
     data: dict                           # 진행 중 맥락(대상 기기/문제/주문 등)
 
+class ConversationMemory:                # 연속성 컴팩션 대상 (operations §4-1, ADR-0040). 영속(R12)
+    summary: str                         # 오래된 턴의 롤링 요약
+    facts: dict                          # 구조화 사실(기기·진행 중 주문·추천 부품·미해결 이슈) — 요약에 안 넣고 별도 보존
+    summarized_through: int              # 요약에 흡수된 마지막 message 인덱스(이후는 verbatim 유지)
+
 class Conversation:
     id: Id
     user_id: Id
     messages: list[Message]              # 시간순 append-only
+    memory: ConversationMemory | None    # 롤링 요약 + 구조화 사실(재방문 rehydrate, ADR-0040)
     active_flow: FlowState | None        # 현재 진행 흐름
     suspended_flow: FlowState | None     # 채팅 전환 시 보관 (R6)
     version: int                         # 낙관적 잠금

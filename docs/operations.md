@@ -76,6 +76,18 @@ LLM·외부 호출 비용을 줄이는 캐시 계층. 각 캐시는 **키·TTL·
 - 개인식별정보 **최소화**(민감정보 과주입 금지, R19).
 - **차등 출력** — 같은 질문이라도 보유 기기·이력·동의에 따라 추천 대상·재주문·근거 문구가 달라진다.
 
+### 4-1. 대화 연속성 — 컴팩션 + 영속 메모리 (continuous session)
+
+세션을 **비우지 않고 이어지는 느낌**을 준다. 맥락이 커지면 리셋이 아니라 **압축해 영속 메모리로 넘기고 재방문 시 복원**한다(*clear → compaction-into-durable-memory*). (하드 세션 클리어는 보류.)
+
+- **3계층 컨텍스트**:
+  - **구조화 사실(durable)** — 기기·진행 중 주문·추천 부품·미해결 이슈·동의·활성 FlowState. 손실 위험 큰 항목(주문ID·모델·동의)은 **요약에 넣지 않고 사실로 보존**(`ConversationMemory.facts`).
+  - **롤링 요약(durable)** — 오래된 턴을 점진 요약으로 접음(`ConversationMemory.summary`).
+  - **최근 N턴 verbatim(working)** — 그대로 유지(`summarized_through` 이후).
+- **컴팩션 트리거** — 컨텍스트 토큰 임계(예: 70%) 또는 N턴마다: 오래된 verbatim → 요약 흡수 + 사실 추출.
+- **영속/휘발 분리(§13 보정)** — working 맥락(`sess:{sid}`)은 휘발(TTL) 가능하되, **구조화 사실 + 롤링 요약은 영속(DB, R12)**. 재방문 시 영속분을 **rehydrate** → TTL이 지나도 이어지는 느낌.
+- **대안 기각** — 슬라이딩 윈도우(단순 절단)는 옛 맥락 참조 시 끊김 → 채택 X. 대화 RAG(전 이력 검색)는 후속 확장 후보. (근거·대안: ADR-0040.)
+
 ## 5. 관측성 / 비용 추적
 
 - **상관관계 ID**로 대화·tool·주문·핸드오프를 연결(architecture §7).
@@ -180,7 +192,7 @@ client ⇄ [BFF: WS 종단] ⇄ Redis(세션·락·레이트리밋·잡큐·릴�
 
 | 책임 | 키 / 구조 | 메모 |
 |---|---|---|
-| 세션 상태 격리 | `sess:{sid}` JSON(user_id·FlowState·screen_context·last_active) | **TTL 30m 슬라이딩**. 워커는 여기서만 읽어 무상태화 |
+| 세션 상태 격리 | `sess:{sid}` JSON(user_id·FlowState·screen_context·last_active) | **TTL 30m 슬라이딩**(working 맥락). 워커는 여기서만 읽어 무상태화. **구조화 사실+롤링 요약은 영속 DB**(§4-1, 재방문 rehydrate) |
 | 세션 직렬화 락 | `lock:turn:{sid}` (SET NX PX) | 세션당 동시 1 turn(§7 서버 방어선). PX 만료로 데드락 방지 |
 | 레이트리밋(토큰버킷) | `rl:openai:{rpm,tpm}`(전역) · `rl:user:{uid}:rpm`(공정성) | **Lua 스크립트**로 원자적 refill+consume |
 | 잡 큐 | `q:turns` (Streams + consumer group `workers`) | 인터랙티브 turn 분배·수평확장 |

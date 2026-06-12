@@ -61,6 +61,12 @@ class BackendClient:
     async def reengagement(self) -> httpx.Response:
         return await self._client.get("/internal/reengagement")
 
+    async def reengagement_deliver(self) -> httpx.Response:
+        return await self._client.post("/internal/reengagement/deliver")
+
+    async def resolve_open_loop(self, ref: str, action: str = "resolve") -> httpx.Response:
+        return await self._client.post(f"/internal/open-loops/{ref}/{action}")
+
     # ── 대화 스트림(NDJSON) ─────────────────────────────────────────────────
     async def turn_stream(self, payload: dict):
         """청크를 **도착 즉시 yield**(증분 포워딩, operations §9). 버퍼링하지 않는다."""

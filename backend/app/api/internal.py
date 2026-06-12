@@ -136,12 +136,41 @@ def resume(fresh: bool = False):
 
 @app.get("/internal/reengagement")
 def reengagement():
-    """선제 재관여(컴패니언 §3) — 엄격 게이트 통과분 1건(peek). 없으면 {}.
-
-    실 전달(AlertPort §10)·전달 후 mark_sent는 선제 파이프라인/스케줄러가 담당(§3.3).
-    """
+    """선제 재관여(컴패니언 §3) — 엄격 게이트 통과분 1건(peek). 없으면 {}."""
     cand = _container.reengagement.candidate(_container.user)
     return cand.model_dump(mode="json") if cand else {}
+
+
+@app.post("/internal/reengagement/deliver")
+def reengagement_deliver():
+    """전달 액션(§3.3) — 게이트 통과분을 전달 처리하고 mark_sent(빈도·중복 갱신). 없으면 {}.
+
+    실 채널은 AlertPort(§10); 여기서는 전달 확정 + 재노출 억제를 담당한다.
+    """
+    user = _container.user
+    cand = _container.reengagement.candidate(user)
+    if not cand:
+        return {}
+    _container.reengagement.mark_sent(user)
+    return cand.model_dump(mode="json")
+
+
+@app.post("/internal/open-loops/{ref}/resolve")
+def resolve_open_loop(ref: str):
+    """미해결 스레드 해소(§2.3) — R25 해결확인·주문 배송완료 등."""
+    loop = _container.companion.resolve_loop(_container.user.id, ref)
+    if loop is None:
+        return JSONResponse(status_code=404, content={"code": "not_found", "message": "open-loop 없음"})
+    return loop.model_dump(mode="json")
+
+
+@app.post("/internal/open-loops/{ref}/dismiss")
+def dismiss_open_loop(ref: str):
+    """미해결 스레드 닫기(§2.3) — 사용자 dismiss."""
+    loop = _container.companion.dismiss_loop(_container.user.id, ref)
+    if loop is None:
+        return JSONResponse(status_code=404, content={"code": "not_found", "message": "open-loop 없음"})
+    return loop.model_dump(mode="json")
 
 
 # ── 결정적 조회(HTTP) ────────────────────────────────────────────────────────

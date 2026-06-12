@@ -116,3 +116,16 @@ def test_reengagement_endpoint_returns_dict():
     r = c.get("/internal/reengagement")
     assert r.status_code == 200
     assert isinstance(r.json(), dict)          # 게이트 미통과면 {}
+
+
+def test_open_loop_resolve_endpoint():
+    c = TestClient(app)
+    c.post("/internal/turn", json={"text": "ord_uniq42 주문했어요"})  # 주문 open-loop 생성
+    r = c.post("/internal/open-loops/ord_uniq42/resolve")
+    assert r.status_code == 200 and r.json()["status"] == "resolved"  # §2.3 해소
+    assert c.post("/internal/open-loops/nope_xyz/dismiss").status_code == 404
+
+
+def test_reengagement_deliver_smoke():
+    r = TestClient(app).post("/internal/reengagement/deliver")
+    assert r.status_code == 200 and isinstance(r.json(), dict)        # §3.3 전달 액션

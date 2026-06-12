@@ -82,6 +82,15 @@ def create_app(backend: Optional[BackendClient] = None) -> FastAPI:
     async def reengagement(user: str = Depends(require_auth), be: BackendClient = Depends(_backend)):
         return await relay(be.reengagement)
 
+    @app.post("/reengagement/deliver")
+    async def reengagement_deliver(user: str = Depends(require_auth), be: BackendClient = Depends(_backend)):
+        return await relay(be.reengagement_deliver)
+
+    @app.post("/open-loops/{ref}/{action}")
+    async def resolve_open_loop(ref: str, action: str, user: str = Depends(require_auth),
+                                be: BackendClient = Depends(_backend)):
+        return await relay(lambda: be.resolve_open_loop(ref, action))
+
     # ── 카드 탭 surface(§2.3) ───────────────────────────────────────────────
     @app.post("/surface")
     async def surface(request: Request, user: str = Depends(require_auth),

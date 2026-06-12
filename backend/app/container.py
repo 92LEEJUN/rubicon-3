@@ -8,8 +8,9 @@ from dataclasses import dataclass
 
 from . import fixtures as fx
 from .adapters import mock
+from .compaction import CompactionService, RuleBasedCompactor
 from .domain import User
-from .repositories import InMemoryEngagementRepository
+from .repositories import InMemoryConversationMemoryRepository, InMemoryEngagementRepository
 from .services import (
     CatalogService,
     DeviceService,
@@ -24,6 +25,8 @@ from .services import (
 class Container:
     user: User
     engagement: InMemoryEngagementRepository
+    conversation_memory: InMemoryConversationMemoryRepository
+    compaction: CompactionService
     device: DeviceService
     knowledge: KnowledgeService
     catalog: CatalogService
@@ -34,6 +37,9 @@ class Container:
 
 def build_container() -> Container:
     engagement = InMemoryEngagementRepository()
+    conversation_memory = InMemoryConversationMemoryRepository()
+    # MVP=결정적 컴팩터(LLM 없이 테스트 가능). 실 전환 시 LLMCompactor로 교체(ADR-0020).
+    compaction = CompactionService(RuleBasedCompactor())
     device = DeviceService(mock.MockDeviceAdapter())
     knowledge = KnowledgeService(mock.MockCSKnowledgeAdapter(), mock.MockWarrantyAdapter())
     catalog = CatalogService(mock.MockCatalogAdapter(), engagement)
@@ -43,6 +49,8 @@ def build_container() -> Container:
     return Container(
         user=User.model_validate(fx.USER),
         engagement=engagement,
+        conversation_memory=conversation_memory,
+        compaction=compaction,
         device=device,
         knowledge=knowledge,
         catalog=catalog,

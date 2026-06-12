@@ -50,14 +50,26 @@ def _llm_backed() -> bool:
     return os.getenv("LLM_BACKED", "").strip().lower() in ("1", "true", "yes", "on")
 
 
+def _multiagent() -> bool:
+    """멀티에이전트 경로 토글 — LLM_BACKED 위에서 동작(매 호출 평가, 기본 off)."""
+    return os.getenv("MULTIAGENT", "").strip().lower() in ("1", "true", "yes", "on")
+
+
 async def _stream_turn(text: str, screen_context: dict | None) -> AsyncIterator[dict]:
-    """턴 스트림 디스패치(비동기) — LLM_BACKED면 자연어(delta, 비동기 tool-loop),
-    아니면 결정적 섹션(동기 제너레이터, I/O 없음·즉시)."""
+    """턴 스트림 디스패치(비동기) — 세 경로:
+    ① LLM_BACKED off → 결정적 섹션(core.Orchestrator)
+    ② LLM_BACKED on, MULTIAGENT off → 단일 tool-loop(legacy)
+    ③ LLM_BACKED on, MULTIAGENT on → 슈퍼바이저-워커(runtime)."""
     if _llm_backed():
-        from ..orchestrator.legacy import astream_turn as _llm_astream
         memory = _container.companion.context(_container.user.id)  # 이어가기 주입(§0.4)
-        async for chunk in _llm_astream(text, screen_context, memory=memory):
-            yield chunk
+        if _multiagent():
+            from ..orchestrator.runtime import astream_multiagent
+            async for chunk in astream_multiagent(text, screen_context, memory=memory):
+                yield chunk
+        else:
+            from ..orchestrator.legacy import astream_turn as _llm_astream
+            async for chunk in _llm_astream(text, screen_context, memory=memory):
+                yield chunk
     else:
         for chunk in _orch.stream_turn(text, screen_context):
             yield chunk

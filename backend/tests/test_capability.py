@@ -58,6 +58,17 @@ def test_diagnose_warranty_hides_part_cta(container):
     assert "보증" in guide.template.data.get("cta_notice", "")
 
 
+def test_diagnose_message_danger_without_solution(container):
+    # 해결책이 없는 기기(인덕션)라도 위험 표지가 있으면 안전 경고로 응답(게이팅)
+    turn = _orch(container).build_turn(
+        "인덕션에서 타는 냄새가 나고 가끔 스파크도 튀어요. 계속 써도 되나요? 해결법 알려줘")
+    sec = next(s for s in turn.sections if s.intent == "troubleshoot")
+    assert "order" not in _cta_kinds(sec)              # 부품 CTA 없음
+    assert "handoff" in _cta_kinds(sec) and "booking" in _cta_kinds(sec)
+    assert "위험" in sec.template.data.get("cta_notice", "")
+    assert sec.handled is True                          # 안전 안내는 처리된 응답
+
+
 def test_diagnose_danger_hides_part_cta(container, monkeypatch):
     # 합성 danger 해결책 — 안전 위험 → 부품 CTA 숨김 + 위험 설명(요구사항 6-3)
     danger = Solution(

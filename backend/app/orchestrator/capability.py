@@ -82,10 +82,24 @@ def _cta_explore_replacement() -> Cta:
                payload={"reason": "uneconomical"})
 
 
-def gate_repair_ctas(section: MessageSection, ctx: TurnCtx) -> None:
+# 안전 위험 표지(메시지 레벨) — 해결책 데이터가 없어도 위험을 잡는다(요구사항 6-3 보강).
+# 장문 검증에서 '해결책 못 찾는 기기(인덕션 등)의 위험 발화'가 게이팅을 빠져나가는 갭을 막는다.
+_DANGER_KW = (
+    "타는 냄새", "탄내", "타는 듯", "가스 냄새", "가스냄새", "가스", "감전", "스파크",
+    "불꽃", "연기", "누전", "폭발", "화재", "쇼트", "스파지",
+)
+
+
+def detect_danger(message: str) -> bool:
+    t = message or ""
+    return any(k in t for k in _DANGER_KW)
+
+
+def gate_repair_ctas(section: MessageSection, ctx: TurnCtx, message_danger: bool = False) -> None:
     """guide_steps 섹션의 CTA를 위험도·보증으로 게이팅(결정적, 요구사항 6-3).
 
-    - danger(안전 위험) 또는 coverage=free(보증 무상) → 부품 자가주문 CTA 숨김 + 이유 설명.
+    - danger(step.safety 또는 메시지 표지) 또는 coverage=free(보증 무상) → 부품 자가주문 CTA
+      숨김 + 이유 설명.
     - 그 외 단순·안전건 → add_to_cart CTA 포함(커밋은 ActionGate).
     - 항상 상담원·수리기사 CTA 제공(요구사항 6-2).
     """
@@ -94,7 +108,8 @@ def gate_repair_ctas(section: MessageSection, ctx: TurnCtx) -> None:
     coverage = data.get("coverage")
     required_parts = data.get("required_parts") or []
 
-    risk_level = "danger" if any(s.get("safety") == "danger" for s in steps) else (
+    step_danger = any(s.get("safety") == "danger" for s in steps)
+    risk_level = "danger" if (step_danger or message_danger) else (
         "caution" if any(s.get("safety") == "caution" for s in steps) else "none")
     in_warranty = coverage == "free"
 
@@ -135,9 +150,18 @@ def _cap_device_status(ctx: TurnCtx, message: str) -> list[MessageSection]:
 
 def _cap_diagnose(ctx: TurnCtx, message: str) -> list[MessageSection]:
     sections = handlers.handle_troubleshoot(ctx.c, ctx.c.user, message)
+    danger = detect_danger(message)
     for s in sections:
         if s.template.kind == "guide_steps":
-            gate_repair_ctas(s, ctx)
+            gate_repair_ctas(s, ctx, message_danger=danger)
+        elif danger:
+            # 해결책을 못 찾았어도 위험 발화면 안전 경고로 응답(게이팅, 요구사항 6-3).
+            ctx.write("risk_level", "danger")
+            s.handled = True
+            s.template.data["cta_notice"] = (
+                "말씀하신 증상은 안전 위험이 있을 수 있어요. 사용을 멈추고 전원(또는 가스)을 "
+                "차단한 뒤, 직접 손대기보다 상담원·수리기사 방문으로 점검받으시길 권해요.")
+            s.ctas = [_cta_connect_agent(), _cta_request_visit()]
     return sections
 
 

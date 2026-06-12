@@ -71,9 +71,9 @@
   - [x] 12.2 §2.1 봉투 동일 보장 — `verify_e2e_timing.py` Part A 패리티(core ≡ capability 구조·intent 동일; 차이는 ADR-0046 수리 CTA 게이팅 **추가분**뿐, 회귀 아님). 옛 `test_orchestrator.py`를 capability로 재배선 후 전체 173 green.
   - [~] 12.3 옛 경로 제거 — **`core` 제거 완료**(결정적 경로 수렴). **`legacy`·`runtime`은 유지** — 이들은 LLM **자연어 prose**(tool-loop·멀티에이전트)를 생성하나 capability 경로는 아직 **라우팅+결정적 템플릿**만(LLM agent capability §8~11 미구현). §8~11 완료 전 제거 시 prose 답변 회귀. **블로커: §8~11.**
 
-- [ ] 13. 실패·부분 폴백 _(요구사항 14)_
-  - [ ] 13.1 step별 try/except·타임아웃, 실패 step만 폴백.
-  - [ ] 13.2 플래너 실패→룰 폴백, 턴 회복불가→`error` 봉투.
+- [~] 13. 실패·부분 폴백 _(요구사항 14)_
+  - [~] 13.1 step별 try/except — 실패 step만 unhandled 텍스트 섹션으로 폴백, 나머지 capability 계속(`_run_capabilities`). 빈 턴이면 clarify로 되묻기(R7). _타임아웃은 미구현(핸들러 결정적·즉시이므로 후순위)._
+  - [x] 13.2 플래너 실패→룰 폴백(`route`/`aroute`·`test_route_planner_failure_falls_back`), 턴 회복불가→`error` 봉투(`stream_turn`/`astream`).
 
 - [x] 14. Mock/결정적 테스트 _(요구사항 15)_ — `backend/tests/test_capability.py`(9), `backend/verify_multiturn.py`
   - [x] 14.1 플래너 **행동형 자동선택 차단**·명시 order 허용 단언.

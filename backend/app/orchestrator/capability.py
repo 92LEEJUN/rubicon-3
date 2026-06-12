@@ -25,6 +25,8 @@ from .classify import IntentClassifier, RuleBasedClassifier
 
 # 우선순위(core._PRIORITY와 동일) — 안전/CS 먼저, 주문은 뒤
 _PRIORITY = {"device_status": 0, "troubleshoot": 1, "general": 2, "recommend": 3, "order": 4}
+_PLAN_CACHE_MAX = 1024   # route 캐시 경계(메시지→조언형 plan)
+_SESSION_MAX = 4096      # 인메모리 세션 경계(멀티유저 누수 방지, ADR-0049)
 
 CapClass = Literal["advisory", "action"]
 
@@ -290,6 +292,7 @@ class CapabilityOrchestrator:
         self.registry = build_registry()
         self._sessions: dict[str, dict] = {}   # session_id → 지속 슬롯
         self.llm_planner = llm_planner          # 단일 라우터(없으면 규칙 폴백)
+        self._plan_cache: dict[str, list[str]] = {}   # message → LLM 조언형 plan(홉 생략)
 
     def _ordered_intents(self, message: str) -> list[str]:
         result = self.classifier.classify(message)
@@ -300,25 +303,6 @@ class CapabilityOrchestrator:
         intents = self._ordered_intents(message)
         return validate_plan(rule_plan(intents, self.registry), intents, self.registry)
 
-    def route(self, message: str) -> Plan:
-        """**모든 질의를 LLM 플래너로 라우팅**(ADR-0048). LLM은 조언형을 고르고, 명시 행동(order)은
-        규칙 plan에서 보존·병합한다. 플래너 미연결·실패·빈 결과면 규칙 plan으로 폴백(요구사항 14-2)."""
-        rule = self.plan(message)
-        if self.llm_planner is not None:
-            try:
-                intents = self._ordered_intents(message)
-                proposed = self.llm_planner.propose(advisory_catalog(self.registry), message)
-                advisory = validate_plan(proposed, intents, self.registry).capabilities
-                # 명시 행동형(order)은 규칙 plan에서 보존 — LLM은 조언형만 고름(ADR-0046)
-                actions = [n for n in rule.capabilities if self.registry[n].cls == "action"]
-                names = advisory + [a for a in actions if a not in advisory]
-                names.sort(key=lambda n: self.registry[n].priority)
-                if names:
-                    return Plan(capabilities=names)
-            except Exception:
-                pass   # 플래너 실패 → 규칙 폴백(요구사항 14-2)
-        return rule
-
     def _merge_advisory_actions(self, advisory: list[str], rule: Plan) -> list[str]:
         """LLM 조언형 + 규칙 plan의 명시 행동(order)을 우선순위 정렬로 병합(route/aroute 공통)."""
         actions = [n for n in rule.capabilities if self.registry[n].cls == "action"]
@@ -326,22 +310,56 @@ class CapabilityOrchestrator:
         names.sort(key=lambda n: self.registry[n].priority)
         return names
 
-    async def aroute(self, message: str) -> Plan:
-        """route()의 비동기 버전 — 플래너에 apropose 코루틴이 있으면 await로 라우팅(ADR-0048).
+    def _cache_get(self, message: str):
+        """캐시된 LLM 조언형 plan(없으면 None). route는 메시지의 순수 함수이므로 캐시 안전(§9.2)."""
+        return self._plan_cache.get(message)
 
-        병합 로직은 sync route()와 동일(LLM 조언형 + 규칙 명시 행동, 우선순위 정렬). 플래너가
-        apropose를 갖지 않거나 예외/빈 결과면 sync route()로 폴백(요구사항 14-2)."""
-        if self.llm_planner is not None and hasattr(self.llm_planner, "apropose"):
-            rule = self.plan(message)
-            try:
-                intents = self._ordered_intents(message)
-                proposed = await self.llm_planner.apropose(advisory_catalog(self.registry), message)
-                advisory = validate_plan(proposed, intents, self.registry).capabilities
+    def _cache_put(self, message: str, advisory: list[str]) -> None:
+        if len(self._plan_cache) >= _PLAN_CACHE_MAX:      # 단순 FIFO 경계
+            self._plan_cache.pop(next(iter(self._plan_cache)))
+        self._plan_cache[message] = advisory
+
+    def route(self, message: str) -> Plan:
+        """**모든 질의를 LLM 플래너로 라우팅**(ADR-0048). LLM은 조언형을 고르고, 명시 행동(order)은
+        규칙 plan에서 보존·병합한다. 동일 메시지는 캐시로 LLM 홉 생략(§9.2 레이턴시). 플래너
+        미연결·실패·빈 결과면 규칙 plan으로 폴백(요구사항 14-2)."""
+        rule = self.plan(message)
+        if self.llm_planner is not None:
+            advisory = self._cache_get(message)
+            if advisory is None:
+                try:
+                    intents = self._ordered_intents(message)
+                    proposed = self.llm_planner.propose(advisory_catalog(self.registry), message)
+                    advisory = validate_plan(proposed, intents, self.registry).capabilities
+                    self._cache_put(message, advisory)
+                except Exception:
+                    advisory = None   # 플래너 실패 → 캐시 안 함(일시 오류), 규칙 폴백
+            if advisory:
                 names = self._merge_advisory_actions(advisory, rule)
                 if names:
                     return Plan(capabilities=names)
-            except Exception:
-                pass   # 플래너 실패 → 규칙 폴백(요구사항 14-2)
+        return rule
+
+    async def aroute(self, message: str) -> Plan:
+        """route()의 비동기 버전 — 플래너에 apropose 코루틴이 있으면 await로 라우팅(ADR-0048).
+
+        병합·캐시 로직은 sync route()와 동일. 플래너가 apropose를 갖지 않거나 예외/빈 결과면
+        sync route()로 폴백(요구사항 14-2)."""
+        if self.llm_planner is not None and hasattr(self.llm_planner, "apropose"):
+            rule = self.plan(message)
+            advisory = self._cache_get(message)
+            if advisory is None:
+                try:
+                    intents = self._ordered_intents(message)
+                    proposed = await self.llm_planner.apropose(advisory_catalog(self.registry), message)
+                    advisory = validate_plan(proposed, intents, self.registry).capabilities
+                    self._cache_put(message, advisory)
+                except Exception:
+                    advisory = None
+            if advisory:
+                names = self._merge_advisory_actions(advisory, rule)
+                if names:
+                    return Plan(capabilities=names)
             return rule
         # apropose 없음(또는 플래너 미연결) → sync route(propose/규칙 폴백)로 위임
         return self.route(message)
@@ -373,9 +391,15 @@ class CapabilityOrchestrator:
                 session[slot] = ctx.turn[slot]
         return sections
 
+    def _session(self, session_id: str) -> dict:
+        """세션 블랙보드 — 경계(_SESSION_MAX) 초과 시 가장 오래된 세션 evict(멀티유저 누수 방지)."""
+        if session_id not in self._sessions and len(self._sessions) >= _SESSION_MAX:
+            self._sessions.pop(next(iter(self._sessions)))
+        return self._sessions.setdefault(session_id, {})
+
     def build_turn(self, message: str, session_id: str = "s1",
                    screen_context: Optional[dict] = None) -> AssistantTurn:
-        session = self._sessions.setdefault(session_id, {})
+        session = self._session(session_id)
         ctx = TurnCtx(self.c, session)
         plan = self.route(message)
 
@@ -411,7 +435,7 @@ class CapabilityOrchestrator:
         방출하는 수준으로만 한다. 완전한 speculative pre-paint(추정 선-렌더)는 범위 밖이다.
         capability handler는 동기(결정적)이므로 await 없이 그대로 호출한다."""
         try:
-            session = self._sessions.setdefault(session_id, {})
+            session = self._session(session_id)
             ctx = TurnCtx(self.c, session)
             plan = await self.aroute(message)
             sections = self._run_capabilities(plan, ctx, message, session)

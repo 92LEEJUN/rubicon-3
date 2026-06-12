@@ -183,10 +183,32 @@ def test_route_preserves_explicit_action_with_planner(container):
     assert plan.capabilities.index("diagnose") < plan.capabilities.index("order")  # 우선순위
 
 
+def test_route_caches_planner_hop(container):
+    # 동일 메시지 재요청 → LLM 홉 생략(캐시), 다른 메시지는 재호출(§9.2 레이턴시)
+    stub = _StubPlanner(["diagnose"])
+    orch = CapabilityOrchestrator(container=container, classifier=RuleBasedClassifier(),
+                                  llm_planner=stub)
+    orch.route("세탁기 물 안 빠져요")
+    orch.route("세탁기 물 안 빠져요")
+    assert stub.calls == 1                 # 두 번째는 캐시
+    orch.route("공기청정기 추천해줘")
+    assert stub.calls == 2                 # 새 메시지는 재호출
+
+
 def test_route_falls_back_to_rule_without_planner(container):
     # LLM 플래너 미연결 → 규칙 plan으로 폴백(오프라인·테스트 결정성)
     plan = _orch(container).route("세탁기 물이 안 빠져요")
     assert "diagnose" in plan.capabilities
+
+
+def test_session_store_bounded(container, monkeypatch):
+    # 멀티유저 누수 방지(ADR-0049) — 경계 초과 시 가장 오래된 세션 evict
+    import app.orchestrator.capability as cap
+    monkeypatch.setattr(cap, "_SESSION_MAX", 2)
+    orch = _orch(container)
+    for sid in ("s1", "s2", "s3"):
+        orch.build_turn("안녕하세요", session_id=sid)
+    assert set(orch._sessions) == {"s2", "s3"}   # s1 evicted
 
 
 def test_route_planner_failure_falls_back(container):

@@ -4,6 +4,7 @@
 > 파이프라인·다단계 스트리밍은 `docs/orchestration.md`(§4·§10), 운영·지연·세션은 `docs/operations.md`(§13·§14),
 > 프롬프트·가드레일은 `docs/llm-policy.md`, 우선순위는 `specs/mvp-concierge/design.md` §6.6 을 본다.
 > MVP 기본은 **단일 오케스트레이터 tool-loop**(orchestration §1). 본 문서는 **규모/복잡도 증가 시 확장 구조**다.
+> 각 결정의 **후보안·근거·기각 이유**는 `docs/adr/`(ADR-0009~0013)에 별도 기록.
 
 ## 1. 제어 패턴 — 슈퍼바이저-워커 / 단일 패스 (확정)
 

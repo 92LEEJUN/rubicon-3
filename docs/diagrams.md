@@ -685,3 +685,28 @@ sequenceDiagram
 ```
 
 > 구조·역할·프롬프트: `docs/agents.md`. 다단계 스트리밍·지연: `docs/orchestration.md` §10 · `docs/operations.md` §14.
+
+### 통합 capability 오케스트레이터 + 하이브리드 병합 (ADR-0043)
+
+```mermaid
+flowchart TD
+  IN["사용자 입력"] --> ORCH["Orchestrator(planner)<br/>의도 분해·우선순위(§6.6)"]
+  ORCH --> DIAG["agent: Diagnosis<br/>상태+RAG"]
+  ORCH --> COMM["agent: Commerce<br/>매칭+주문초안"]
+  ORCH --> TREC["tool: Recommend"]
+  ORCH --> TO2O["tool: O2O(Store/Quote)"]
+  ORCH --> THAND["tool: Handoff"]
+  ORCH --> THIST["tool: History"]
+  DIAG -. required_parts .-> COMM
+  DIAG --> MERGE
+  COMM --> MERGE
+  TREC --> MERGE
+  TO2O --> MERGE
+  THAND --> MERGE
+  THIST --> MERGE
+  MERGE["Merge(하이브리드)<br/>결정적 섹션 스택 + 얇은 LLM 연결문구"] --> REV{"조건부 Review<br/>안전·커밋·불확실"}
+  REV -->|통과/스킵| DONE["done · 다단계 스트리밍<br/>(빠른 결정적 섹션 먼저)"]
+  REV -->|위반| FB["보정·사람 연결"]
+```
+
+> 그래뉼래리티 1b(진단·커머스만 agent)·병합 2c(하이브리드)·오케스트레이터 통합: `docs/agents.md` §11 · ADR-0043.

@@ -84,3 +84,23 @@
 | `review` | (조건부) 안전·근거·정책 검수 | 새 사실 생성·무리한 재생성 | {pass, issues, action} |
 
 > 발동·라우팅 임계(리뷰 조건, 모델 라우팅)는 구현 단계에서 확정(operations §14, orchestration §10).
+
+## 11. 통합 capability 오케스트레이터 + 하이브리드 병합 (재확정, ADR-0043)
+
+구현이 진행되며 구조를 재확정했다(ADR-0043). 핵심: **오케스트레이터는 하나**이고, "필요한 capability(agent|tool)를 호출 → 병합·정리"한다.
+
+```text
+사용자 입력
+ → Orchestrator(planner): 의도 분해 + 우선순위(§6.6)
+ → capability 선택·실행   [균일 인터페이스 call(input) → result]
+      agent : Diagnosis(상태+RAG) · Commerce(매칭+주문초안)
+      tool  : Recommend(RecommendationService) · O2O(Store/Quote) · Handoff(booking) · History
+      의존(진단 required_parts → 커머스)은 순차, 독립은 병렬 후보(ADR-0017 보류)
+ → Merge(하이브리드): 결정적 섹션 우선순위 스택 + 얇은 LLM 연결문구
+ → 조건부 Review(안전 R23·커밋 R17·불확실 R16) → done(빠른 결정적 섹션 먼저)
+```
+
+- **그래뉼래리티 = 1b**(§2 재확인) — 다단계 추론이 필요한 **진단·커머스만 agent**. 추천·O2O·핸드오프·이력은 내부가 **결정적 서비스**라 tool(감싸면 LLM 홉만↑).
+- **병합 = 하이브리드(2c)** — 근거(섹션 데이터)는 결정적으로 보존하고, **연결문구(인트로/전환)만 LLM**. 결정적 병합(2a)의 무환각·근거보존 + 자연어 흐름을 절충(2b 신서사이저의 환각·지연 회피).
+- **통합** — `core.Orchestrator`(결정적 섹션 백본)가 capability+merge의 골격, `runtime`의 LLM 워커는 그 위의 agent capability. `LLM_BACKED`/`MULTIAGENT` 토글은 "어떤 capability가 LLM-backed인가"로 수렴(후속 리팩터).
+- 근거·후보안·기각: **ADR-0043**.

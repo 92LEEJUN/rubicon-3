@@ -33,6 +33,7 @@
 | [0011](0011-conditional-review.md) | 리뷰/크리틱 = **조건부** | 채택 |
 | [0012](0012-single-pass.md) | 계획 = **단일 패스**(재계획 루프 없음) | 채택 |
 | [0013](0013-prompt-single-source.md) | 에이전트 프롬프트 **단일 출처 = prompts.py** | 구현됨 |
+| [0043](0043-capability-orchestrator-hybrid-merge.md) | **capability 통합 오케스트레이터 + 하이브리드 병합**(1b·2c) | 채택 |
 
 ### Phase A — 스트리밍 / 동시성 실행 (operations.md §6·§9·§14)
 | # | 결정 | 상태 |

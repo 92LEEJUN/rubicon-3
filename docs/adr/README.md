@@ -79,3 +79,9 @@
 | [0037](0037-attribution-turn-based.md) | 전환 기여 = **turn 기반 + CTA last-touch** | 채택 |
 | [0038](0038-analytics-schema-hardening.md) | 분석 스키마 견고성(**네이밍·event_id·version·소유자**) | 채택 |
 | [0039](0039-analytics-error-events.md) | **에러/폴백 이벤트** 추가(지연=운영 분리) | 채택 |
+| [0041](0041-analytics-session-consistent-sampling.md) | 분석 = **세션 일관 샘플링**(중요이벤트 100%) | 채택 |
+
+### 세션 / 대화 연속성 (operations.md)
+| # | 결정 | 상태 |
+|---|---|---|
+| [0040](0040-conversation-continuity-compaction.md) | 대화 연속성 = **하이브리드 컴팩션 + 영속 메모리** | 채택 |

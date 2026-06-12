@@ -19,6 +19,7 @@
 ```python
 { "event_id": Id,              # 클라이언트/서버 생성 UUID — 멱등 dedup(배치 재시도 중복 제거)
   "schema_version": int,       # 이벤트 스키마 버전 — props 진화 추적
+  "sample_rate": float,        # 이 이벤트가 통과한 샘플 비율 — 분석 시 1/rate 재가중(§8)
   "name": str,                 # 택소노미 이벤트명 (§4)
   "ts": datetime,              # UTC
   "session_id": Id,
@@ -116,7 +117,20 @@
 - **BE** — 서버 확정 이벤트(`order_confirmed`·`notification_*`)는 직접 emit.
 - **MVP** — `MockAnalyticsPort`(로컬 로그). **실** — 분석 플랫폼/웨어하우스(`architecture.md` §11).
 
-## 8. 비범위 (후속)
+## 8. 샘플링 (세션 일관, 적용)
+
+고빈도 저단가 이벤트(`screen_viewed`·`template_shown`·`cta_shown`·dwell)의 볼륨·비용을 제어한다.
+
+- **세션 일관 샘플링(핵심)** — `hash(session_id) < sample_rate`로 **세션 단위**로 수집 여부 결정. 수집 대상 세션은 **모든 이벤트를 다** 보낸다 → **퍼널 무결성 보존**.
+  - (이벤트별 랜덤 샘플링은 `cta_clicked`는 남고 `order_confirmed`는 버려질 수 있어 퍼널이 깨짐 → **금지**.)
+- **중요 이벤트 100%(allowlist)** — 샘플링과 무관하게 항상 전송: `order_confirmed`·`order_cancelled`·`error_shown`·`fallback_shown`·`flow_abandoned`·`handoff_started`·`resolution_confirmed`.
+- **드롭보다 클라 집계** — dwell heartbeat는 **합산 1개**, impression은 **배치 카운트**(정보 손실 없이 볼륨↓).
+- **재가중** — 이벤트에 `sample_rate` 기록 → 분석 시 1/rate scale-up(모수 보정).
+- **기본값** — `sample_rate`는 환경값(MVP 기본 **1.0=전수**), 고빈도 비용 문제 시 하향. (메커니즘은 적용된 상태.)
+
+> 근거·대안: ADR-0041.
+
+## 9. 비범위 (후속)
 
 - 실시간 대시보드·세션 리플레이·히트맵, A/B 테스트 프레임워크.
 - 서버 웨어하우스 스키마·ETL은 실 연동 시 확정.

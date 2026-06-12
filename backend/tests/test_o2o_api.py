@@ -142,7 +142,7 @@ def test_convert_forbidden_quote_403():
 def test_center_booking_endpoint():
     slots = client.get("/internal/bookings/slots", params={"visit_type": "center"}).json()
     r = client.post("/internal/bookings", json={
-        "slot_id": slots[0]["id"], "context_ref": "conv_7",
+        "slot_id": slots[0]["id"], "context_ref": "conv_7", "confirmed": True,
         "visit_type": "center", "store_id": "store_seocho_svc"})
     body = r.json()
     assert body["status"] == "CONFIRMED"

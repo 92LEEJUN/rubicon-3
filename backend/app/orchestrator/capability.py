@@ -19,7 +19,7 @@ from dataclasses import dataclass, field
 from typing import AsyncIterator, Callable, Iterator, Literal, Optional
 
 from ..container import Container, build_container
-from ..domain import AssistantTurn, Cta, MessageSection
+from ..domain import AssistantTurn, Cta, MessageSection, Template
 from . import handlers
 from .classify import IntentClassifier, RuleBasedClassifier
 
@@ -350,10 +350,22 @@ class CapabilityOrchestrator:
                           session: dict) -> list[MessageSection]:
         """plan의 capability를 순차 실행하고 세션 carry를 갱신한다(build_turn/astream 공통).
 
-        capability handler는 동기(결정적)이므로 그대로 호출한다."""
+        capability handler는 동기(결정적)이므로 그대로 호출한다. 각 capability는 **독립 폴백**으로
+        감싸 한 step 실패가 턴 전체를 무너뜨리지 않게 한다(요구사항 14·§13.1). 산출 섹션이 하나도
+        없으면(빈 plan·전부 실패) 침묵 대신 clarify로 되묻는다(R7 — 빈 턴 금지, F4 보강)."""
         sections: list[MessageSection] = []
         for name in plan.capabilities:
-            sections.extend(self.registry[name].run(ctx, message))
+            try:
+                sections.extend(self.registry[name].run(ctx, message))
+            except Exception as exc:   # 실패 step만 폴백 — 나머지 capability는 계속(§13.1)
+                sections.append(MessageSection(
+                    label=handlers.LABELS.get(name, "안내"), intent=name, handled=False,
+                    template=Template(kind="text", data={
+                        "message": "이 요청을 처리하는 중 일시적인 문제가 생겼어요. 잠시 후 다시 시도해 주세요.",
+                        "detail": str(exc)})))
+
+        if not sections:   # 빈 턴 방지(R7) — 무엇을 원하는지 되묻기
+            sections = handlers.handle_clarify(self.c, self.c.user, message)
 
         # 세션 carry 갱신 — 다음 턴 주문이 이어받을 슬롯 보존(요구사항 5)
         for slot in ("required_parts", "candidates"):

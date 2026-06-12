@@ -5,6 +5,7 @@
 from app.domain import Solution, SolutionStep
 from app.orchestrator.capability import (
     CapabilityOrchestrator,
+    Plan,
     TurnCtx,
     advisory_catalog,
     build_registry,
@@ -197,6 +198,28 @@ def test_route_planner_failure_falls_back(container):
                                   llm_planner=_Boom())
     plan = orch.route("산 지 얼마 안 됐는데 보증으로 무상 수리되는지랑 예약 가능한지 알려줘")
     assert isinstance(plan.capabilities, list)   # 예외 없이 규칙 폴백
+
+
+# ── 견고성: per-capability 폴백 + 빈 턴 금지(§13.1·R7·F4) ───────────────────
+def test_per_capability_failure_isolated(container):
+    # 한 capability가 예외를 던져도 나머지는 살고, 실패분은 unhandled 섹션으로 표면화
+    orch = _orch(container)
+    def _boom(ctx, msg):
+        raise RuntimeError("handler down")
+    orch.registry["diagnose"] = orch.registry["diagnose"].__class__(
+        "diagnose", "advisory", "tool", ("troubleshoot",), _boom, priority=1)
+    secs = orch.build_turn("세탁기 물 안 빠져요 배수필터 주문해줘").sections
+    diag = [s for s in secs if s.intent == "diagnose"]
+    order = [s for s in secs if s.intent == "order"]
+    assert diag and diag[0].handled is False              # 실패 step만 폴백
+    assert order and order[0].handled is True             # 나머지는 정상
+
+
+def test_empty_plan_falls_back_to_clarify(container):
+    orch = _orch(container)
+    ctx = _ctx(container)
+    secs = orch._run_capabilities(Plan([]), ctx, "음...", {})
+    assert secs and secs[0].intent == "clarify"           # 빈 턴 금지 — 되묻기
 
 
 # ── 봉투 패리티(요구사항 13) ────────────────────────────────────────────────

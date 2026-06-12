@@ -151,6 +151,7 @@ class BookingRequest(BaseModel):
     # O2O — 센터/매장 방문(O7). visit_type=center·store_id로 거점 동반.
     visit_type: str = "REPAIR"
     store_id: str | None = None
+    confirmed: bool = False   # R17 커밋 게이트 — 미확인이면 409(주문과 동일)
 
 
 class PickupActionRequest(BaseModel):
@@ -428,9 +429,28 @@ def booking_slots(visit_type: str = "REPAIR"):
     return [s.model_dump(mode="json") for s in _container.handoff.list_slots(visit_type)]
 
 
+def _booking_confirmation_409(req: BookingRequest) -> JSONResponse:
+    """409 + confirmation 템플릿 — 예약 커밋 전 확인(R17, 주문 게이트와 동형)."""
+    slot = next((s for s in _container.handoff.list_slots(req.visit_type)
+                 if s.id == req.slot_id), None)
+    return JSONResponse(status_code=409, content={
+        "code": "ConfirmationRequired",
+        "message": "방문 예약 확인이 필요합니다.",
+        "template": Template(kind="confirmation", data={
+            "booking": {
+                "slot_id": req.slot_id, "visit_type": req.visit_type, "store_id": req.store_id,
+                "slot": slot.model_dump(mode="json") if slot else None,
+            },
+        }).model_dump(mode="json"),
+    })
+
+
 @app.post("/internal/bookings")
 def create_booking(req: BookingRequest):
-    """방문 예약 — 센터 방문(O7-4)은 visit_type/store_id 동반, 맥락 전달(context_ref, O7-5)."""
+    """방문 예약 — 미확인이면 409 ConfirmationRequired(R17). 확인 시 센터 방문(O7-4)은
+    visit_type/store_id 동반, 맥락 전달(context_ref, O7-5)."""
+    if not req.confirmed:
+        return _booking_confirmation_409(req)
     return _container.handoff.book(
         req.slot_id, req.context_ref, visit_type=req.visit_type, store_id=req.store_id
     ).model_dump(mode="json")

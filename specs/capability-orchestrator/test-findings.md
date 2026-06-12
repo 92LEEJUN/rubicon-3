@@ -60,6 +60,22 @@
 - **F2는 LLM 플래너만으로 부분 교정** — `warranty`·`booking`·`explain` **전용 capability가 없어** LLM도 기존 4개(diagnose·device_status·recommend·general) 안에서만 고름. → 다음 단계 ⓑ(목적지 capability 추가)가 필요함을 실측 입증.
 - 부작용: LLM이 가끔 `general`을 군더더기로 추가(무해). 프롬프트 튜닝으로 축소 가능.
 
+## 전면수정 — LLM 플래너 단일 라우터 (ADR-0048)
+
+게이트(ADR-0047) 폐기, **모든 질의를 LLM 플래너로 라우팅**, F2 목적지 capability(`warranty`·`booking`·`explain`·`clarify`) 추가. 실 LLM 재검증:
+
+| 턴 | 규칙폴백 | LLM plan | 결과 |
+|---|---|---|---|
+| A-T2 (F1) | `[device_status]` | `[diagnose, explain]` | ✅ 교정 |
+| **B-T2** (F2 보증·예약) | `[diagnose]` | `[warranty, booking]` | ✅ **완전 해소**(보증 안내+예약 슬롯) |
+| C-T2 (F2 설명+주문) | `[device_status, order]` | `[device_status, diagnose, explain, order]` | ✅ explain 라우팅·order 보존 |
+| warranty 단독 | `[general]` | `[warranty]` | ✅ |
+| **모호** "이거 어떻게 해줘" | `[general]` | `[clarify]` | ✅ **되묻기**(기기 칩) |
+| clean 단일 | `[diagnose]` | `[diagnose]` | ✅ 동일 |
+| clean J5 | `[diagnose, order]` | `[diagnose, recommend, order]` | ⚠️ recommend 군더더기(과선택) |
+
+**해소됨**: F1·F2(보증/예약/설명) 완전 라우팅, 진짜 모호 → clarify. **남은 것**: 플래너 과선택(불필요 cap 1개 추가, 무해) → 프롬프트 튜닝(§9.4). 매 턴 +1홉 수용(레이턴시 은닉 §9.2).
+
 ## 결론 / 우선순위
 - **즉시 처방(데이터·규칙 독립, 안전 직결)**: F3 → **완료**(detect_danger).
 - **LLM 플래너로 해소(tasks §9)**: F1·F2 — 장문 문맥·후속 의도. 규칙 분류기의 구조적 한계.

@@ -5,6 +5,7 @@
 from app.domain import Solution, SolutionStep
 from app.orchestrator.capability import (
     CapabilityOrchestrator,
+    TurnCtx,
     advisory_catalog,
     build_registry,
 )
@@ -13,6 +14,10 @@ from app.orchestrator.classify import RuleBasedClassifier
 
 def _orch(container):
     return CapabilityOrchestrator(container=container, classifier=RuleBasedClassifier())
+
+
+def _ctx(container):
+    return TurnCtx(container, {})
 
 
 def _cta_kinds(section):
@@ -102,55 +107,42 @@ def test_session_isolation(container):
     assert order_secs and all(s.handled is False for s in order_secs)
 
 
-# ── 에스컬레이션 게이트(티어드 플래닝, ADR-0047) ───────────────────────────
-# 깨끗한 케이스 = 홉 0(규칙 즉답). F1·F2 장문/모호 = 홉 1(LLM 플래너 필요).
-_NO_ESCALATE = [
-    "세탁기에서 물이 안 빠져요",                          # 짧은 단일
-    "공기청정기 신제품 추천해줘",
-    "배수필터 주문해줘",
-    # J5 — 장문 복합이지만 규칙이 깨끗이 분류(troubleshoot+order)
-    "세탁기 물 안 빠지는 거 해결법 알려주고, 냉장고 정수필터랑 공기청정기 HEPA 필터도 주문해줘",
-    # A-T1 — 장문이지만 단일 의도 명확
-    "어제 저녁부터 세탁기를 돌리면 중간에 멈추면서 물이 안 빠지는 것 같아요. "
-    "안을 열어보니 물이 가득 차 있고 화면에 5C인가 하는 에러도 떴어요. 어떻게 해결하면 좋을까요?",
-    # B-T1 — 위험 장문이지만 결정적 안전 게이팅으로 처리(홉 불필요)
-    "주방에서 인덕션을 쓰는데 켜기만 하면 타는 냄새가 나고 가끔 스파크도 튀어요. 해결법 알려주세요",
-]
-_ESCALATE = [
-    # F1 — '확인해/가격'이 약한 의도로 장문을 흡수
-    "비용이 많이 들면 그냥 새로 살까 고민도 되는데, 그 배수 필터 어떤 건지 한번 확인해서 가격이랑 같이 알려주세요",
-    # F2 — 보증·예약 후속 의도(미매핑)
-    "산 지 얼마 안 됐으니까 보증으로 무상 수리가 되는지 궁금하고, 기사님 방문 예약도 가능한가요?",
-    # F2 — 설명/비교 후속 의도(미매핑)
-    "비스포크 큐브 그거 필터 교체나 소음이 어느 정도인지 더 알려주고 비교도 해줄 수 있어요?",
-    "정수필터 가격 얼마인지 알려줘",
-]
+# ── 신규 조언형 capability (warranty·booking·explain·clarify, §9.3) ─────────
+def test_warranty_capability_free(container):
+    sec = _orch(container).registry["warranty"].run(_ctx(container), "냉장고 정수필터 보증 무상 수리 되나요")[0]
+    assert sec.intent == "warranty" and sec.template.data["coverage"] == "free"
+    assert "booking" in _cta_kinds(sec)            # 보증 수리 접수
+    assert "무상" in sec.template.data["message"]
 
 
-def test_escalation_gate_keeps_clean_on_fast_path(container):
-    orch = _orch(container)
-    for msg in _NO_ESCALATE:
-        d = orch.decide(msg)
-        assert d.escalate is False, f"불필요 에스컬레이션: {msg!r} → {d.reasons}"
+def test_booking_capability_lists_slots(container):
+    sec = _orch(container).registry["booking"].run(_ctx(container), "기사님 방문 예약하고 싶어요")[0]
+    assert sec.intent == "booking" and sec.template.kind == "booking"
+    assert sec.template.data["slots"]              # 가능 슬롯 초안
+    assert all(c.action == "commit" and c.kind == "booking" for c in sec.ctas)  # 커밋=확정
 
 
-def test_escalation_gate_flags_ambiguous(container):
-    orch = _orch(container)
-    for msg in _ESCALATE:
-        d = orch.decide(msg)
-        assert d.escalate is True, f"에스컬레이션 누락: {msg!r}"
-        assert d.reasons
+def test_explain_capability_uses_candidates(container):
+    ctx = _ctx(container)
+    ctx.write("candidates", ["prod_purifier_cube"])
+    sec = _orch(container).registry["explain"].run(ctx, "그거 소음이랑 가격 더 알려줘")[0]
+    assert sec.intent == "explain" and sec.template.kind == "recommendation_list"
+    assert any(p["id"] == "prod_purifier_cube" for p in sec.template.data["products"])
 
 
-def test_route_falls_back_to_rule_without_planner(container):
-    # LLM 플래너 미연결 → 에스컬레이션이어도 규칙 plan으로 폴백(홉 0, 동작 불변)
-    orch = _orch(container)
-    plan = orch.route(_ESCALATE[0])
-    assert orch.last_decision.escalate is True
-    assert isinstance(plan.capabilities, list)
+def test_clarify_capability_asks_back(container):
+    sec = _orch(container).registry["clarify"].run(_ctx(container), "이거 좀 어떻게 해줘")[0]
+    assert sec.intent == "clarify"
+    assert "select_device" in _cta_kinds(sec)      # 기기 빠른 선택지
 
 
-# ── LLM 플래너 연결(stub로 결정적 검증, 요구사항 4-1) ───────────────────────
+def test_advisory_catalog_includes_new_caps():
+    names = {c.name for c in advisory_catalog(build_registry())}
+    assert {"warranty", "booking", "explain", "clarify"} <= names
+    assert "order" not in names                    # 행동형은 여전히 제외
+
+
+# ── LLM 플래너 = 단일 라우터(ADR-0048, stub로 결정적 검증) ──────────────────
 class _StubPlanner:
     def __init__(self, caps):
         self.caps = caps
@@ -162,24 +154,38 @@ class _StubPlanner:
         return Plan(capabilities=list(self.caps))
 
 
-def test_route_uses_llm_planner_on_escalation(container):
+def test_planner_routes_every_query(container):
+    # 게이트 폐기 — 깨끗한 짧은 쿼리도 LLM 플래너를 거친다(ADR-0048)
     stub = _StubPlanner(["diagnose"])
     orch = CapabilityOrchestrator(container=container, classifier=RuleBasedClassifier(),
                                   llm_planner=stub)
-    # F1: 규칙은 device_status로 오분류하던 장문 → LLM이 diagnose로 교정
-    plan = orch.route("그 배수 필터 어떤 건지 한번 확인해서 가격이랑 같이 알려주세요")
+    orch.route("세탁기 물 안 빠져요")
     assert stub.calls == 1
-    assert plan.capabilities == ["diagnose"]
+
+
+def test_planner_routes_to_new_caps(container):
+    # F2 — LLM이 보증·예약으로 라우팅(목적지 capability 존재)
+    stub = _StubPlanner(["warranty", "booking"])
+    orch = CapabilityOrchestrator(container=container, classifier=RuleBasedClassifier(),
+                                  llm_planner=stub)
+    plan = orch.route("보증으로 무상 수리 되는지랑 기사 방문 예약도 가능한가요")
+    assert plan.capabilities == ["warranty", "booking"]
 
 
 def test_route_preserves_explicit_action_with_planner(container):
     stub = _StubPlanner(["diagnose"])
     orch = CapabilityOrchestrator(container=container, classifier=RuleBasedClassifier(),
                                   llm_planner=stub)
-    # 에스컬레이션 + 명시 주문 → LLM 조언형(diagnose) + 규칙 행동형(order) 병합
+    # LLM 조언형(diagnose) + 규칙 행동형(order) 병합
     plan = orch.route("보증 되는지랑 가격 알려주고 배수필터 주문해줘")
     assert "diagnose" in plan.capabilities and "order" in plan.capabilities
     assert plan.capabilities.index("diagnose") < plan.capabilities.index("order")  # 우선순위
+
+
+def test_route_falls_back_to_rule_without_planner(container):
+    # LLM 플래너 미연결 → 규칙 plan으로 폴백(오프라인·테스트 결정성)
+    plan = _orch(container).route("세탁기 물이 안 빠져요")
+    assert "diagnose" in plan.capabilities
 
 
 def test_route_planner_failure_falls_back(container):
@@ -191,15 +197,6 @@ def test_route_planner_failure_falls_back(container):
                                   llm_planner=_Boom())
     plan = orch.route("산 지 얼마 안 됐는데 보증으로 무상 수리되는지랑 예약 가능한지 알려줘")
     assert isinstance(plan.capabilities, list)   # 예외 없이 규칙 폴백
-
-
-def test_clean_query_skips_planner(container):
-    # 깨끗한 짧은 쿼리 → 에스컬레이션 안 함 → LLM 플래너 호출 0(홉 0)
-    stub = _StubPlanner(["diagnose"])
-    orch = CapabilityOrchestrator(container=container, classifier=RuleBasedClassifier(),
-                                  llm_planner=stub)
-    orch.route("세탁기에서 물이 안 빠져요")
-    assert stub.calls == 0
 
 
 # ── 봉투 패리티(요구사항 13) ────────────────────────────────────────────────

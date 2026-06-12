@@ -14,14 +14,16 @@ from .capability import Capability, Plan
 
 _SYSTEM = (
     "당신은 삼성 가전 AI 컨시어지의 '플래너'입니다. 사용자 메시지를 처리하려면 어떤 "
-    "'조언형 capability'를 어떤 순서로 실행할지 고르세요. 규칙:\n"
+    "조언형 capability를 어떤 순서로 실행할지 고르세요. 규칙:\n"
     "1) 반드시 주어진 후보 이름 중에서만 고릅니다(없는 이름 금지).\n"
-    "2) 주문·예약·결제 같은 '행동'은 고르지 않습니다 — 그건 사용자가 CTA로 직접 확정합니다.\n"
+    "2) '구매 커밋'(주문/결제)은 고르지 않습니다 — 사용자가 CTA로 확정합니다. 단 보증 안내·"
+    "예약 가능 시간 안내·상세 설명은 정보 제공이므로 고를 수 있습니다.\n"
     "3) 안전·진단(diagnose)을 먼저, 추천(recommend)을 뒤에 둡니다.\n"
     "4) 한 메시지에 여러 요청이 섞여 있으면 해당하는 capability를 모두 고릅니다.\n"
-    "5) 단순 잡담·범위 밖이면 general만 고릅니다.\n"
-    "6) 기기의 '현재 상태'를 묻는 게 아니라 고장·증상·가격·방법을 묻는 거면 "
-    "device_status가 아니라 diagnose를 고릅니다."
+    "5) 무엇을 원하는지 정말 불명확하면(중의적·정보 부족) clarify 하나만 고릅니다.\n"
+    "6) 단순 잡담·범위 밖이면 general만 고릅니다.\n"
+    "7) 기기의 '현재 상태'를 묻는 게 아니라 고장·증상·방법을 묻는 거면 device_status가 아니라 "
+    "diagnose를 고릅니다. 보증 여부는 warranty, 스펙·가격·비교는 explain을 고릅니다."
 )
 
 
@@ -47,7 +49,7 @@ def _schema(names: list[str]) -> dict:
 
 
 def _user_prompt(catalog: list[Capability], message: str) -> str:
-    desc = "\n".join(f"- {c.name}: 의도={'/'.join(c.intents)}" for c in catalog)
+    desc = "\n".join(f"- {c.name}: {c.desc or ('의도=' + '/'.join(c.intents))}" for c in catalog)
     return f"capability 후보:\n{desc}\n\n사용자 메시지:\n{message}"
 
 

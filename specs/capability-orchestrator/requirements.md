@@ -45,9 +45,9 @@
 **User Story:** 운영자로서, 플래너가 의도·맥락에 따라 조언형 capability를 동적 선택하되 안전하게 검증되기를 원한다.
 
 **수용기준:**
-1. WHEN 자유텍스트 턴이 들어오면 THEN 시스템은 LLM 플래너로 `Plan{steps:[{capability, depends_on, parallel_group}]}`을 제안해야 한다 (SHALL). 후보는 **조언형 capability**로 한정한다.
+1. WHEN 자유텍스트 턴이 들어오면 THEN 시스템은 **LLM 플래너를 단일 라우터로** `Plan{capabilities:[...]}`을 제안해야 한다 (SHALL). 후보는 **조언형 capability**로 한정한다. (에스컬레이션 게이트 없음 — 모든 질의 LLM 라우팅, [ADR-0048](../../docs/adr/0048-llm-planner-single-router.md))
 2. WHEN plan을 받으면 THEN 시스템은 룰로 검증 — 레지스트리 존재·사이클 금지·우선순위(안전·CS 먼저, [mvp-concierge/design.md](../mvp-concierge/design.md) §6.6)·**행동형 자동선택 차단** — 해야 한다 (SHALL).
-3. IF plan이 비었거나 무효면 THEN 시스템은 규칙 매핑으로 폴백해야 한다 (SHALL).
+3. IF LLM 플래너가 미연결·실패·빈 결과면 THEN 시스템은 **규칙 분류기 매핑으로 폴백**해야 한다 (SHALL). 규칙은 폴백 전용(오프라인·테스트 결정성 보장).
 4. IF 안전 의도(R23 위험)인데 plan에 진단/경고 capability가 없으면 THEN 시스템은 이를 **누락으로 보정**(필수 capability 강제 포함)해야 한다 (SHALL).
 5. WHEN 검증된 plan을 실행할 때 THEN 시스템은 `depends_on` 순서를 지키고 실행은 순차 유지해야 한다 (SHALL). ([ADR-0017](../../docs/adr/0017-intra-turn-parallelism-deferred.md))
 

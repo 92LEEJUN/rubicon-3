@@ -21,8 +21,10 @@ CORPUS = [
     ("C-T2(F2 설명/비교+주문)",
      "비스포크 큐브 그거 필터 교체나 소음이 어느 정도인지 더 알려주고, "
      "지금 우리 집 공기청정기 상태도 어떤지 같이 확인해주고, 헤파 필터도 같이 주문해주세요."),
-    ("clean 단일(홉0 기대)", "세탁기에서 물이 안 빠져요"),
-    ("clean 복합 J5(홉0 기대)",
+    ("warranty 단독", "이 냉장고 아직 보증 되나요? 무상으로 고칠 수 있어요?"),
+    ("clarify(모호)", "이거 좀 어떻게 해줘"),
+    ("clean 단일", "세탁기에서 물이 안 빠져요"),
+    ("clean 복합 J5",
      "세탁기 물 안 빠지는 거 해결법 알려주고, 냉장고 정수필터랑 공기청정기 HEPA 필터도 주문해줘"),
 ]
 
@@ -33,13 +35,11 @@ def main():
                                  llm_planner=LLMPlanner())
     for label, msg in CORPUS:
         rule_plan = rule_only.plan(msg).capabilities
-        routed = llm.route(msg).capabilities
-        dec = llm.last_decision
-        hop = f"🐢 홉({','.join(dec.reasons)})" if dec.escalate else "⚡ 홉0"
+        routed = llm.route(msg).capabilities   # 모든 질의 LLM 라우팅(ADR-0048)
         print("─" * 78)
-        print(f"[{label}] {hop}")
-        print(f"  규칙 plan : {rule_plan}")
-        print(f"  LLM  plan : {routed}" + ("   ← 교정" if routed != rule_plan else "   (동일)"))
+        print(f"[{label}]")
+        print(f"  규칙폴백 plan : {rule_plan}")
+        print(f"  LLM    plan : {routed}" + ("   ← 교정" if routed != rule_plan else "   (동일)"))
         # 실제 산출 섹션
         turn = llm.build_turn(msg, session_id=label)
         for s in turn.sections:

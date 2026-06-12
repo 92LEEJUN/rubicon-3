@@ -65,6 +65,7 @@ class Capability:
     emits: tuple[str, ...] = ()
     needs: tuple[str, ...] = ()
     priority: int = 2
+    desc: str = ""                      # LLM 플래너 프롬프트용 한 줄 설명
 
 
 # ── 수리 CTA 게이팅(요구사항 6·7) ───────────────────────────────────────────
@@ -184,18 +185,53 @@ def _cap_general(ctx: TurnCtx, message: str) -> list[MessageSection]:
     return handlers.handle_general(ctx.c, ctx.c.user, message)
 
 
+def _cap_warranty(ctx: TurnCtx, message: str) -> list[MessageSection]:
+    sections = handlers.handle_warranty(ctx.c, ctx.c.user, message)
+    for s in sections:
+        ctx.write("warranty_status", s.template.data.get("coverage"))
+    return sections
+
+
+def _cap_booking(ctx: TurnCtx, message: str) -> list[MessageSection]:
+    return handlers.handle_booking(ctx.c, ctx.c.user, message)
+
+
+def _cap_explain(ctx: TurnCtx, message: str) -> list[MessageSection]:
+    # 직전 추천 후보(blackboard)를 이어받아 상세/비교 설명(요구사항 5)
+    return handlers.handle_explain(ctx.c, ctx.c.user, message, candidates=ctx.read("candidates"))
+
+
+def _cap_clarify(ctx: TurnCtx, message: str) -> list[MessageSection]:
+    return handlers.handle_clarify(ctx.c, ctx.c.user, message)
+
+
 def build_registry() -> dict[str, Capability]:
     caps = [
         Capability("device_status", "advisory", "tool", ("device_status",), _cap_device_status,
-                   emits=("device_status",), priority=0),
+                   emits=("device_status",), priority=0,
+                   desc="기기의 '현재 상태/이상 여부'를 조회(연결·소모품·이상 신호)."),
         Capability("diagnose", "advisory", "tool", ("troubleshoot",), _cap_diagnose,
-                   emits=("required_parts", "risk_level", "warranty_status"), priority=1),
-        Capability("general", "advisory", "tool", ("general",), _cap_general, priority=2),
+                   emits=("required_parts", "risk_level", "warranty_status"), priority=1,
+                   desc="고장·증상·에러코드의 원인 진단 + 자가 해결 가이드 + 안전/부품 안내."),
+        Capability("warranty", "advisory", "tool", ("warranty",), _cap_warranty,
+                   emits=("warranty_status",), priority=1,
+                   desc="보증(유·무상) 여부 안내. '보증 되나요/무상 수리' 류."),
+        Capability("explain", "advisory", "tool", ("explain",), _cap_explain,
+                   needs=("candidates",), priority=2,
+                   desc="제품/추천의 스펙·가격·소음·비교 등 상세 설명. '더 알려줘/비교/얼마' 류."),
+        Capability("booking", "advisory", "tool", ("booking",), _cap_booking, priority=2,
+                   desc="방문 예약 가능 시간 안내(초안). '기사 예약/방문' 류. 커밋은 확정 CTA."),
+        Capability("general", "advisory", "tool", ("general",), _cap_general, priority=2,
+                   desc="일반 안내. 위 어디에도 안 맞는 단순 인사·범위 안내."),
+        Capability("clarify", "advisory", "tool", ("clarify",), _cap_clarify, priority=2,
+                   desc="요청이 모호하거나 무엇을 원하는지 불명확할 때 되묻기."),
         Capability("recommend", "advisory", "tool", ("recommend",), _cap_recommend,
-                   emits=("candidates",), priority=3),
+                   emits=("candidates",), priority=3,
+                   desc="새 제품 추천(개인화). '추천해줘/뭐가 좋아/새로 장만' 류."),
         # 행동형 — 플래너 자동선택 제외. 명시 order 의도 또는 CTA 회신으로만 진입. 초안만 산출.
         Capability("order", "action", "tool", ("order",), _cap_order,
-                   needs=("required_parts",), priority=4),
+                   needs=("required_parts",), priority=4,
+                   desc="부품/제품 주문 초안(커밋은 CTA 확정). 플래너 자동선택 금지."),
     ]
     return {c.name: c for c in caps}
 
@@ -237,62 +273,13 @@ def validate_plan(plan: Plan, intents: list[str], registry: dict[str, Capability
     return Plan(capabilities=kept)
 
 
-# ── 에스컬레이션 게이트(티어드 플래닝) ──────────────────────────────────────
-# 규칙 분류를 1차(홉 0)로 두고, "규칙이 부서질 신호"가 있을 때만 LLM 플래너로 올린다.
-# 목적: LLM 홉(레이턴시·비용)을 **꼭 필요한 장문·모호 턴에만** 지불(ADR-0047).
-#
-# 신호는 장문 검증 결함(test-findings F1·F2)에서 도출 — 규칙 분류기가 못 잡는 것들:
-#  · 미매핑 후속 의도(보증·예약·설명/비교/가격) → 해당 capability가 없어 누락/오라우팅(F2)
-#  · 약한 의도가 장문을 통째로 흡수(general/device_status만 잡힘, F1)
-#  · 접속사 많은데 단일 capability로 과소분할된 복합
-_WARRANTY_CUES = ("보증", "무상", "as 센터", "a/s", "에이에스")
-_BOOKING_CUES = ("예약", "기사님", "기사분", "방문 요청")
-_EXPLAIN_CUES = ("더 알려", "비교", "차이", "얼마", "가격", "왜 추천", "스펙")
-_CONJ_MARK = ("그리고", "또 ", "하고", "랑 ", "이랑 ", ",", "，")
-_SUBSTANTIVE_LEN = 45   # 이 이상이면 '장문' — 규칙 신뢰도 하락 구간
-
-
-@dataclass
-class EscalationDecision:
-    escalate: bool
-    reasons: list[str] = field(default_factory=list)
-
-    @property
-    def confidence(self) -> str:
-        return "low" if self.escalate else "high"
-
-
-def should_escalate(message: str, plan: Plan) -> EscalationDecision:
-    """규칙 plan을 LLM 플래너로 올릴지 결정(결정적). reasons로 근거를 남겨 측정 가능."""
-    t = message or ""
-    caps = set(plan.capabilities)
-    reasons: list[str] = []
-
-    # F2: 규칙에 매핑 안 된 후속 의도 단서 → capability 부재로 누락/오라우팅
-    if any(k in t for k in _WARRANTY_CUES):
-        reasons.append("warranty_cue")
-    if any(k in t for k in _BOOKING_CUES):
-        reasons.append("booking_cue")
-    if any(k in t for k in _EXPLAIN_CUES):
-        reasons.append("explain_cue")
-
-    # F1: 장문인데 약한 의도(general/device_status)만 잡힘 → 본의도 흡수 가능성
-    if len(t) >= _SUBSTANTIVE_LEN and caps and caps <= {"general", "device_status"}:
-        reasons.append("weak_capture")
-
-    # 접속사 많은 장문이 단일 capability로 과소분할
-    conj = sum(t.count(m) for m in _CONJ_MARK)
-    if conj >= 2 and len(caps) <= 1 and len(t) >= _SUBSTANTIVE_LEN:
-        reasons.append("compound_undersplit")
-
-    return EscalationDecision(escalate=bool(reasons), reasons=reasons)
-
-
 # ── 오케스트레이터 ───────────────────────────────────────────────────────────
 class CapabilityOrchestrator:
-    """capability 레지스트리 기반 결정적 오케스트레이터(ADR-0043·0046 1차 골격).
+    """capability 레지스트리 기반 오케스트레이터(ADR-0043·0046·0048).
 
-    core.Orchestrator와 동일한 §2.1 봉투를 내며, 세션 블랙보드로 멀티턴 carry를 지원한다.
+    **LLM 플래너를 모든 질의의 단일 라우터로** 둔다(ADR-0048, 게이트 폐기). 규칙 분류기는
+    LLM 플래너 미연결·실패 시의 폴백으로만 쓴다. core.Orchestrator와 동일한 §2.1 봉투를
+    내며, 세션 블랙보드로 멀티턴 carry를 지원한다.
     """
 
     def __init__(self, container: Optional[Container] = None,
@@ -302,30 +289,22 @@ class CapabilityOrchestrator:
         self.classifier = classifier or RuleBasedClassifier()
         self.registry = build_registry()
         self._sessions: dict[str, dict] = {}   # session_id → 지속 슬롯
-        # 티어드 플래닝 — 규칙 1차, 에스컬레이션 신호일 때만 LLM 플래너로(없으면 규칙 폴백).
-        self.llm_planner = llm_planner
-        self.last_decision: Optional[EscalationDecision] = None
+        self.llm_planner = llm_planner          # 단일 라우터(없으면 규칙 폴백)
 
     def _ordered_intents(self, message: str) -> list[str]:
         result = self.classifier.classify(message)
         return sorted(result.intents, key=lambda i: _PRIORITY.get(i, 9))
 
-    def decide(self, message: str) -> EscalationDecision:
-        """이 턴이 LLM 플래너 홉을 지불해야 하는지 판정(측정 가능, ADR-0047)."""
-        return should_escalate(message, self.plan(message))
-
     def plan(self, message: str) -> Plan:
+        """규칙 폴백 plan — LLM 플래너 미연결·실패 시에만 사용."""
         intents = self._ordered_intents(message)
         return validate_plan(rule_plan(intents, self.registry), intents, self.registry)
 
     def route(self, message: str) -> Plan:
-        """규칙 plan 산출 → 에스컬레이션 판정. 신호가 있고 LLM 플래너가 붙어 있으면 LLM이 고른
-        조언형 plan을 쓰되 **명시 행동(order 등)은 규칙에서 보존**한다. 실패 시 규칙 폴백(홉 0).
-        판정은 last_decision에 기록한다."""
+        """**모든 질의를 LLM 플래너로 라우팅**(ADR-0048). LLM은 조언형을 고르고, 명시 행동(order)은
+        규칙 plan에서 보존·병합한다. 플래너 미연결·실패·빈 결과면 규칙 plan으로 폴백(요구사항 14-2)."""
         rule = self.plan(message)
-        decision = should_escalate(message, rule)
-        self.last_decision = decision
-        if decision.escalate and self.llm_planner is not None:
+        if self.llm_planner is not None:
             try:
                 intents = self._ordered_intents(message)
                 proposed = self.llm_planner.propose(advisory_catalog(self.registry), message)

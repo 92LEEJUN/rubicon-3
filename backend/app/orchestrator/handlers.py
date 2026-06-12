@@ -15,6 +15,10 @@ LABELS = {
     "order": "부품 주문",
     "recommend": "추천",
     "general": "안내",
+    "warranty": "보증 안내",
+    "booking": "방문 예약",
+    "explain": "상세 설명",
+    "clarify": "확인",
 }
 
 # 부품 키워드 → id(데모용 엔티티 해석; 실 전환 시 NER/LLM)
@@ -132,6 +136,74 @@ def handle_general(c: Container, user: User, message: str) -> list[MessageSectio
         label=LABELS["general"], intent="general",
         template=Template(kind="text", data={
             "message": "가전 상태 점검·문제 해결·부품 주문을 도와드릴 수 있어요. 무엇을 도와드릴까요?"}))]
+
+
+def handle_warranty(c: Container, user: User, message: str) -> list[MessageSection]:
+    """보증(유·무상) 안내 — 해결책 coverage 기반(R22). 무상이면 보증 수리 접수로 안내."""
+    sol = c.knowledge.best_solution(message)
+    coverage = sol.coverage if sol else "unknown"
+    if coverage == "free":
+        msg = "확인해 보니 보증 기간 내 무상 수리 대상으로 보여요. 비용 없이 점검·수리를 받으실 수 있어요."
+        ctas = [Cta(label="보증 수리 접수", action="chat", kind="booking", payload={"visit_type": "REPAIR"}),
+                Cta(label="상담원 연결", action="chat", kind="handoff")]
+    elif coverage == "paid":
+        msg = "보증 범위 밖(유상)일 수 있어요. 정확한 비용은 상담원이 확인해 드릴게요."
+        ctas = [Cta(label="상담원 연결", action="chat", kind="handoff")]
+    else:
+        msg = "보증 여부는 모델·구매 정보로 확인이 필요해요. 상담원이 정확히 안내해 드릴게요."
+        ctas = [Cta(label="상담원 연결", action="chat", kind="handoff")]
+    return [MessageSection(
+        label=LABELS["warranty"], intent="warranty",
+        template=Template(kind="text", data={"message": msg, "coverage": coverage}),
+        ctas=ctas)]
+
+
+def handle_booking(c: Container, user: User, message: str) -> list[MessageSection]:
+    """방문 예약 — 가능 슬롯을 초안으로 제시(R18). 커밋은 ActionGate(확정 CTA)."""
+    slots = c.handoff.list_slots("REPAIR")
+    ctas = [Cta(label="이 시간 예약", action="commit", kind="booking", payload={"slot_id": s.id})
+            for s in slots[:3]]
+    if not ctas:
+        ctas = [Cta(label="상담원 연결", action="chat", kind="handoff")]
+    return [MessageSection(
+        label=LABELS["booking"], intent="booking",
+        template=Template(kind="booking", data={
+            "visit_type": "REPAIR",
+            "slots": [s.model_dump(mode="json") for s in slots]}),
+        ctas=ctas)]
+
+
+def handle_explain(c: Container, user: User, message: str,
+                   candidates: list[str] | None = None) -> list[MessageSection]:
+    """제품/추천 상세 설명·비교 — 직전 추천 후보(blackboard)나 개인화 추천의 스펙·근거를 제시."""
+    items = c.recommendation.recommend(user)
+    cand = set(candidates or [])
+    chosen = [it for it in items if (not cand or it.product.id in cand)]
+    if not chosen:
+        return [MessageSection(
+            label=LABELS["explain"], intent="explain",
+            template=Template(kind="text", data={
+                "message": "어떤 제품·부품을 더 알려드릴까요? 모델명이나 알고 싶은 점(소음·가격·필터 등)을 알려주세요."}),
+            handled=False)]
+    return [MessageSection(
+        label=LABELS["explain"], intent="explain",
+        template=Template(kind="recommendation_list", data={
+            "products": [{**it.product.model_dump(mode="json"), "reason": it.reason} for it in chosen],
+            "personalized": chosen[0].personalized,
+            "detail": True}),
+        ctas=[Cta(label="장바구니", action="commit", kind="order",
+                  payload={"product_ids": [it.product.id for it in chosen]})])]
+
+
+def handle_clarify(c: Container, user: User, message: str) -> list[MessageSection]:
+    """모호·범위 불명확 — 되묻기(어느 기기·어떤 증상). 보유 기기를 빠른 선택지로 제시."""
+    devices = c.device.list_devices()
+    return [MessageSection(
+        label=LABELS["clarify"], intent="clarify",
+        template=Template(kind="text", data={
+            "message": "어떤 기기의 어떤 점이 궁금하신지 알려주시면 정확히 도와드릴게요."}),
+        ctas=[Cta(label=d.type, action="chat", kind="select_device", payload={"device_id": d.id})
+              for d in devices[:3]])]
 
 
 DISPATCH = {

@@ -4,6 +4,7 @@
 환경변수 LLM_MODEL 로 교체 가능. 키는 OPENAI_API_KEY 환경변수에서만 읽는다(코드/저장소에 두지 않음).
 """
 import os
+import asyncio
 import random
 import threading
 import time
@@ -23,6 +24,8 @@ _SEM = threading.BoundedSemaphore(_MAX_CONCURRENCY)
 _RETRY_DELAYS = (0.5, 1.0, 2.0, 4.0)  # 지수 백오프(+지터)
 
 _client = None
+_async_client = None
+_async_sem = None
 
 
 def get_client():
@@ -37,17 +40,27 @@ def get_client():
     return _client
 
 
-def chat_completion(**kwargs):
-    """Phase A LLM 호출 래퍼 — 동시성 세마포어 + 일시적 오류(429/5xx/타임아웃) 지수 백오프+지터.
+def get_async_client():
+    """AsyncOpenAI 클라이언트 지연 생성 — 비동기 서빙 경로(이벤트 루프 비차단)용."""
+    global _async_client
+    if _async_client is None:
+        from openai import AsyncOpenAI
+        _async_client = AsyncOpenAI()
+    return _async_client
 
-    멀티에이전트/툴루프의 모든 LLM 호출을 이 래퍼로 통일해 동시성·레이트리밋을 한 곳에서 제어한다.
-    """
+
+def _transient_errors():
+    """일시적(재시도 대상) 오류 튜플 — 429/타임아웃/연결/5xx."""
     try:
         from openai import APIConnectionError, APITimeoutError, InternalServerError, RateLimitError
-        transient = (RateLimitError, APITimeoutError, APIConnectionError, InternalServerError)
+        return (RateLimitError, APITimeoutError, APIConnectionError, InternalServerError)
     except Exception:  # SDK 버전 차이 대비
-        transient = (Exception,)
+        return (Exception,)
 
+
+def chat_completion(**kwargs):
+    """Phase A 동기 LLM 래퍼 — 동시성 세마포어 + 일시적 오류 지수 백오프+지터(스레드 컨텍스트용)."""
+    transient = _transient_errors()
     last = None
     with _SEM:  # 동시 호출 상한
         for attempt in range(len(_RETRY_DELAYS) + 1):
@@ -58,4 +71,32 @@ def chat_completion(**kwargs):
                 if attempt == len(_RETRY_DELAYS):
                     raise
                 time.sleep(_RETRY_DELAYS[attempt] * (1 + random.random() * 0.3))
+    raise last  # pragma: no cover
+
+
+def _get_async_sem() -> asyncio.Semaphore:
+    """async 동시성 세마포어 — 실행 중 이벤트 루프에 지연 바인딩(서빙 단일 루프)."""
+    global _async_sem
+    if _async_sem is None:
+        _async_sem = asyncio.Semaphore(_MAX_CONCURRENCY)
+    return _async_sem
+
+
+async def achat_completion(**kwargs):
+    """Phase A 비동기 LLM 래퍼 — 동시성 세마포어 + 일시적 오류 지수 백오프+지터.
+
+    비동기 서빙 경로(`/internal/turn`)가 LLM I/O 대기 동안 이벤트 루프를 비우도록 한다
+    (스레드-당-턴 점유 제거 → 동시 처리량↑). 실행은 순차 유지(출력 동일).
+    """
+    transient = _transient_errors()
+    last = None
+    async with _get_async_sem():  # 동시 호출 상한
+        for attempt in range(len(_RETRY_DELAYS) + 1):
+            try:
+                return await get_async_client().chat.completions.create(**kwargs)
+            except transient as exc:  # 일시적 → 백오프 재시도
+                last = exc
+                if attempt == len(_RETRY_DELAYS):
+                    raise
+                await asyncio.sleep(_RETRY_DELAYS[attempt] * (1 + random.random() * 0.3))
     raise last  # pragma: no cover

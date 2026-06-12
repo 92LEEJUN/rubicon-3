@@ -3,11 +3,12 @@
 OpenAI function calling으로 tool을 자유 호출하는 프로토타입 경로. 실제 내부 API는
 `core.Orchestrator`(결정적 섹션 생성, 테스트 가능)를 쓴다. 본 모듈은 CLI 데모에 한정한다.
 """
+import asyncio
 import json
 import uuid
-from typing import Iterator, Optional
+from typing import AsyncIterator, Optional
 
-from ..llm import MODEL, get_client
+from ..llm import MODEL, achat_completion, get_client
 from ..tools import TOOLS, call
 
 SYSTEM = (
@@ -56,8 +57,22 @@ def classify(user_message: str) -> dict:
     return json.loads(resp.choices[0].message.content)
 
 
-def run(user_message: str, max_steps: int = 6, verbose: bool = True) -> str:
-    intent = classify(user_message)
+async def aclassify(user_message: str) -> dict:
+    """① 의도 분류·분해 (구조화 출력) — 비동기."""
+    resp = await achat_completion(
+        model=MODEL,
+        messages=[
+            {"role": "system", "content": "사용자 입력의 의도를 분류·분해한다."},
+            {"role": "user", "content": user_message},
+        ],
+        response_format=INTENT_SCHEMA,
+    )
+    return json.loads(resp.choices[0].message.content)
+
+
+async def arun(user_message: str, max_steps: int = 6, verbose: bool = False) -> str:
+    """LLM tool-loop — 비동기(서빙 경로). 실행은 순차 유지(출력 동일)."""
+    intent = await aclassify(user_message)
     if verbose:
         print(f"[의도] {intent}")
 
@@ -65,13 +80,13 @@ def run(user_message: str, max_steps: int = 6, verbose: bool = True) -> str:
                 {"role": "user", "content": user_message}]
 
     for _ in range(max_steps):
-        resp = get_client().chat.completions.create(
+        resp = await achat_completion(
             model=MODEL, messages=messages, tools=TOOLS, tool_choice="auto",
         )
         msg = resp.choices[0].message
         if not msg.tool_calls:
             return msg.content or ""
-        # 도구 호출 → Mock 실행 → 결과 회신
+        # 도구 호출 → Mock 실행 → 결과 회신 (tool은 결정적·즉시)
         messages.append(msg.model_dump(exclude_none=True))
         for tc in msg.tool_calls:
             args = json.loads(tc.function.arguments or "{}")
@@ -83,19 +98,24 @@ def run(user_message: str, max_steps: int = 6, verbose: bool = True) -> str:
                 "content": json.dumps(result, ensure_ascii=False),
             })
     # 루프 한계 — 마지막 한 번 더 생성
-    final = get_client().chat.completions.create(model=MODEL, messages=messages)
+    final = await achat_completion(model=MODEL, messages=messages)
     return final.choices[0].message.content or ""
 
 
-def stream_turn(message: str, screen_context: Optional[dict] = None) -> Iterator[dict]:
-    """LLM 자연어 답변 경로 — api-contract §2.1 봉투(delta → done).
+def run(user_message: str, max_steps: int = 6, verbose: bool = True) -> str:
+    """CLI 동기 진입점 — 내부 비동기 tool-loop을 실행(루프 외부 호출 전제)."""
+    return asyncio.run(arun(user_message, max_steps=max_steps, verbose=verbose))
+
+
+async def astream_turn(message: str, screen_context: Optional[dict] = None) -> AsyncIterator[dict]:
+    """LLM 자연어 답변 경로(비동기) — api-contract §2.1 봉투(delta → done).
 
     tool-loop으로 근거(기기·해결·부품 Mock)를 모아 자연어 답변을 생성하고,
     텍스트를 `delta` 청크로 흘린 뒤 `done`으로 종료한다(실패 시 error 폴백, R13).
     `core.Orchestrator.stream_turn`(결정적 섹션)과 동일한 봉투 계약을 따른다.
     """
     try:
-        answer = run(message, verbose=False)
+        answer = await arun(message, verbose=False)
     except Exception as exc:  # 전체 폴백(R13) — 대화 중단 금지
         yield {"type": "error", "code": "orchestrator_error",
                "fallback": {"kind": "text",

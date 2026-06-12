@@ -23,7 +23,14 @@ _SYSTEM = (
     "5) 무엇을 원하는지 정말 불명확하면(중의적·정보 부족) clarify 하나만 고릅니다.\n"
     "6) 단순 잡담·범위 밖이면 general만 고릅니다.\n"
     "7) 기기의 '현재 상태'를 묻는 게 아니라 고장·증상·방법을 묻는 거면 device_status가 아니라 "
-    "diagnose를 고릅니다. 보증 여부는 warranty, 스펙·가격·비교는 explain을 고릅니다."
+    "diagnose를 고릅니다. 보증 여부는 warranty, 스펙·가격·비교는 explain을 고릅니다.\n"
+    "8) 최소 집합 원칙: 메시지가 명시적으로 요청한 capability만 고릅니다. 메시지의 각 요청 문구를 "
+    "그에 대응하는 capability 하나에만 매핑하고, 어떤 요청 문구에도 직접 대응하지 않는 capability는 "
+    "절대 추가하지 않습니다. 특히 recommend·general·explain·booking 등은 사용자가 그 행위를 "
+    "명시적으로 요청했을 때만 고릅니다(예: '추천'이라는 말이 없으면 recommend 금지, '예약/방문'이라는 "
+    "말이 없으면 booking 금지). 추가하면 더 도움이 될 것 같다는 이유로 capability를 덧붙이지 않습니다. "
+    "예) '고장 해결법 알려주고 필터도 주문해줘' → diagnose·order만 (recommend·explain·general·booking "
+    "넣지 않음). 확신이 없으면 더 적게 고릅니다."
 )
 
 

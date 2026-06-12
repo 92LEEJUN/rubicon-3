@@ -16,7 +16,7 @@ from __future__ import annotations
 
 import uuid
 from dataclasses import dataclass, field
-from typing import Callable, Iterator, Literal, Optional
+from typing import AsyncIterator, Callable, Iterator, Literal, Optional
 
 from ..container import Container, build_container
 from ..domain import AssistantTurn, Cta, MessageSection
@@ -319,12 +319,38 @@ class CapabilityOrchestrator:
                 pass   # 플래너 실패 → 규칙 폴백(요구사항 14-2)
         return rule
 
-    def build_turn(self, message: str, session_id: str = "s1",
-                   screen_context: Optional[dict] = None) -> AssistantTurn:
-        session = self._sessions.setdefault(session_id, {})
-        ctx = TurnCtx(self.c, session)
-        plan = self.route(message)
+    def _merge_advisory_actions(self, advisory: list[str], rule: Plan) -> list[str]:
+        """LLM 조언형 + 규칙 plan의 명시 행동(order)을 우선순위 정렬로 병합(route/aroute 공통)."""
+        actions = [n for n in rule.capabilities if self.registry[n].cls == "action"]
+        names = advisory + [a for a in actions if a not in advisory]
+        names.sort(key=lambda n: self.registry[n].priority)
+        return names
 
+    async def aroute(self, message: str) -> Plan:
+        """route()의 비동기 버전 — 플래너에 apropose 코루틴이 있으면 await로 라우팅(ADR-0048).
+
+        병합 로직은 sync route()와 동일(LLM 조언형 + 규칙 명시 행동, 우선순위 정렬). 플래너가
+        apropose를 갖지 않거나 예외/빈 결과면 sync route()로 폴백(요구사항 14-2)."""
+        if self.llm_planner is not None and hasattr(self.llm_planner, "apropose"):
+            rule = self.plan(message)
+            try:
+                intents = self._ordered_intents(message)
+                proposed = await self.llm_planner.apropose(advisory_catalog(self.registry), message)
+                advisory = validate_plan(proposed, intents, self.registry).capabilities
+                names = self._merge_advisory_actions(advisory, rule)
+                if names:
+                    return Plan(capabilities=names)
+            except Exception:
+                pass   # 플래너 실패 → 규칙 폴백(요구사항 14-2)
+            return rule
+        # apropose 없음(또는 플래너 미연결) → sync route(propose/규칙 폴백)로 위임
+        return self.route(message)
+
+    def _run_capabilities(self, plan: Plan, ctx: TurnCtx, message: str,
+                          session: dict) -> list[MessageSection]:
+        """plan의 capability를 순차 실행하고 세션 carry를 갱신한다(build_turn/astream 공통).
+
+        capability handler는 동기(결정적)이므로 그대로 호출한다."""
         sections: list[MessageSection] = []
         for name in plan.capabilities:
             sections.extend(self.registry[name].run(ctx, message))
@@ -333,6 +359,15 @@ class CapabilityOrchestrator:
         for slot in ("required_parts", "candidates"):
             if slot in ctx.turn:
                 session[slot] = ctx.turn[slot]
+        return sections
+
+    def build_turn(self, message: str, session_id: str = "s1",
+                   screen_context: Optional[dict] = None) -> AssistantTurn:
+        session = self._sessions.setdefault(session_id, {})
+        ctx = TurnCtx(self.c, session)
+        plan = self.route(message)
+
+        sections = self._run_capabilities(plan, ctx, message, session)
 
         active_flow = "troubleshoot" if any(s.intent == "troubleshoot" for s in sections) else None
         return AssistantTurn(sections=sections, active_flow=active_flow,
@@ -353,3 +388,31 @@ class CapabilityOrchestrator:
             yield {"type": "section", "section": section.model_dump(mode="json")}
         yield {"type": "flow", "active_flow": turn.active_flow}
         yield {"type": "done", "message_id": turn.message_id}
+
+    async def astream(self, message: str, session_id: str = "s1",
+                      screen_context: Optional[dict] = None) -> AsyncIterator[dict]:
+        """stream_turn의 비동기 버전 — aroute(LLM-planner)로 플래닝 후 §2.1 봉투를 방출한다.
+
+        section* → flow → done(실패 시 error). sync stream_turn과 동일 봉투·세션 carry.
+
+        한계: 본 구현은 '결정적-섹션-우선 스트리밍'을 capability가 끝나는 즉시 섹션을
+        방출하는 수준으로만 한다. 완전한 speculative pre-paint(추정 선-렌더)는 범위 밖이다.
+        capability handler는 동기(결정적)이므로 await 없이 그대로 호출한다."""
+        try:
+            session = self._sessions.setdefault(session_id, {})
+            ctx = TurnCtx(self.c, session)
+            plan = await self.aroute(message)
+            sections = self._run_capabilities(plan, ctx, message, session)
+            active_flow = "troubleshoot" if any(
+                s.intent == "troubleshoot" for s in sections) else None
+            message_id = f"msg_{uuid.uuid4().hex[:8]}"
+        except Exception as exc:   # 전체 폴백(R13) — stream_turn과 동일 error 봉투
+            yield {"type": "error", "code": "orchestrator_error",
+                   "fallback": {"kind": "text",
+                                "data": {"message": "일시적인 문제가 발생했어요. 잠시 후 다시 시도해 주세요."}},
+                   "detail": str(exc)}
+            return
+        for section in sections:
+            yield {"type": "section", "section": section.model_dump(mode="json")}
+        yield {"type": "flow", "active_flow": active_flow}
+        yield {"type": "done", "message_id": message_id}

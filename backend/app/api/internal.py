@@ -55,12 +55,40 @@ def _multiagent() -> bool:
     return os.getenv("MULTIAGENT", "").strip().lower() in ("1", "true", "yes", "on")
 
 
+def _capability_orch() -> bool:
+    """capability 오케스트레이터 경로 토글(§9.2) — 매 호출 평가, 기본 off.
+
+    on이면 결정적/멀티에이전트 경로 대신 CapabilityOrchestrator.astream으로 라우팅한다.
+    LLM_BACKED on이면 LLM 플래너(apropose)로, off면 규칙 폴백으로 동작한다."""
+    return os.getenv("CAPABILITY_ORCH", "").strip().lower() in ("1", "true", "yes", "on")
+
+
+# 모듈 로드 시 1회 구성(_orch와 동일 패턴). LLM_BACKED 평가는 _stream_turn에서 매 호출.
+def _build_cap_orch():
+    from ..orchestrator.capability import CapabilityOrchestrator
+    from ..orchestrator.planner import LLMPlanner
+    planner = LLMPlanner() if _llm_backed() else None
+    return CapabilityOrchestrator(container=_container, llm_planner=planner)
+
+
+_cap_orch = None   # 첫 CAPABILITY_ORCH 요청 시 lazy 구성(LLM_BACKED 토글 반영)
+
+
 async def _stream_turn(text: str, screen_context: dict | None) -> AsyncIterator[dict]:
-    """턴 스트림 디스패치(비동기) — 세 경로:
+    """턴 스트림 디스패치(비동기):
+    ⓪ CAPABILITY_ORCH on → CapabilityOrchestrator.astream(LLM-planner 라우팅, §9.2)
     ① LLM_BACKED off → 결정적 섹션(core.Orchestrator)
     ② LLM_BACKED on, MULTIAGENT off → 단일 tool-loop(legacy)
-    ③ LLM_BACKED on, MULTIAGENT on → 슈퍼바이저-워커(runtime)."""
-    if _llm_backed():
+    ③ LLM_BACKED on, MULTIAGENT on → 슈퍼바이저-워커(runtime).
+
+    CAPABILITY_ORCH off(기본)면 ①~③ 기존 디스패치가 오늘과 정확히 동일하게 동작한다."""
+    if _capability_orch():
+        global _cap_orch
+        if _cap_orch is None:
+            _cap_orch = _build_cap_orch()
+        async for chunk in _cap_orch.astream(text, screen_context=screen_context):
+            yield chunk
+    elif _llm_backed():
         memory = _container.companion.context(_container.user.id)  # 이어가기 주입(§0.4)
         if _multiagent():
             from ..orchestrator.runtime import astream_multiagent

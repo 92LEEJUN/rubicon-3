@@ -22,13 +22,15 @@
 | **Supervisor** | intent 분해·우선순위·위임·최종 조립 | (분류 구조화 출력) | R7·§6.6 |
 | **Diagnosis(진단)** | 기기 상태 + 증상→해결책(RAG) | `get_device_status`·`search_solutions` | R2·R3·R16 |
 | **Commerce(커머스)** | 부품 매칭 + 주문 초안(커밋=ActionGate) | `match_parts`·`create_order`(게이트) | R4·R17 |
+| **Recommend(추천)** | 자연어 need 이해 → 후보 비교·근거 설명 (ADR-0044) | `recommend`·`match_parts` | R8 |
 | **Review(크리틱·조건부)** | 안전·근거·정책 검수 | — | R23·R16·llm-policy |
 
-**tool (에이전트 아님)** — `get_recommendations`(R8)·`booking_slots`/`create_booking`(R18)·`get_history`(R12)·DB 조회.
-→ **추천·핸드오프·이력은 전용 에이전트 없이 Supervisor가 직접 tool 호출**(단순 조회·게이트라 추론 루프 불필요).
+**tool (에이전트 아님)** — `booking_slots`/`create_booking`(R18)·`get_history`(R12)·DB 조회.
+→ **핸드오프·이력은 전용 에이전트 없이 직접 tool 호출**(결정적 조회·게이트라 추론 루프 불필요).
 
-> "중간" 선택 이유 — 다단계 추론이 필요한 **진단·커머스만 에이전트**로 두어 LLM 홉/비용을 억제하고,
-> 결정적 성격(추천·예약·이력)은 tool로 처리.
+> 그래뉼래리티 = **1b + Recommend**(ADR-0044) — 진단·커머스에 더해 **추천**도 agent.
+> 자연어 추천(need 추론·비교·"왜?")은 비결정적 reasoning이 필요해 tool 단발로는 약하다(ADR-0044 기각 A).
+> 단 **선택의 grounding은 결정적 tool**(`recommend`)로 환각 방지. 핸드오프·이력은 결정적이라 tool 유지.
 
 ## 3. 리뷰/크리틱 — 조건부 게이트 (확정)
 
@@ -81,6 +83,7 @@
 | `supervisor` | 의도 분해·우선순위·위임·조립(handled/unhandled) | 도메인 직접 추론·위임 없는 결론 | 위임 계획(구조화) |
 | `diagnosis` | 상태 조회 + 해결책 RAG + 출처 + 부품 식별 | 근거 없는 해결책·위험 셀프수리 유도·주문 실행 | device_status·guide_steps(+required_parts) |
 | `commerce` | 부품 매칭 + 주문 초안(ActionGate) + 품절 폴백 | 가격/재고 지어내기·무확인 커밋 | product_card·order_summary·confirmation |
+| `recommend` | 자연어 need 이해 + 후보 비교·근거 설명 | 가격/사양 날조·근거없는 추천·예산초과 강권 | recommendation_list(근거) |
 | `review` | (조건부) 안전·근거·정책 검수 | 새 사실 생성·무리한 재생성 | {pass, issues, action} |
 
 > 발동·라우팅 임계(리뷰 조건, 모델 라우팅)는 구현 단계에서 확정(operations §14, orchestration §10).
@@ -93,14 +96,14 @@
 사용자 입력
  → Orchestrator(planner): 의도 분해 + 우선순위(§6.6)
  → capability 선택·실행   [균일 인터페이스 call(input) → result]
-      agent : Diagnosis(상태+RAG) · Commerce(매칭+주문초안)
-      tool  : Recommend(RecommendationService) · O2O(Store/Quote) · Handoff(booking) · History
+      agent : Diagnosis(상태+RAG) · Commerce(매칭+주문초안) · Recommend(자연어 추천, ADR-0044)
+      tool  : recommend(grounding) · O2O(Store/Quote) · Handoff(booking) · History
       의존(진단 required_parts → 커머스)은 순차, 독립은 병렬 후보(ADR-0017 보류)
  → Merge(하이브리드): 결정적 섹션 우선순위 스택 + 얇은 LLM 연결문구
  → 조건부 Review(안전 R23·커밋 R17·불확실 R16) → done(빠른 결정적 섹션 먼저)
 ```
 
-- **그래뉼래리티 = 1b**(§2 재확인) — 다단계 추론이 필요한 **진단·커머스만 agent**. 추천·O2O·핸드오프·이력은 내부가 **결정적 서비스**라 tool(감싸면 LLM 홉만↑).
+- **그래뉼래리티 = 1b + Recommend**(§2, ADR-0044) — 진단·커머스에 더해 **추천**도 agent(자연어 need 추론·비교·설명). 단 추천의 **선택(랭킹·필터)은 결정적 tool**(`recommend`)로 grounding. O2O·핸드오프·이력은 결정적이라 tool 유지.
 - **병합 = 하이브리드(2c)** — 근거(섹션 데이터)는 결정적으로 보존하고, **연결문구(인트로/전환)만 LLM**. 결정적 병합(2a)의 무환각·근거보존 + 자연어 흐름을 절충(2b 신서사이저의 환각·지연 회피).
 - **통합** — `core.Orchestrator`(결정적 섹션 백본)가 capability+merge의 골격, `runtime`의 LLM 워커는 그 위의 agent capability. `LLM_BACKED`/`MULTIAGENT` 토글은 "어떤 capability가 LLM-backed인가"로 수렴(후속 리팩터).
 - 근거·후보안·기각: **ADR-0043**.

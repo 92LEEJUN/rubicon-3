@@ -22,6 +22,14 @@ def _search_solutions(query: str, error_code: str | None = None) -> dict:
 def _match_parts(device_model: str | None = None, part_ids: list[str] | None = None) -> dict:
     return _catalog.match_parts(device_model, part_ids).model_dump(mode="json")
 
+
+def _recommend(category: str | None = None, budget: int | None = None) -> dict:
+    """추천 후보 제품 조회(가격·사양 근거). Recommend 에이전트의 grounding tool."""
+    products = _catalog.recommend([category] if category else [])
+    if budget:
+        products = [p for p in products if p.price <= budget]
+    return {"count": len(products), "products": [p.model_dump(mode="json") for p in products]}
+
 TOOLS = [
     {
         "type": "function",
@@ -66,12 +74,27 @@ TOOLS = [
             },
         },
     },
+    {
+        "type": "function",
+        "function": {
+            "name": "recommend",
+            "description": "카탈로그에서 추천 후보 제품(가격·사양)을 조회한다. 제품 추천/구매 상담 시 호출. 자연어 필요를 category·budget으로 좁혀 호출한다.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "category": {"type": "string", "description": "제품 카테고리 (예: air_purifier, washer, refrigerator)"},
+                    "budget": {"type": "integer", "description": "예산 상한(원, 있으면)"},
+                },
+            },
+        },
+    },
 ]
 
 DISPATCH = {
     "get_device_status": _get_device_status,
     "search_solutions": _search_solutions,
     "match_parts": _match_parts,
+    "recommend": _recommend,
 }
 
 

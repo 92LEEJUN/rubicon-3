@@ -693,14 +693,15 @@ flowchart TD
   IN["사용자 입력"] --> ORCH["Orchestrator(planner)<br/>의도 분해·우선순위(§6.6)"]
   ORCH --> DIAG["agent: Diagnosis<br/>상태+RAG"]
   ORCH --> COMM["agent: Commerce<br/>매칭+주문초안"]
-  ORCH --> TREC["tool: Recommend"]
+  ORCH --> AREC["agent: Recommend<br/>자연어 추천(ADR-0044)"]
+  AREC --> TREC["tool: recommend<br/>(grounding)"]
   ORCH --> TO2O["tool: O2O(Store/Quote)"]
   ORCH --> THAND["tool: Handoff"]
   ORCH --> THIST["tool: History"]
   DIAG -. required_parts .-> COMM
   DIAG --> MERGE
   COMM --> MERGE
-  TREC --> MERGE
+  AREC --> MERGE
   TO2O --> MERGE
   THAND --> MERGE
   THIST --> MERGE

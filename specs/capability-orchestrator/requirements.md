@@ -38,6 +38,7 @@
 2. IF 응답이 되돌릴 수 없는 행동(주문·예약·기사 접수)을 포함하면 THEN 시스템은 **CTA 확정 회신 + ActionGate(R17/409)** 를 거치기 전에 실행하지 않아야 한다 (SHALL). ([ADR-0033](../../docs/adr/0033-action-gate.md))
 3. WHEN 행동 CTA 확정 회신을 받으면 THEN 시스템은 LLM 플래너를 거치지 않고 **payload(action·id) 기반으로 결정적으로** 해당 행동 capability + ActionGate로 라우팅해야 한다 (SHALL).
 4. IF 사용자가 자유텍스트로 명시적 행동("주문해줘")을 요청하면 THEN 시스템은 **자동 커밋하지 않고** 초안(`confirmation`/`product_card`) + 확정 CTA를 산출해 ActionGate로 보내야 한다 (SHALL).
+5. WHEN 제품/부품 카드(`product_card`·`recommendation_list`)를 **표시하는 시점에** THEN 시스템은 해당 항목의 행동 CTA(`add_to_cart`·`order`)를 **카드에 함께 동봉**해야 한다 (SHALL). 그래야 이후 "주문해줘" 발화가 재확인 마찰 없이 기존 CTA 탭으로 이어진다. ([ADR-0046](../../docs/adr/0046-advisory-action-cta-bridge.md))
 
 ### 요구사항 4: LLM 플래너 + 룰 검증/폴백
 
@@ -66,7 +67,7 @@
 **수용기준:**
 1. WHEN 수리/진단 의도면 THEN 시스템은 `diagnose`(조언형)로 `guide_steps`(자가진단) + `required_parts`를 산출해야 한다 (SHALL).
 2. WHEN 해결 가이드를 제시할 때 THEN 시스템은 끝에 CTA `connect_agent`(상담원)·`request_visit`(수리기사 접수)를 제공해야 한다 (SHALL). ([response-templates](../../docs/response-templates.md) `handoff_card`·`booking`)
-3. IF 해결책이 **안전 위험**(R23)이거나 기기가 **보증 중**(R22)이면 THEN 시스템은 **부품 자가주문 CTA(`add_to_cart`)를 숨기고** 상담원/수리기사 CTA만 노출해야 한다 (SHALL). ([ADR-0046](../../docs/adr/0046-advisory-action-cta-bridge.md))
+3. IF 해결책이 **안전 위험**(R23)이거나 기기가 **보증 중**(R22)이면 THEN 시스템은 **부품 자가주문 CTA(`add_to_cart`)를 숨기고** 상담원/수리기사 CTA만 노출해야 한다 (SHALL). 이때 시스템은 **버튼을 숨긴 이유를 짧은 설명 문구로 동반**해야 한다("이 증상은 직접 수리가 위험해 전문 점검을 권해요" / "보증 기간 내라 무상 수리 대상이에요"). 버튼만 사라져 생기는 혼란을 막는다. ([ADR-0046](../../docs/adr/0046-advisory-action-cta-bridge.md))
 4. IF 단순·안전한 부품 교체 건이면 THEN 시스템은 `add_to_cart` CTA를 함께 제공하되 **커밋은 ActionGate**를 거쳐야 한다 (SHALL).
 
 ### 요구사항 7: 수리↔교체 브릿지 — 비경제일 때만 중립 CTA

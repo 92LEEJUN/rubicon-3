@@ -5,31 +5,31 @@
 
 ## 작업 목록
 
-- [ ] 1. capability 골격 + 레지스트리 _(요구사항 1, 2)_
-  - [ ] 1.1 `capability.py` — `Capability` dataclass(`cls=advisory|action`·`kind`·`intents`·`emits`·`needs`·`priority`·`tools`·`prompt`·`run`), `CapabilityFn`.
-  - [ ] 1.2 `registry.py` — `CapabilityRegistry`, `advisory_catalog()`는 **조언형만** 노출.
-  - [ ] 1.3 `TurnCtx`(블랙보드) — `write/read`, 슬롯(`required_parts`·`device_status`·`candidates`·`risk_level`·`warranty_status`·`repair_cost`).
+- [x] 1. capability 골격 + 레지스트리 _(요구사항 1, 2)_ — `backend/app/orchestrator/capability.py`
+  - [x] 1.1 `Capability` dataclass(`cls=advisory|action`·`kind`·`intents`·`emits`·`needs`·`priority`·`run`), `CapabilityFn`.
+  - [x] 1.2 `build_registry()`/`advisory_catalog()` — **조언형만** 후보 노출.
+  - [x] 1.3 `TurnCtx`(블랙보드) — `write/read` + **세션 지속 슬롯**(`required_parts`·`device_status`·`candidates`·`risk_level`·`warranty_status`). _(repair_cost는 5.4 보류분)_
 
-- [ ] 2. 결정적 조언형 tool capability 래핑 (1차 이주) _(요구사항 2, 13)_
-  - [ ] 2.1 `handlers.handle_*`(device_status·troubleshoot·recommend·general)을 `class=advisory, kind=tool` capability로 감싸 `section` 방출.
-  - [ ] 2.2 troubleshoot capability가 `required_parts` `ctx.write`. _(요구사항 5)_
-  - [ ] 2.3 레지스트리 등록.
+- [x] 2. 결정적 조언형 tool capability 래핑 (1차 이주) _(요구사항 2, 13)_
+  - [x] 2.1 `handlers.handle_*`(device_status·troubleshoot→diagnose·recommend·general)을 `advisory/tool` capability로 래핑.
+  - [x] 2.2 diagnose가 `required_parts`·`risk_level`·`warranty_status`, recommend가 `candidates` `ctx.write`. _(요구사항 5)_
+  - [x] 2.3 레지스트리 등록.
 
-- [ ] 3. 룰 플래너 + 검증 (조언형 한정) _(요구사항 4)_
-  - [ ] 3.1 `rule_plan(intents)` — `_ordered_intents`+`plan_workers`(조언형) → `Plan`.
-  - [ ] 3.2 `PlanValidator` — 미등록·사이클 제거, 우선순위 정렬, **행동형 자동선택 차단**, 안전의도 필수 capability 누락 보정.
-  - [ ] 3.3 주문 등 행동 의도는 plan이 아닌 **CTA/ActionGate 경로**로 보냄(자유텍스트 명시요청은 초안+확정 CTA).
+- [x] 3. 룰 플래너 + 검증 (조언형 한정) _(요구사항 4)_
+  - [x] 3.1 `rule_plan(intents, registry)` — 의도→capability 매핑·우선순위 정렬 → `Plan`.
+  - [x] 3.2 `validate_plan` — 미등록 제거, **행동형 자동선택 차단**(명시 의도일 때만 허용).
+  - [ ] 3.3 행동 CTA 회신을 `internal.py`에서 **CTA/ActionGate 경로**로 라우팅(자유텍스트 명시요청은 초안+확정 CTA — 현재 handle_order가 초안 산출까지는 충족, 라우터 배선 미완).
 
-- [ ] 4. CapabilityOrchestrator 조립 (결정적 패리티 게이트) _(요구사항 11, 13, 14)_
-  - [ ] 4.1 `astream(message, screen_context, memory)` — plan(룰)→exec(순차)→ctaGate→merge→done. 드롭인 시그니처.
-  - [ ] 4.2 다단계 스트리밍 — 빠른 결정적(device_status) 먼저(≤2~3s).
-  - [ ] 4.3 **회귀 게이트** — LLM off에서 기존 `test_orchestrator.py`(J1·compound·envelope·fallback) 통과. _(요구사항 15-5)_
+- [x] 4. CapabilityOrchestrator 조립 (결정적 패리티 게이트) _(요구사항 11, 13, 14)_
+  - [x] 4.1 `build_turn`/`stream_turn(message, session_id)` — plan(룰)→exec(순차)→ctaGate→done. 세션 carry 포함.
+  - [ ] 4.2 다단계 스트리밍 — 빠른 결정적(device_status) 먼저(≤2~3s). _(현재 단일 패스)_
+  - [x] 4.3 **회귀 게이트** — 전체 스위트 153 통과(기존 `test_orchestrator.py` 불변). _(요구사항 15-5)_
 
-- [ ] 5. 수리 해결 CTA + 위험도·보증 게이팅 _(요구사항 6, 7)_
-  - [ ] 5.1 `diagnose` capability가 `guide_steps`+CTA(`connect_agent`·`request_visit`) 산출.
-  - [ ] 5.2 `risk_level`(R23 안전)·`warranty_status`(R22 보증)를 `ctx.write`.
-  - [ ] 5.3 `ctaGate` — risk/warranty면 `add_to_cart` 숨기고 상담원/기사만; 단순건만 부품 CTA(커밋=ActionGate). _(요구사항 6-3·6-4)_
-  - [ ] 5.4 비경제(`repair_cost`≥교체가 임계·반복고장)면 중립 "교체 알아보기" CTA 1개 추가, 판단은 사용자. _(요구사항 7)_
+- [x] 5. 수리 해결 CTA + 위험도·보증 게이팅 _(요구사항 6, 7)_
+  - [x] 5.1 `diagnose`가 `guide_steps`+CTA(`connect_agent`·`request_visit`) 산출.
+  - [x] 5.2 `risk_level`(R23 안전·step.safety)·`warranty_status`(R22 coverage)를 `ctx.write`.
+  - [x] 5.3 `gate_repair_ctas` — risk(danger)/warranty(free)면 `add_to_cart` 숨기고 상담원/기사만 + **이유 설명(cta_notice)**; 단순건만 부품 CTA. _(요구사항 6-3·6-4)_
+  - [ ] 5.4 비경제(`repair_cost`≥교체가 임계·반복고장)면 중립 "교체 알아보기" CTA. _(열림: 임계값 결정·repair_cost 데이터 필요 — `_cta_explore_replacement` 훅만 배치)_
 
 - [ ] 6. 행동형 capability + CTA 회신 라우터 _(요구사항 3)_
   - [ ] 6.1 `order`·`booking`·`handoff`를 `class=action` capability로(플래너 후보 제외).
@@ -72,13 +72,13 @@
   - [ ] 13.1 step별 try/except·타임아웃, 실패 step만 폴백.
   - [ ] 13.2 플래너 실패→룰 폴백, 턴 회복불가→`error` 봉투.
 
-- [ ] 14. Mock/결정적 테스트 _(요구사항 15)_
-  - [ ] 14.1 플래너 검증·폴백·**행동형 자동선택 차단** 단언.
-  - [ ] 14.2 수리 CTA 게이팅(risk/warranty 부품 숨김·비경제 교체 CTA) 단언.
-  - [ ] 14.3 블랙보드 핸드오프·CTA 회신→ActionGate 라우팅 단언.
-  - [ ] 14.4 추천 위임(동의 폴백·중복) 단언.
-  - [ ] 14.5 복합 fan-out·결정=CTA·충돌 지연, 스트리밍·병합 청크 순서 단언.
-  - [ ] 14.6 토글 수렴 회귀(LLM off = 결정적 봉투 동등).
+- [x] 14. Mock/결정적 테스트 _(요구사항 15)_ — `backend/tests/test_capability.py`(9), `backend/verify_multiturn.py`
+  - [x] 14.1 플래너 **행동형 자동선택 차단**·명시 order 허용 단언.
+  - [x] 14.2 수리 CTA 게이팅(risk danger·warranty free 부품 숨김 + 설명, 단순건 부품 CTA) 단언. _(비경제 교체 CTA는 5.4 보류)_
+  - [x] 14.3 블랙보드 크로스턴 carry(다음 턴 order가 required_parts 이어받음)·세션 격리 단언. _(CTA 회신→ActionGate 라우팅은 3.3와 함께 후속)_
+  - [ ] 14.4 추천 위임(동의 폴백·중복) 단언. _(현 recommend는 기존 RecommendationService 경유 — 위임 단언 후속)_
+  - [ ] 14.5 복합 fan-out·결정=CTA·충돌 지연, 스트리밍·병합 청크 순서 단언. _(verify_multiturn에서 수동 확인, 자동 단언 후속)_
+  - [x] 14.6 봉투 패리티(section→flow→done) 회귀 단언.
 
 ## 진행 메모
 - 스트랭글러 순서: **1→2→3→4(결정적 패리티 게이트)** 가 "회귀 없이 골격 수렴" 1차. **5~7**에서 수리 CTA 게이팅·행동형 분리·추천 위임(ADR-0046 핵심), **8~11**에서 LLM capability·플래너·복합·리뷰, **12.3**에서 옛 경로 삭제.

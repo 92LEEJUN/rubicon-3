@@ -26,10 +26,10 @@
 - [x] 2.4 resume에 열린 loop 우선순위 정렬 포함(`ResumePayload.open_loops`) _(요구 2.2)_
 
 ## 3. ReEngagement (선제, 엄격 게이트) _(요구 3·6)_
-- [ ] 3.1 트리거 — open-loop 후속(입고·R25 시점·리마인드) 이벤트/스케줄
-- [ ] 3.2 **엄격 게이트** — Consent/opted_in → R26 빈도/중요도 → 가치/중복 억제 → R27 묶음 _(요구 3.2·3.3·6.1)_
-- [ ] 3.3 통과분 AlertPort 전달(§10) + 탭 시 proactive→reactive 맥락 이어가기 _(요구 3.4)_
-- [ ] 3.4 게이트 차단 결정적 테스트(동의 없음·빈도 초과·저가치·중복)
+- [x] 3.1 트리거 — open-loop 기반 후보 생성(`ReEngagementService.candidate`). **남은**: 입고·R25 시점 이벤트/스케줄 연결
+- [x] 3.2 **엄격 게이트** — Consent/opted_in → R26 빈도(cooldown) → 중복(dedup) → R27 묶음(top+카운트) _(요구 3.2·3.3·6.1)_ — `app/reengagement.py`
+- [~] 3.3 `GET /internal/reengagement`(peek) + BFF `/reengagement`. **남은**: AlertPort 실 전달(§10)·전달 후 `mark_sent`·탭→reactive 맥락 _(요구 3.4)_
+- [x] 3.4 게이트 차단 결정적 테스트(동의 없음·빈도 초과·중복·loop 없음) — `tests/test_reengagement.py`
 
 ## 4. 교차기기 / 프라이버시 _(요구 4·6)_
 - [ ] 4.1 메모리·open-loop **user 단위 키** + Consent 접근 가드 _(요구 4.2·6.1)_

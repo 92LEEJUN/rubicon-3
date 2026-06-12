@@ -78,6 +78,10 @@ def create_app(backend: Optional[BackendClient] = None) -> FastAPI:
                      be: BackendClient = Depends(_backend)):
         return await relay(lambda: be.resume(fresh))
 
+    @app.get("/reengagement")
+    async def reengagement(user: str = Depends(require_auth), be: BackendClient = Depends(_backend)):
+        return await relay(be.reengagement)
+
     # ── 카드 탭 surface(§2.3) ───────────────────────────────────────────────
     @app.post("/surface")
     async def surface(request: Request, user: str = Depends(require_auth),

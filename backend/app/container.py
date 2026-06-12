@@ -11,6 +11,7 @@ from .adapters import mock
 from .companion import CompanionService
 from .compaction import CompactionService, RuleBasedCompactor
 from .domain import User
+from .reengagement import ReEngagementService
 from .repositories import (
     InMemoryConversationMemoryRepository,
     InMemoryConversationStore,
@@ -34,6 +35,7 @@ class Container:
     conversation_memory: InMemoryConversationMemoryRepository
     compaction: CompactionService
     companion: CompanionService
+    reengagement: ReEngagementService
     device: DeviceService
     knowledge: KnowledgeService
     catalog: CatalogService
@@ -50,6 +52,7 @@ def build_container() -> Container:
     # MVP=결정적 컴팩터(LLM 없이 테스트 가능). 실 전환 시 LLMCompactor로 교체(ADR-0020).
     compaction = CompactionService(RuleBasedCompactor())
     companion = CompanionService(conversation_memory, conversation_store, compaction, open_loops)
+    reengagement = ReEngagementService(companion, engagement)
     device = DeviceService(mock.MockDeviceAdapter())
     knowledge = KnowledgeService(mock.MockCSKnowledgeAdapter(), mock.MockWarrantyAdapter())
     catalog = CatalogService(mock.MockCatalogAdapter(), engagement)
@@ -62,6 +65,7 @@ def build_container() -> Container:
         conversation_memory=conversation_memory,
         compaction=compaction,
         companion=companion,
+        reengagement=reengagement,
         device=device,
         knowledge=knowledge,
         catalog=catalog,

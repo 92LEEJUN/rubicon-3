@@ -29,6 +29,14 @@ def test_resume_relayed(client):
     assert body["has_context"] is False        # fresh → 깨끗한 시작
 
 
+def test_reengagement_requires_auth(client):
+    assert client.get("/reengagement").status_code == 401
+
+
+def test_reengagement_relayed(client):
+    assert client.get("/reengagement", headers=AUTH).status_code == 200
+
+
 def test_device_not_found_status_preserved(client):
     assert client.get("/devices/없는기기", headers=AUTH).status_code == 404
 

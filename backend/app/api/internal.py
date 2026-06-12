@@ -134,6 +134,16 @@ def resume(fresh: bool = False):
     return _container.companion.resume(_container.user.id, fresh=fresh).model_dump(mode="json")
 
 
+@app.get("/internal/reengagement")
+def reengagement():
+    """선제 재관여(컴패니언 §3) — 엄격 게이트 통과분 1건(peek). 없으면 {}.
+
+    실 전달(AlertPort §10)·전달 후 mark_sent는 선제 파이프라인/스케줄러가 담당(§3.3).
+    """
+    cand = _container.reengagement.candidate(_container.user)
+    return cand.model_dump(mode="json") if cand else {}
+
+
 # ── 결정적 조회(HTTP) ────────────────────────────────────────────────────────
 @app.get("/internal/devices")
 def list_devices():

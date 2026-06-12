@@ -259,3 +259,12 @@ class ConversationMemory(_Base):
     summary: str = ""
     facts: dict = Field(default_factory=dict)
     summarized_through: int = 0  # 요약에 흡수된 메시지 수(이 인덱스 이후는 verbatim)
+
+
+class ResumePayload(_Base):
+    """이어가기(resume) — 패널 (재)열기 시 복원 맥락(컴패니언 spec 요구 1·4·5)."""
+    has_context: bool = False           # 이어갈 맥락이 있는지(없으면 깨끗한 시작)
+    summary: str = ""
+    facts: dict = Field(default_factory=dict)
+    elapsed_label: Optional[str] = None  # "방금"·"어제"·"지난주" 등 상대 시간(요구 5)
+    suspended_flow: Optional[str] = None  # 보류 흐름(ADR-0028)이 있으면 이어가기 후보

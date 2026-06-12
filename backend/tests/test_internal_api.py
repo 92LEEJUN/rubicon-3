@@ -99,3 +99,13 @@ def test_ws_turn_streams_sections():
                 break
         assert "section" in types and types[-1] == "done"
         assert "guide_steps" in kinds
+
+
+# ── 이어가기(컴패니언 §1) — 턴 기록 후 resume에 맥락 복원 ─────────────────────
+def test_resume_after_turn_records_context():
+    c = TestClient(app)  # 격리 위해 새 클라이언트(모듈 컨테이너 공유 상태 주의)
+    assert c.get("/internal/resume?fresh=true").json()["has_context"] is False
+    c.post("/internal/turn", json={"text": "세탁기 5C 에러"})  # 턴 기록 → 컴팩션 배선
+    r = c.get("/internal/resume").json()
+    assert r["has_context"] is True
+    assert r["elapsed_label"] is not None

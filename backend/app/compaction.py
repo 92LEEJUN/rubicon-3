@@ -32,6 +32,14 @@ def _merge_facts(facts: dict, turn: dict) -> None:
                 bucket.append(m)
 
 
+def extract_facts(base: dict, turns: list[dict]) -> dict:
+    """base 사실에 turns의 명시·규칙 사실을 병합한 새 dict(요약과 무관하게 매 턴 갱신용)."""
+    facts = {k: (list(v) if isinstance(v, list) else v) for k, v in base.items()}
+    for t in turns:
+        _merge_facts(facts, t)
+    return facts
+
+
 class Compactor(Protocol):
     def fold(self, memory: ConversationMemory, turns: list[dict]) -> ConversationMemory:
         """turns를 memory에 접어 갱신된 (summary, facts)를 반환. summarized_through는 서비스가 설정."""

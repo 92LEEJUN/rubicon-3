@@ -38,27 +38,22 @@
 - **A-T3**: "배수필터 주문" — 문구에 `배수`가 있어 직접 해석으로 동작(carry 아님). 우연히 맞음.
   문구가 "아까 그거"였다면 carry 경로. 둘의 경계가 키워드 유무에 달려 불안정.
 
-## 실 LLM 플래너 검증 (ADR-0047 §9.1, `verify_llm_planner.py`)
+## 실 LLM 플래너 검증 — 1차(ADR-0047 게이트 시절) · ⚠️ 폐기됨
 
-규칙 vs 실 LLM(gpt-4o-mini) plan을 에스컬레이션 턴에서 실측. 티어드 게이트로 **clean은 LLM 미호출**.
+> **이 절은 폐기된 ADR-0047(티어드 게이트) 시점의 기록(historical)이다.** 게이트는
+> [ADR-0048](../../docs/adr/0048-llm-planner-single-router.md)로 폐기됐고, F2 미교정·`general`
+> 군더더기도 이후 §9.3(목적지 capability)·§9.4(과선택 억제)에서 해소됐다. **현재 결과는 바로
+> 아래 "전면수정(ADR-0048)" 절을 보라.** 아래 표는 "왜 게이트+4개 capability로는 부족했나"의
+> 근거로만 남긴다.
 
-| 턴 | 규칙 plan | LLM plan | 결과 |
+| 턴(1차) | 규칙 plan | LLM plan(당시) | 당시 한계 |
 |---|---|---|---|
-| A-T2 (F1 확인해/가격) | `[device_status]` (빈 응답) | `[diagnose, general]` | ✅ **교정** — device_status 트랩 회피, 진단+부품 CTA |
-| B-T2 (F2 보증/예약) | `[diagnose]` | `[diagnose, general]` | ⚠️ **부분** — 보증·예약 전용 capability 부재로 한계 |
-| C-T2 (F2 설명/비교+주문) | `[device_status, order]` | `[device_status, diagnose, general, order]` | ⚠️ **부분** — order 보존·diagnose 추가, 설명/비교 미충족 |
-| clean 단일 | `[diagnose]` | `[diagnose]` | ⚡ **홉0**(LLM 미호출) |
-| clean 복합 J5 | `[diagnose, order]` | `[diagnose, order]` | ⚡ **홉0** |
+| A-T2 (F1) | `[device_status]`(빈 응답) | `[diagnose, general]` | F1 교정됐으나 `general` 군더더기 |
+| B-T2 (F2 보증/예약) | `[diagnose]` | `[diagnose, general]` | ❌ 보증·예약 capability 부재로 미교정 |
+| C-T2 (F2 설명+주문) | `[device_status, order]` | `[device_status, diagnose, general, order]` | ❌ 설명/비교 미충족 |
+| clean 단일·J5 | `[diagnose]`·`[diagnose, order]` | 동일 | 게이트로 LLM 미호출(홉0) |
 
-**입증된 것**
-- 티어드 게이트 작동 — clean(짧은 단일·J5)은 LLM 호출 0, F-corpus만 호출.
-- LLM이 **F1(device_status 오발화)을 교정** — 규칙이 빈 응답 내던 턴에서 진단 가이드 산출.
-- **명시 order 보존**(C-T2·J5) — LLM은 조언형만, 행동형은 규칙 병합.
-- 플래너 실패/네트워크 오류 시 규칙 폴백(`test_route_planner_failure_falls_back`).
-
-**남은 한계(예상대로)**
-- **F2는 LLM 플래너만으로 부분 교정** — `warranty`·`booking`·`explain` **전용 capability가 없어** LLM도 기존 4개(diagnose·device_status·recommend·general) 안에서만 고름. → 다음 단계 ⓑ(목적지 capability 추가)가 필요함을 실측 입증.
-- 부작용: LLM이 가끔 `general`을 군더더기로 추가(무해). 프롬프트 튜닝으로 축소 가능.
+→ 이 한계가 **ADR-0048 전환**(목적지 capability 추가 + 게이트 폐기)의 직접 동기. 교정된 최신 결과는 아래.
 
 ## 전면수정 — LLM 플래너 단일 라우터 (ADR-0048)
 

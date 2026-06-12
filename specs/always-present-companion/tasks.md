@@ -22,13 +22,13 @@
 ## 2. OpenLoop (미해결 스레드) _(요구 2)_
 - [x] 2.1 `OpenLoop` 모델 + `InMemoryOpenLoopRepository`(ref 멱등·상태·우선순위) — `app/repositories/open_loop.py`
 - [x] 2.2 생성 훅 — 사실(오류코드·주문ID)에서 자동 멱등 생성(`_sync_open_loops`), 오류>주문 우선순위 _(요구 2.1)_
-- [~] 2.3 해소 — `resolve_loop`/`dismiss_loop` 서비스 + "해소된 건 안 되살림". **남은**: R25 해결확인·주문 배송완료 이벤트 연결 _(요구 2.3)_
+- [x] 2.3 해소 — `resolve_loop`/`dismiss_loop` 서비스 + `POST /internal/open-loops/{ref}/resolve|dismiss`(BFF `/open-loops/{ref}/{action}`) + "해소된 건 안 되살림". **남은**: R25 해결확인·주문 배송완료를 이 훅에 자동 연결(이벤트 소스) _(요구 2.3)_
 - [x] 2.4 resume에 열린 loop 우선순위 정렬 포함(`ResumePayload.open_loops`) _(요구 2.2)_
 
 ## 3. ReEngagement (선제, 엄격 게이트) _(요구 3·6)_
 - [x] 3.1 트리거 — open-loop 기반 후보 생성(`ReEngagementService.candidate`). **남은**: 입고·R25 시점 이벤트/스케줄 연결
 - [x] 3.2 **엄격 게이트** — Consent/opted_in → R26 빈도(cooldown) → 중복(dedup) → R27 묶음(top+카운트) _(요구 3.2·3.3·6.1)_ — `app/reengagement.py`
-- [~] 3.3 `GET /internal/reengagement`(peek) + BFF `/reengagement`. **남은**: AlertPort 실 전달(§10)·전달 후 `mark_sent`·탭→reactive 맥락 _(요구 3.4)_
+- [x] 3.3 `GET /internal/reengagement`(peek) + `POST /internal/reengagement/deliver`(전달 확정 + `mark_sent` 재노출 억제) + BFF 패스스루. **남은**: AlertPort 실 채널(§10 스케줄러)·탭→reactive 맥락 주입(FE) _(요구 3.4)_
 - [x] 3.4 게이트 차단 결정적 테스트(동의 없음·빈도 초과·중복·loop 없음) — `tests/test_reengagement.py`
 
 ## 4. 교차기기 / 프라이버시 _(요구 4·6)_

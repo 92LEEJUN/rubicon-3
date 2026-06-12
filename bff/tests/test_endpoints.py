@@ -37,6 +37,15 @@ def test_reengagement_relayed(client):
     assert client.get("/reengagement", headers=AUTH).status_code == 200
 
 
+def test_reengagement_deliver_relayed(client):
+    assert client.post("/reengagement/deliver", headers=AUTH).status_code == 200
+
+
+def test_open_loop_action_relayed(client):
+    # 미존재 ref → BE 404를 그대로 중계
+    assert client.post("/open-loops/none_xyz/resolve", headers=AUTH).status_code == 404
+
+
 def test_device_not_found_status_preserved(client):
     assert client.get("/devices/없는기기", headers=AUTH).status_code == 404
 

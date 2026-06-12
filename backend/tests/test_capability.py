@@ -150,6 +150,58 @@ def test_route_falls_back_to_rule_without_planner(container):
     assert isinstance(plan.capabilities, list)
 
 
+# ── LLM 플래너 연결(stub로 결정적 검증, 요구사항 4-1) ───────────────────────
+class _StubPlanner:
+    def __init__(self, caps):
+        self.caps = caps
+        self.calls = 0
+
+    def propose(self, catalog, message):
+        self.calls += 1
+        from app.orchestrator.capability import Plan
+        return Plan(capabilities=list(self.caps))
+
+
+def test_route_uses_llm_planner_on_escalation(container):
+    stub = _StubPlanner(["diagnose"])
+    orch = CapabilityOrchestrator(container=container, classifier=RuleBasedClassifier(),
+                                  llm_planner=stub)
+    # F1: 규칙은 device_status로 오분류하던 장문 → LLM이 diagnose로 교정
+    plan = orch.route("그 배수 필터 어떤 건지 한번 확인해서 가격이랑 같이 알려주세요")
+    assert stub.calls == 1
+    assert plan.capabilities == ["diagnose"]
+
+
+def test_route_preserves_explicit_action_with_planner(container):
+    stub = _StubPlanner(["diagnose"])
+    orch = CapabilityOrchestrator(container=container, classifier=RuleBasedClassifier(),
+                                  llm_planner=stub)
+    # 에스컬레이션 + 명시 주문 → LLM 조언형(diagnose) + 규칙 행동형(order) 병합
+    plan = orch.route("보증 되는지랑 가격 알려주고 배수필터 주문해줘")
+    assert "diagnose" in plan.capabilities and "order" in plan.capabilities
+    assert plan.capabilities.index("diagnose") < plan.capabilities.index("order")  # 우선순위
+
+
+def test_route_planner_failure_falls_back(container):
+    class _Boom:
+        def propose(self, *a, **k):
+            raise RuntimeError("planner down")
+
+    orch = CapabilityOrchestrator(container=container, classifier=RuleBasedClassifier(),
+                                  llm_planner=_Boom())
+    plan = orch.route("산 지 얼마 안 됐는데 보증으로 무상 수리되는지랑 예약 가능한지 알려줘")
+    assert isinstance(plan.capabilities, list)   # 예외 없이 규칙 폴백
+
+
+def test_clean_query_skips_planner(container):
+    # 깨끗한 짧은 쿼리 → 에스컬레이션 안 함 → LLM 플래너 호출 0(홉 0)
+    stub = _StubPlanner(["diagnose"])
+    orch = CapabilityOrchestrator(container=container, classifier=RuleBasedClassifier(),
+                                  llm_planner=stub)
+    orch.route("세탁기에서 물이 안 빠져요")
+    assert stub.calls == 0
+
+
 # ── 봉투 패리티(요구사항 13) ────────────────────────────────────────────────
 def test_stream_emits_section_flow_done(container):
     chunks = list(_orch(container).stream_turn("세탁기 물이 안 빠져요"))

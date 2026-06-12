@@ -319,15 +319,25 @@ class CapabilityOrchestrator:
         return validate_plan(rule_plan(intents, self.registry), intents, self.registry)
 
     def route(self, message: str) -> Plan:
-        """규칙 plan 산출 → 에스컬레이션 판정. 신호가 있고 LLM 플래너가 붙어 있으면 그쪽으로,
-        아니면 규칙 plan 그대로(홉 0). 판정은 last_decision에 기록한다."""
+        """규칙 plan 산출 → 에스컬레이션 판정. 신호가 있고 LLM 플래너가 붙어 있으면 LLM이 고른
+        조언형 plan을 쓰되 **명시 행동(order 등)은 규칙에서 보존**한다. 실패 시 규칙 폴백(홉 0).
+        판정은 last_decision에 기록한다."""
         rule = self.plan(message)
         decision = should_escalate(message, rule)
         self.last_decision = decision
         if decision.escalate and self.llm_planner is not None:
-            intents = self._ordered_intents(message)
-            proposed = self.llm_planner.propose(advisory_catalog(self.registry), message)
-            return validate_plan(proposed, intents, self.registry)
+            try:
+                intents = self._ordered_intents(message)
+                proposed = self.llm_planner.propose(advisory_catalog(self.registry), message)
+                advisory = validate_plan(proposed, intents, self.registry).capabilities
+                # 명시 행동형(order)은 규칙 plan에서 보존 — LLM은 조언형만 고름(ADR-0046)
+                actions = [n for n in rule.capabilities if self.registry[n].cls == "action"]
+                names = advisory + [a for a in actions if a not in advisory]
+                names.sort(key=lambda n: self.registry[n].priority)
+                if names:
+                    return Plan(capabilities=names)
+            except Exception:
+                pass   # 플래너 실패 → 규칙 폴백(요구사항 14-2)
         return rule
 
     def build_turn(self, message: str, session_id: str = "s1",

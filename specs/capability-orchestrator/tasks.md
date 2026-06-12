@@ -50,8 +50,9 @@
 
 - [~] 9. LLM 플래너 (티어드, ADR-0047) _(요구사항 4-1, 11)_
   - [x] 9.0 **에스컬레이션 게이트**(`should_escalate`/`EscalationDecision`/`decide`/`route`) — 규칙 1차(홉0), 장문/모호 신호일 때만 LLM. LLM 미연결 시 규칙 폴백. 코퍼스 측정(8턴 중 3턴만 홉). _완료_
-  - [ ] 9.1 `LLMPlanner.propose(advisory_catalog, msg, ctx)` 구조화 출력, `achat_completion`, 주입형(`llm_planner`로 주입).
-  - [ ] 9.2 propose→validate→무효/실패면 `rule_plan` 폴백. 결정적 섹션 먼저 스트리밍으로 홉 지연 은닉(요구사항 11-1).
+  - [x] 9.1 `LLMPlanner.propose/apropose(catalog, message)` 구조화 출력(json_schema·enum), `get_client`/`achat_completion`, 주입형. `route`에서 LLM 조언형 + 규칙 행동형 병합, 실패 시 규칙 폴백. _실 LLM 검증 `verify_llm_planner.py`: F1 교정 확인, clean은 홉0._
+  - [ ] 9.2 비동기 서빙 경로(`apropose`) 배선 + 결정적 섹션 먼저 스트리밍으로 홉 지연 은닉(요구사항 11-1). _현재 `apropose` 구현·미배선._
+  - [ ] 9.3 F2 목적지 capability(`warranty`·`booking`·`explain`) 추가 — LLM 플래너가 고를 대상 확장(검증서 부분교정 한계 입증).
 
 - [ ] 10. 복합 쿼리 + 하이브리드 병합 _(요구사항 9, 10)_
   - [ ] 10.1 조언형 fan-out, 의도별 `MessageSection`(handled/unhandled).

@@ -38,6 +38,28 @@
 - **A-T3**: "배수필터 주문" — 문구에 `배수`가 있어 직접 해석으로 동작(carry 아님). 우연히 맞음.
   문구가 "아까 그거"였다면 carry 경로. 둘의 경계가 키워드 유무에 달려 불안정.
 
+## 실 LLM 플래너 검증 (ADR-0047 §9.1, `verify_llm_planner.py`)
+
+규칙 vs 실 LLM(gpt-4o-mini) plan을 에스컬레이션 턴에서 실측. 티어드 게이트로 **clean은 LLM 미호출**.
+
+| 턴 | 규칙 plan | LLM plan | 결과 |
+|---|---|---|---|
+| A-T2 (F1 확인해/가격) | `[device_status]` (빈 응답) | `[diagnose, general]` | ✅ **교정** — device_status 트랩 회피, 진단+부품 CTA |
+| B-T2 (F2 보증/예약) | `[diagnose]` | `[diagnose, general]` | ⚠️ **부분** — 보증·예약 전용 capability 부재로 한계 |
+| C-T2 (F2 설명/비교+주문) | `[device_status, order]` | `[device_status, diagnose, general, order]` | ⚠️ **부분** — order 보존·diagnose 추가, 설명/비교 미충족 |
+| clean 단일 | `[diagnose]` | `[diagnose]` | ⚡ **홉0**(LLM 미호출) |
+| clean 복합 J5 | `[diagnose, order]` | `[diagnose, order]` | ⚡ **홉0** |
+
+**입증된 것**
+- 티어드 게이트 작동 — clean(짧은 단일·J5)은 LLM 호출 0, F-corpus만 호출.
+- LLM이 **F1(device_status 오발화)을 교정** — 규칙이 빈 응답 내던 턴에서 진단 가이드 산출.
+- **명시 order 보존**(C-T2·J5) — LLM은 조언형만, 행동형은 규칙 병합.
+- 플래너 실패/네트워크 오류 시 규칙 폴백(`test_route_planner_failure_falls_back`).
+
+**남은 한계(예상대로)**
+- **F2는 LLM 플래너만으로 부분 교정** — `warranty`·`booking`·`explain` **전용 capability가 없어** LLM도 기존 4개(diagnose·device_status·recommend·general) 안에서만 고름. → 다음 단계 ⓑ(목적지 capability 추가)가 필요함을 실측 입증.
+- 부작용: LLM이 가끔 `general`을 군더더기로 추가(무해). 프롬프트 튜닝으로 축소 가능.
+
 ## 결론 / 우선순위
 - **즉시 처방(데이터·규칙 독립, 안전 직결)**: F3 → **완료**(detect_danger).
 - **LLM 플래너로 해소(tasks §9)**: F1·F2 — 장문 문맥·후속 의도. 규칙 분류기의 구조적 한계.

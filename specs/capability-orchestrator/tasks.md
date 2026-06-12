@@ -52,8 +52,8 @@
   - [x] 9.0 ~~에스컬레이션 게이트~~ — **ADR-0048로 폐기**. `should_escalate`/`EscalationDecision`/`decide` 제거.
   - [x] 9.1 `LLMPlanner.propose/apropose(catalog, message)` 구조화 출력(json_schema·enum), `get_client`/`achat_completion`, 주입형. `route`는 **모든 질의를 LLM 라우팅**(미연결·실패 시 규칙 폴백), LLM 조언형 + 규칙 행동형 병합. _실 LLM 검증 `verify_llm_planner.py`._
   - [x] 9.3 F2 목적지 capability 추가 — `warranty`(보증)·`booking`(예약 슬롯 초안)·`explain`(스펙·가격·비교)·`clarify`(모호 되묻기). 레지스트리·advisory_catalog 등록. _실 LLM: 보증/예약 → `[warranty,booking]`, 모호 → `[clarify]` 확인._
-  - [ ] 9.2 비동기 서빙(`apropose`) 배선 + 결정적 섹션 먼저 스트리밍으로 홉 지연 은닉(요구사항 11-1). _`apropose` 구현·미배선._
-  - [ ] 9.4 플래너 과선택(불필요 capability 1개 추가) 프롬프트 튜닝 — 검증서 J5에 recommend 군더더기 관측.
+  - [x] 9.2 비동기 서빙 배선 — `aroute`/`astream`(apropose, sync 폴백), `internal.py` `CAPABILITY_ORCH` 토글(끄면 기존 3경로 불변). `_run_capabilities`/`_merge_advisory_actions` 헬퍼로 sync/async 공유. `tests/test_capability_async.py`(9). _실 async 스모크: '보증 되나요 예약 가능?' → section warranty/booking → flow → done._ (결정적 섹션 먼저 pre-paint는 범위 밖 — 섹션 완성 시점 스트리밍으로 충분, 코드 주석 명시)
+  - [x] 9.4 플래너 과선택 억제 — `_SYSTEM` 최소 집합 원칙(명시 요청 capability만, 미요청 recommend·general·explain·booking 금지). _실 LLM 5회 안정: J5 `[diagnose, order]`(recommend 군더더기 제거), B-T2 `[warranty, booking]`·clarify·단일·warranty 유지._
 
 - [ ] 10. 복합 쿼리 + 하이브리드 병합 _(요구사항 9, 10)_
   - [ ] 10.1 조언형 fan-out, 의도별 `MessageSection`(handled/unhandled).

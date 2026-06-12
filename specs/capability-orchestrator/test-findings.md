@@ -74,7 +74,12 @@
 | clean 단일 | `[diagnose]` | `[diagnose]` | ✅ 동일 |
 | clean J5 | `[diagnose, order]` | `[diagnose, recommend, order]` | ⚠️ recommend 군더더기(과선택) |
 
-**해소됨**: F1·F2(보증/예약/설명) 완전 라우팅, 진짜 모호 → clarify. **남은 것**: 플래너 과선택(불필요 cap 1개 추가, 무해) → 프롬프트 튜닝(§9.4). 매 턴 +1홉 수용(레이턴시 은닉 §9.2).
+**해소됨**: F1·F2(보증/예약/설명) 완전 라우팅, 진짜 모호 → clarify.
+
+### 후속(§9.2·§9.4) — subagent 병렬 처리
+- **§9.4 과선택 억제** ✅ — `_SYSTEM`에 '최소 집합 원칙' 추가. 실 LLM 5회 연속 안정: J5 `[diagnose, recommend, order]` → **`[diagnose, order]`**(군더더기 제거, 대체도 없음). B-T2 `[warranty, booking]`·clarify·단일·warranty 단독 모두 유지. (C-T2의 device_status는 범위 밖·불변.)
+- **§9.2 async 서빙** ✅ — `aroute`/`astream`(apropose, sync 폴백) + `internal.py` `CAPABILITY_ORCH` 토글(끄면 기존 경로 불변). 실 async 스모크: '보증 되나요 예약 가능?' → `section warranty`→`section booking`→`flow`→`done`. 전체 173 통과.
+- **남은 것**: 결정적 섹션 먼저 pre-paint(speculative)로 홉 지연 완전 은닉은 범위 밖(현재 섹션 완성 시점 스트리밍). 매 턴 +1홉 수용.
 
 ## 결론 / 우선순위
 - **즉시 처방(데이터·규칙 독립, 안전 직결)**: F3 → **완료**(detect_danger).

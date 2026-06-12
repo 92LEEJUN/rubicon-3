@@ -261,10 +261,27 @@ class ConversationMemory(_Base):
     summarized_through: int = 0  # 요약에 흡수된 메시지 수(이 인덱스 이후는 verbatim)
 
 
+OpenLoopKind = Literal["issue", "order", "flow"]
+OpenLoopStatus = Literal["open", "resolved", "dismissed"]
+
+
+class OpenLoop(_Base):
+    """미해결 스레드 — 진행 중 문제·주문·보류 흐름(컴패니언 spec 요구 2)."""
+    id: Id
+    kind: OpenLoopKind
+    ref: str                            # 참조(주문ID·오류코드·흐름명) — user 내 유일 키
+    label: str                          # 사용자 표시 라벨
+    status: OpenLoopStatus = "open"
+    priority: int = 0                   # 높을수록 먼저(안전/CS 우선, §6.6)
+    opened_at: datetime
+    last_touch: datetime
+
+
 class ResumePayload(_Base):
     """이어가기(resume) — 패널 (재)열기 시 복원 맥락(컴패니언 spec 요구 1·4·5)."""
     has_context: bool = False           # 이어갈 맥락이 있는지(없으면 깨끗한 시작)
     summary: str = ""
     facts: dict = Field(default_factory=dict)
+    open_loops: list[OpenLoop] = Field(default_factory=list)  # 열린 미해결 스레드(요구 2.2)
     elapsed_label: Optional[str] = None  # "방금"·"어제"·"지난주" 등 상대 시간(요구 5)
     suspended_flow: Optional[str] = None  # 보류 흐름(ADR-0028)이 있으면 이어가기 후보

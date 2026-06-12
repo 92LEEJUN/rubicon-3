@@ -353,6 +353,13 @@ class ConversationMemory:                # 연속성 컴팩션 대상 (operation
     facts: dict                          # 구조화 사실(기기·진행 중 주문·추천 부품·미해결 이슈) — 요약에 안 넣고 별도 보존
     summarized_through: int              # 요약에 흡수된 마지막 message 인덱스(이후는 verbatim 유지)
 
+class OpenLoop:                          # 미해결 스레드(컴패니언 §2). 구현: app/repositories/open_loop.py
+    id: Id; kind: str                    # issue|order|flow
+    ref: str                             # 주문ID·오류코드·흐름명(user 내 멱등 키)
+    label: str; status: str              # open|resolved|dismissed
+    priority: int                        # 높을수록 먼저(안전/CS 우선, §6.6)
+    opened_at: datetime; last_touch: datetime
+
 class Conversation:
     id: Id
     user_id: Id

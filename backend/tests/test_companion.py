@@ -3,7 +3,11 @@ from datetime import datetime, timedelta, timezone
 
 from app.companion import CompanionService, relative_label
 from app.compaction import CompactionService, RuleBasedCompactor
-from app.repositories import InMemoryConversationMemoryRepository, InMemoryConversationStore
+from app.repositories import (
+    InMemoryConversationMemoryRepository,
+    InMemoryConversationStore,
+    InMemoryOpenLoopRepository,
+)
 
 NOW = datetime(2026, 6, 12, 12, 0, tzinfo=timezone.utc)
 
@@ -11,7 +15,8 @@ NOW = datetime(2026, 6, 12, 12, 0, tzinfo=timezone.utc)
 def _svc(keep=2):
     return CompanionService(InMemoryConversationMemoryRepository(),
                             InMemoryConversationStore(),
-                            CompactionService(RuleBasedCompactor(), keep_recent=keep))
+                            CompactionService(RuleBasedCompactor(), keep_recent=keep),
+                            InMemoryOpenLoopRepository())
 
 
 # ── 턴 루프 배선 ──────────────────────────────────────────────────────────────
@@ -66,6 +71,33 @@ def test_forget_clears_all():
     svc.forget("u1")
     assert svc.resume("u1").has_context is False
     assert svc.store.messages("u1") == []
+
+
+# ── 미해결 스레드(OpenLoop §2) ───────────────────────────────────────────────
+def test_open_loops_auto_created_from_facts():
+    svc = _svc(keep=1)
+    svc.record_turn("u1", "세탁기 5C 떠요", "주문 ord_x1 넣었어요", now=NOW)
+    loops = svc.open_loops("u1")
+    refs = {l.ref for l in loops}
+    assert "5C" in refs and "ord_x1" in refs
+    # 안전·CS(오류)가 주문보다 우선순위 높음 → 먼저
+    assert loops[0].ref == "5C"
+
+
+def test_open_loop_resolved_not_revived():
+    svc = _svc(keep=1)
+    svc.record_turn("u1", "5C 에러", "확인할게요", now=NOW)
+    svc.resolve_loop("u1", "5C")
+    assert svc.open_loops("u1") == []                  # 해소됨
+    svc.record_turn("u1", "또 5C", "다시 볼게요", now=NOW)
+    assert svc.open_loops("u1") == []                  # 해소된 건 되살리지 않음
+
+
+def test_resume_includes_open_loops():
+    svc = _svc(keep=1)
+    svc.record_turn("u1", "ord_a1 주문함", "네", now=NOW)
+    r = svc.resume("u1", now=NOW)
+    assert any(l.ref == "ord_a1" for l in r.open_loops)
 
 
 # ── 상대 시간 라벨 ────────────────────────────────────────────────────────────

@@ -7,7 +7,8 @@
 - [x] 0.1 `ConversationMemory`(summary·facts·summarized_through) 모델 + **user 단위** Repository(인메모리·삭제 cascade) _(ADR-0040, 요구 4·6)_ — `app/domain/models.py`·`app/repositories/conversation_memory.py`
 - [x] 0.2 `CompactionService` — N턴 트리거 + 롤링 요약 + 사실 추출(주문ID·오류코드) + rehydrate(`working_context`). 결정적 `RuleBasedCompactor` _(ADR-0040)_ — `app/compaction.py`, 테스트 `tests/test_compaction.py`
   - 손실 위험 항목(주문ID·오류코드)은 facts로 보존 ✓ (기기모델·동의는 명시 facts로)
-- [ ] 0.3 `LLMCompactor` 실 요약 프롬프트·**구조화 facts 추출 스키마** 확정 + **토큰 임계(~70%) 트리거**(현재 N턴) _(구현 단계)_
+- [x] 0.3 `LLMCompactor` 실 요약 + **구조화 facts 추출 스키마**(`_FACTS_SCHEMA`: devices·unresolved_issues, 규칙 사실과 이중 보존) + **토큰 임계 트리거**(`CompactionService.max_tokens` 70% 모드) — `app/compaction.py`
+  - 남은: 실 모델별 토큰 budget 설정·평가셋 튜닝(컨테이너는 기본 N턴 모드 유지)
 - [x] 0.4 오케스트레이터 턴 루프 배선 — 턴 후 `record_turn`(→`maybe_compact`), 다음 턴에 `context()`(요약+사실) **LLM 주입** — `app/companion.py`·`api/internal.py`(`_stream_and_record`)·`orchestrator/legacy.py`(`_memory_note`)
   - 사실은 **매 턴 즉시 추출**(최근 턴 사실 누락 방지), 요약은 임계 시 컴팩션
 
@@ -19,10 +20,10 @@
 - [ ] 1.5 패널 open(R9) 시 resume 템플릿 노출(FE) + `suspended_flow` 소스(FlowState 영속) 연결
 
 ## 2. OpenLoop (미해결 스레드) _(요구 2)_
-- [ ] 2.1 `OpenLoop` 모델 + Repository(상태·우선순위·해소 시점)
-- [ ] 2.2 생성 훅 — 진단 미해결·주문 진행·`suspended_flow` → open-loop
-- [ ] 2.3 해소 훅 — R25 해결확인·주문 배송완료·사용자 dismiss → close _(요구 2.3)_
-- [ ] 2.4 resume 시 열린 loop 우선순위 요약 제시 _(요구 2.2)_
+- [x] 2.1 `OpenLoop` 모델 + `InMemoryOpenLoopRepository`(ref 멱등·상태·우선순위) — `app/repositories/open_loop.py`
+- [x] 2.2 생성 훅 — 사실(오류코드·주문ID)에서 자동 멱등 생성(`_sync_open_loops`), 오류>주문 우선순위 _(요구 2.1)_
+- [~] 2.3 해소 — `resolve_loop`/`dismiss_loop` 서비스 + "해소된 건 안 되살림". **남은**: R25 해결확인·주문 배송완료 이벤트 연결 _(요구 2.3)_
+- [x] 2.4 resume에 열린 loop 우선순위 정렬 포함(`ResumePayload.open_loops`) _(요구 2.2)_
 
 ## 3. ReEngagement (선제, 엄격 게이트) _(요구 3·6)_
 - [ ] 3.1 트리거 — open-loop 후속(입고·R25 시점·리마인드) 이벤트/스케줄

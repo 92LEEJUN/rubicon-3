@@ -20,6 +20,15 @@ def test_should_compact_only_when_exceeds_keep_recent():
     assert svc.should_compact(mem, _msgs(5)) is True
 
 
+def test_token_trigger_mode():
+    # 토큰 모드: keep_recent 넘어도 토큰 임계(70%) 이하면 압축 안 함
+    svc = CompactionService(RuleBasedCompactor(), keep_recent=2, max_tokens=1000)
+    short = [{"role": "user", "text": "짧음"} for _ in range(10)]   # 추정 토큰 적음
+    assert svc.should_compact(ConversationMemory(), short) is False
+    big = [{"role": "user", "text": "가" * 400} for _ in range(10)]  # 추정 토큰 큼(>700)
+    assert svc.should_compact(ConversationMemory(), big) is True
+
+
 def test_compact_folds_older_keeps_recent_verbatim():
     svc = _svc(keep=2)
     mem = svc.compact(ConversationMemory(), _msgs(5))

@@ -5,3 +5,4 @@ Engagement(확인 정보, R29)는 앱 동작을 바꾸는 조회 가능한 내�
 from .conversation_memory import InMemoryConversationMemoryRepository  # noqa: F401
 from .conversation_store import InMemoryConversationStore  # noqa: F401
 from .memory import InMemoryEngagementRepository  # noqa: F401
+from .open_loop import InMemoryOpenLoopRepository  # noqa: F401

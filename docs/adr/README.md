@@ -36,6 +36,7 @@
 | [0043](0043-capability-orchestrator-hybrid-merge.md) | **capability 통합 오케스트레이터 + 하이브리드 병합**(1b·2c) | 채택 |
 | [0044](0044-recommend-as-agent.md) | **Recommend를 agent로 승격**(자연어 추천 reasoning) | 구현됨 |
 | [0045](0045-capability-structure-detail.md) | capability 상세 — **2채널 출력·LLM플래너(검증)·블랙보드** | 채택 |
+| [0046](0046-advisory-action-cta-bridge.md) | **조언형/행동형 분리 + CTA 브릿지** — 판매·기사 자동라우팅 금지·수리CTA게이팅·추천위임·복합쿼리 | 채택 |
 
 ### Phase A — 스트리밍 / 동시성 실행 (operations.md §6·§9·§14)
 | # | 결정 | 상태 |

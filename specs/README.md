@@ -7,6 +7,7 @@
 | 스펙 | 범위 |
 |------|------|
 | [`mvp-concierge/`](./mvp-concierge/) | **MVP** — 이상 감지 → 해결 → 부속품 주문 (비전 3→4→5 + 진입 1) |
+| [`always-present-companion/`](./always-present-companion/) | **컴패니언** — 대화 연속성 + 미해결 챙김 + 엄격 게이트 선제 (ADR-0040·0042) |
 
 > ⚠️ 이름이 제품명처럼 컸을 뿐, 내용은 **MVP 한 기능 줄기**다. "전부를 포괄"하는 건 `docs/`(토대)다.
 

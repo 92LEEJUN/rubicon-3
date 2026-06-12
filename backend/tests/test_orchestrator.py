@@ -1,10 +1,13 @@
-"""오케스트레이터 — 분류·우선순위·섹션 생성(복합 R7). 규칙기반 분류기로 네트워크 없이 검증."""
-from app.orchestrator import Orchestrator, RuleBasedClassifier
+"""오케스트레이터 — 분류·우선순위·섹션 생성(복합 R7). 규칙기반 분류기로 네트워크 없이 검증.
+
+옛 core.Orchestrator 제거(§12.3) 후 결정적 경로는 CapabilityOrchestrator(플래너 없음)로 수렴.
+"""
+from app.orchestrator import CapabilityOrchestrator, RuleBasedClassifier
 from app.orchestrator.classify import OpenAIClassifier
 
 
 def _orch(container):
-    return Orchestrator(container=container, classifier=RuleBasedClassifier())
+    return CapabilityOrchestrator(container=container, classifier=RuleBasedClassifier())
 
 
 # ── 분류기 ───────────────────────────────────────────────────────────────────

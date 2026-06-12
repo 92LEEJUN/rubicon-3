@@ -66,10 +66,10 @@
   - [ ] 11.2 커밋 = `confirmation`/`booking` 확정 + ActionGate(409), 버퍼링 없음.
   - [ ] 11.3 위반시 보정/차단·사람연결, 재계획 금지.
 
-- [ ] 12. 디스패치 수렴 + 토글 _(요구사항 13)_
-  - [ ] 12.1 `_stream_turn`을 capability 경로로 흡수, 토글을 capability 단위 LLM-backed로 평가(매 호출 env).
-  - [ ] 12.2 어느 상태든 §2.1 봉투 동일 보장.
-  - [ ] 12.3 패리티 증명 후 `legacy`·`runtime`·`core` 옛 경로 제거(스트랭글러 마무리).
+- [~] 12. 디스패치 수렴 + 토글 _(요구사항 13)_
+  - [x] 12.1 결정적 경로(LLM off) `_stream_turn` ①을 CapabilityOrchestrator(플래너 없음)로 흡수. `_orch = CapabilityOrchestrator(...)`. 토글(CAPABILITY_ORCH·LLM_BACKED·MULTIAGENT) 매 호출 env 평가 유지.
+  - [x] 12.2 §2.1 봉투 동일 보장 — `verify_e2e_timing.py` Part A 패리티(core ≡ capability 구조·intent 동일; 차이는 ADR-0046 수리 CTA 게이팅 **추가분**뿐, 회귀 아님). 옛 `test_orchestrator.py`를 capability로 재배선 후 전체 173 green.
+  - [~] 12.3 옛 경로 제거 — **`core` 제거 완료**(결정적 경로 수렴). **`legacy`·`runtime`은 유지** — 이들은 LLM **자연어 prose**(tool-loop·멀티에이전트)를 생성하나 capability 경로는 아직 **라우팅+결정적 템플릿**만(LLM agent capability §8~11 미구현). §8~11 완료 전 제거 시 prose 답변 회귀. **블로커: §8~11.**
 
 - [ ] 13. 실패·부분 폴백 _(요구사항 14)_
   - [ ] 13.1 step별 try/except·타임아웃, 실패 step만 폴백.
@@ -84,6 +84,6 @@
   - [x] 14.6 봉투 패리티(section→flow→done) 회귀 단언.
 
 ## 진행 메모
-- 스트랭글러 순서: **1→2→3→4(결정적 패리티 게이트)** 가 "회귀 없이 골격 수렴" 1차. **5~7**에서 수리 CTA 게이팅·행동형 분리·추천 위임(ADR-0046 핵심), **8~11**에서 LLM capability·플래너·복합·리뷰, **12.3**에서 옛 경로 삭제.
+- 스트랭글러 순서: **1→2→3→4(결정적 패리티 게이트)** 가 "회귀 없이 골격 수렴" 1차. **5~7**에서 수리 CTA 게이팅·행동형 분리·추천 위임(ADR-0046 핵심), **8~11**에서 LLM capability·플래너·복합·리뷰, **12.3**에서 옛 경로 삭제(현재 `core` 삭제 완료, `legacy`·`runtime`은 §8~11 LLM prose capability 완료 후).
 - 기존 자산 재사용: `_PRIORITY`·`plan_workers`·`carried_parts`·`should_review`·`_run_worker`·`achat_completion`·`RecommendationService`·기존 템플릿. 새로 만들지 말고 재배치.
 - 구현 중 설계와 달라지면 design.md·본 파일 동시 갱신.

@@ -81,6 +81,19 @@
 - **§9.2 async 서빙** ✅ — `aroute`/`astream`(apropose, sync 폴백) + `internal.py` `CAPABILITY_ORCH` 토글(끄면 기존 경로 불변). 실 async 스모크: '보증 되나요 예약 가능?' → `section warranty`→`section booking`→`flow`→`done`. 전체 173 통과.
 - **남은 것**: 결정적 섹션 먼저 pre-paint(speculative)로 홉 지연 완전 은닉은 범위 밖(현재 섹션 완성 시점 스트리밍). 매 턴 +1홉 수용.
 
+### E2E 실측 타이밍 (`verify_e2e_timing.py` Part B, gpt-4o-mini, 6회 중앙값)
+| 턴 | LLM 라우팅 홉 | capability 실행+스트림 | 실 총 E2E |
+|---|---|---|---|
+| clean 단일 → [diagnose] | ~572ms (483–687) | **0.40ms** | ~569ms |
+| F2 보증/예약 → [warranty,booking] | ~569ms (479–733) | **0.35ms** | ~570ms(꼬리 spike max 3.5s) |
+| 모호 → [clarify] | ~522ms (467–767) | **0.14ms** | ~557ms |
+
+**결론**: E2E ≈ **LLM 라우팅 홉 1회**(~0.5–0.6s 중앙값, 꼬리 1.5–3.5s). capability 실행은 **~0.2ms(<0.1%)**. → 레이턴시 개선 레버는 전적으로 홉(모델 속도·캐시·pre-paint 은닉)이지 결정적 실행이 아님.
+
+### 옛 경로 정리 (스트랭글러 §12.3)
+- **`core` 제거** ✅ — 결정적 경로(LLM off)를 CapabilityOrchestrator(플래너 없음)로 수렴. 패리티(Part A): 구조·intent 동일, 차이는 ADR-0046 수리 CTA 게이팅 **추가분**뿐(회귀 아님). 173 green.
+- **`legacy`·`runtime` 유지** — LLM **자연어 prose** 생성 경로. capability엔 LLM agent capability(§8~11)가 없어 제거 시 prose 답변 회귀. **블로커: §8~11.**
+
 ## 결론 / 우선순위
 - **즉시 처방(데이터·규칙 독립, 안전 직결)**: F3 → **완료**(detect_danger).
 - **LLM 플래너로 해소(tasks §9)**: F1·F2 — 장문 문맥·후속 의도. 규칙 분류기의 구조적 한계.

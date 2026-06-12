@@ -36,13 +36,15 @@ from ..errors import (
     QuoteForbidden,
     QuoteNotConvertible,
 )
-from ..orchestrator import Orchestrator
+from ..orchestrator.capability import CapabilityOrchestrator
 
 app = FastAPI(title="MVP 컨시어지 — BE 내부 API")
 
 # MVP: 단일 컨테이너(인메모리 상태). 실 전환 시 세션/사용자별로 분리.
 _container = build_container()
-_orch = Orchestrator(container=_container)
+# 결정적 경로(LLM off) = capability 오케스트레이터(플래너 없음). 옛 core.Orchestrator를
+# 여기로 수렴(스트랭글러 §12.3) — 봉투 동일 + ADR-0046 수리 CTA 게이팅 포함.
+_orch = CapabilityOrchestrator(container=_container, llm_planner=None)
 
 
 def _llm_backed() -> bool:
@@ -77,11 +79,11 @@ _cap_orch = None   # 첫 CAPABILITY_ORCH 요청 시 lazy 구성(LLM_BACKED 토�
 async def _stream_turn(text: str, screen_context: dict | None) -> AsyncIterator[dict]:
     """턴 스트림 디스패치(비동기):
     ⓪ CAPABILITY_ORCH on → CapabilityOrchestrator.astream(LLM-planner 라우팅, §9.2)
-    ① LLM_BACKED off → 결정적 섹션(core.Orchestrator)
-    ② LLM_BACKED on, MULTIAGENT off → 단일 tool-loop(legacy)
-    ③ LLM_BACKED on, MULTIAGENT on → 슈퍼바이저-워커(runtime).
+    ① LLM_BACKED off → 결정적 섹션(CapabilityOrchestrator, 플래너 없음 — core 수렴 §12.3)
+    ② LLM_BACKED on, MULTIAGENT off → 단일 tool-loop(legacy, LLM 자연어 prose)
+    ③ LLM_BACKED on, MULTIAGENT on → 슈퍼바이저-워커(runtime, LLM 자연어 prose).
 
-    CAPABILITY_ORCH off(기본)면 ①~③ 기존 디스패치가 오늘과 정확히 동일하게 동작한다."""
+    ②③(LLM prose)는 capability에 LLM agent capability(§8~11)가 생기기 전까지 유지한다."""
     if _capability_orch():
         global _cap_orch
         if _cap_orch is None:
@@ -99,7 +101,7 @@ async def _stream_turn(text: str, screen_context: dict | None) -> AsyncIterator[
             async for chunk in _llm_astream(text, screen_context, memory=memory):
                 yield chunk
     else:
-        for chunk in _orch.stream_turn(text, screen_context):
+        for chunk in _orch.stream_turn(text, screen_context=screen_context):
             yield chunk
 
 

@@ -14,7 +14,7 @@ from __future__ import annotations
 import json
 import os
 from pathlib import Path
-from typing import Iterator
+from typing import AsyncIterator
 
 try:  # backend/.env 자동 로드(있으면) — OPENAI_API_KEY·LLM_BACKED 등.
     from dotenv import load_dotenv
@@ -43,13 +43,16 @@ def _llm_backed() -> bool:
     return os.getenv("LLM_BACKED", "").strip().lower() in ("1", "true", "yes", "on")
 
 
-def _stream_turn(text: str, screen_context: dict | None) -> Iterator[dict]:
-    """턴 스트림 디스패치 — LLM_BACKED면 자연어(delta), 아니면 결정적 섹션."""
+async def _stream_turn(text: str, screen_context: dict | None) -> AsyncIterator[dict]:
+    """턴 스트림 디스패치(비동기) — LLM_BACKED면 자연어(delta, 비동기 tool-loop),
+    아니면 결정적 섹션(동기 제너레이터, I/O 없음·즉시)."""
     if _llm_backed():
-        from ..orchestrator.legacy import stream_turn as _llm_stream
-        yield from _llm_stream(text, screen_context)
+        from ..orchestrator.legacy import astream_turn as _llm_astream
+        async for chunk in _llm_astream(text, screen_context):
+            yield chunk
     else:
-        yield from _orch.stream_turn(text, screen_context)
+        for chunk in _orch.stream_turn(text, screen_context):
+            yield chunk
 
 
 # ── 요청 모델 ────────────────────────────────────────────────────────────────
@@ -85,7 +88,7 @@ async def turn_ws(ws: WebSocket) -> None:
         while True:
             msg = await ws.receive_json()
             text = msg.get("text", "")
-            for chunk in _stream_turn(text, msg.get("screen_context")):
+            async for chunk in _stream_turn(text, msg.get("screen_context")):
                 await ws.send_json(chunk)
     except WebSocketDisconnect:
         return
@@ -93,9 +96,10 @@ async def turn_ws(ws: WebSocket) -> None:
 
 @app.post("/internal/turn")
 def turn_http(req: TurnRequest) -> StreamingResponse:
-    """BFF 중계용 HTTP 스트림(NDJSON) — 한 줄당 청크 1개(§2.1 봉투)."""
-    def gen():
-        for chunk in _stream_turn(req.text, req.screen_context):
+    """BFF 중계용 HTTP 스트림(NDJSON) — 한 줄당 청크 1개(§2.1 봉투). 비동기 제너레이터로
+    스트리밍(이벤트 루프 비차단 — 스레드-당-턴 점유 제거)."""
+    async def gen():
+        async for chunk in _stream_turn(req.text, req.screen_context):
             yield json.dumps(chunk, ensure_ascii=False) + "\n"
     return StreamingResponse(gen(), media_type="application/x-ndjson")
 

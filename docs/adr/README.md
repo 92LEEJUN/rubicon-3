@@ -85,3 +85,4 @@
 | # | 결정 | 상태 |
 |---|---|---|
 | [0040](0040-conversation-continuity-compaction.md) | 대화 연속성 = **하이브리드 컴팩션 + 영속 메모리** | 채택 |
+| [0042](0042-companion-proactive-gated.md) | 컴패니언 선제 재관여 = **엄격 게이트** | 채택 |

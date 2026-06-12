@@ -10,9 +10,18 @@ def test_plan_workers_mapping():
     assert runtime.plan_workers(["troubleshoot"]) == ["diagnosis"]
     assert runtime.plan_workers(["troubleshoot", "order"]) == ["diagnosis", "commerce"]
     assert runtime.plan_workers(["order"]) == ["commerce"]
-    assert runtime.plan_workers(["recommend"]) == ["general"]
+    assert runtime.plan_workers(["recommend"]) == ["recommend"]           # 추천 = agent(ADR-0044)
+    assert runtime.plan_workers(["troubleshoot", "recommend"]) == ["diagnosis", "recommend"]
     assert runtime.plan_workers([]) == ["general"]            # 폴백
     assert runtime.plan_workers(["device_status"]) == ["diagnosis"]
+
+
+def test_recommend_tool_returns_products():
+    from app.tools import call
+    res = call("recommend", {})
+    assert "products" in res and isinstance(res["products"], list)
+    res_b = call("recommend", {"budget": 1})                  # 예산 상한 적용(결정적)
+    assert all(p["price"] <= 1 for p in res_b["products"])
 
 
 def test_should_review_conditional():
@@ -81,6 +90,20 @@ def test_streaming_partial_fallback(monkeypatch):
     assert "error" not in types_seq                    # 단계 실패는 중단 아님(부분 폴백)
     assert types_seq[-1] == "done"
     assert types_seq.count("delta") >= 1               # 폴백 델타로 부분결과 유지
+
+
+def test_streaming_recommend_stage(monkeypatch):
+    async def fc(_m):
+        return {"intents": ["recommend"], "is_compound": False}
+
+    async def fa(**_k):
+        return _fake_resp("공기청정기 추천")
+
+    monkeypatch.setattr(runtime, "aclassify", fc)
+    monkeypatch.setattr(runtime, "achat_completion", fa)
+    chunks = asyncio.run(_collect(runtime.astream_multiagent("공기청정기 추천해줘")))
+    types = [c["type"] for c in chunks]
+    assert types.count("delta") == 1 and types[-1] == "done"  # recommend 단계 1개, 리뷰 스킵
 
 
 def test_streaming_simple_no_review(monkeypatch):

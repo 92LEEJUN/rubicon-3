@@ -16,12 +16,13 @@ from typing import AsyncIterator, Optional
 from ..llm import MODEL, achat_completion
 from ..tools import TOOLS, call
 from .legacy import INTENT_SCHEMA, SYSTEM, _memory_note
-from .prompts import COMMERCE_PROMPT, DIAGNOSIS_PROMPT, REVIEW_PROMPT
+from .prompts import COMMERCE_PROMPT, DIAGNOSIS_PROMPT, RECOMMEND_PROMPT, REVIEW_PROMPT
 
 # 의도 우선순위(core._PRIORITY와 정합: 안전/CS 먼저, order 뒤)
 _PRIORITY = {"device_status": 0, "troubleshoot": 1, "general": 2, "recommend": 3, "order": 4}
 _DIAG_TOOLS = ("get_device_status", "search_solutions")
 _COMM_TOOLS = ("match_parts",)
+_RECO_TOOLS = ("recommend", "match_parts")
 
 
 # ── 결정적 오케스트레이션 판정(LLM 무관, 단위 테스트 대상) ────────────────────
@@ -32,7 +33,9 @@ def plan_workers(intents: list[str]) -> list[str]:
         stages.append("diagnosis")
     if "order" in intents:
         stages.append("commerce")
-    if any(i in ("recommend", "general") for i in intents) or not stages:
+    if "recommend" in intents:
+        stages.append("recommend")              # 자연어 추천 = agent(ADR-0044)
+    if "general" in intents or not stages:
         stages.append("general")
     return stages
 
@@ -113,7 +116,9 @@ async def astream_multiagent(message: str, screen_context: Optional[dict] = None
             elif stage == "commerce":
                 cmsg = message + (f"\n[필요 부품 후보: {carried_parts}]" if carried_parts else "")
                 text, _ = await _run_worker(COMMERCE_PROMPT, cmsg, _COMM_TOOLS, memory)
-            else:  # general / recommend
+            elif stage == "recommend":
+                text, _ = await _run_worker(RECOMMEND_PROMPT, message, _RECO_TOOLS, memory)
+            else:  # general
                 text = await _general(message, memory)
         except Exception:  # 단계 실패 = 부분 폴백(이미 방출분 유지, 나머지 계속)
             yield {"type": "delta", "text": "(이 부분은 잠시 후 다시 도와드릴게요.)"}

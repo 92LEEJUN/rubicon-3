@@ -38,3 +38,6 @@ Thumbs.db
 .idea/
 .vscode/
 *.swp
+
+# Claude Code 하니스 내부(에이전트 worktree 등) — 추적 금지
+.claude/

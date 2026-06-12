@@ -119,7 +119,10 @@ class PartMatchResult(_Base):
 
 
 # ── 주문 / 커머스 (Commerce · O2O) ─────────────────────────────────────────
-OrderStatus = Literal["DRAFT", "CONFIRMED", "CANCELLED", "FAILED"]
+OrderStatus = Literal["DRAFT", "CONFIRMED", "CANCELLED", "FAILED", "REFUNDED"]
+# O2O — 이행 방식·픽업 라이프사이클(data-model.md §3, BOPIS)
+Fulfillment = Literal["delivery", "pickup"]
+PickupStatus = Literal["RESERVED", "READY", "PICKED_UP", "EXPIRED"]
 
 
 class OrderItem(_Base):
@@ -149,6 +152,42 @@ class Order(_Base):
     status: OrderStatus = "DRAFT"
     summary: OrderSummary = Field(default_factory=OrderSummary)
     created_at: Optional[datetime] = None
+    # O2O(BOPIS) — fulfillment=pickup이면 store_id·pickup_status 필수(data-model.md 불변식).
+    fulfillment: Fulfillment = "delivery"
+    store_id: Optional[Id] = None
+    pickup_status: Optional[PickupStatus] = None
+
+
+# ── 오프라인 거점 / 견적 (O2O — Store · Quote) ─────────────────────────────
+StoreType = Literal["retail", "experience", "service_center"]
+QuoteSource = Literal["offline", "online"]
+QuoteStatus = Literal["ACTIVE", "CONVERTED", "EXPIRED"]
+
+
+class Store(_Base):
+    """오프라인 거점 — 매장·서비스센터(O2O). MVP: 후속/Mock."""
+    id: Id
+    name: str
+    type: StoreType
+    address: str
+    geo: Optional[tuple[float, float]] = None   # 위도·경도(위치 기반 찾기)
+    hours: Optional[str] = None
+
+
+class Quote(_Base):
+    """견적 — 오프라인↔온라인 브리지(reverse O2O). MVP: 후속/Mock.
+
+    조회는 본인(`user_id`) 한정. `ACTIVE`만 전환 가능, `expires_at` 경과 시 만료.
+    """
+    id: Id
+    user_id: Id
+    source: QuoteSource = "offline"
+    items: list[OrderItem] = Field(default_factory=list)
+    total: int = 0
+    status: QuoteStatus = "ACTIVE"
+    store_id: Optional[Id] = None
+    expires_at: Optional[datetime] = None
+    created_at: Optional[datetime] = None
 
 
 # ── 핸드오프 / 예약 (Handoff) ──────────────────────────────────────────────
@@ -167,6 +206,8 @@ class Booking(_Base):
     slot_id: Id
     status: BookingStatus = "REQUESTED"
     context_ref: Optional[Id] = None
+    visit_type: str = "REPAIR"          # 수리/설치/센터방문 (O2O, O7)
+    store_id: Optional[Id] = None       # 서비스센터/매장 방문 거점 (O2O, O7-4)
 
 
 # ── 사용자 / 동의 (User · Identity) ────────────────────────────────────────

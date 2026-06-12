@@ -6,4 +6,6 @@ from .services import (  # noqa: F401
     KnowledgeService,
     NotificationService,
     OrderService,
+    StoreService,
+    TriageService,
 )

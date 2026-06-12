@@ -248,3 +248,14 @@ class AssistantTurn(_Base):
     sections: list[MessageSection] = Field(default_factory=list)
     active_flow: Optional[str] = None
     message_id: Optional[str] = None
+
+
+class ConversationMemory(_Base):
+    """대화 연속성 — 컴팩션 대상(ADR-0040, operations §4-1). user 단위 영속.
+
+    오래된 턴은 `summary`로 접고(롤링 요약), 손실 위험 큰 항목(주문ID·기기모델 등)은
+    `facts`로 별도 보존한다. `summarized_through` 이후 메시지는 verbatim으로 유지한다.
+    """
+    summary: str = ""
+    facts: dict = Field(default_factory=dict)
+    summarized_through: int = 0  # 요약에 흡수된 메시지 수(이 인덱스 이후는 verbatim)

@@ -348,6 +348,7 @@ class FlowState:                         # 흐름 전환/복원 (R6)
     data: dict                           # 진행 중 맥락(대상 기기/문제/주문 등)
 
 class ConversationMemory:                # 연속성 컴팩션 대상 (operations §4-1, ADR-0040). 영속(R12)
+    # 구현: app/domain/models.py · app/compaction.py · app/repositories/conversation_memory.py
     summary: str                         # 오래된 턴의 롤링 요약
     facts: dict                          # 구조화 사실(기기·진행 중 주문·추천 부품·미해결 이슈) — 요약에 안 넣고 별도 보존
     summarized_through: int              # 요약에 흡수된 마지막 message 인덱스(이후는 verbatim 유지)

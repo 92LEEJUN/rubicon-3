@@ -61,5 +61,11 @@
   - [ ] 10.5 토글 off 결정적 경로 회귀 테스트(봉투 동일). _(요구사항 6)_
   - [ ] 10.6 부분 폴백(워커 예외) 비중단 테스트. _(요구사항 8)_
 
-## 진행 메모
-<!-- 구현 중 설계와 달라진 점, 결정 사항 등을 기록한다. 변경 시 design.md도 갱신한다. -->
+## 진행 메모 (구현)
+**구현됨** — `backend/app/orchestrator/runtime.py`(`astream_multiagent`·`plan_workers`·`should_review`·async 워커 tool-loop) + `api/internal.py` `_multiagent()` 토글·디스패치 3경로 + `tests/test_runtime.py`(7종). **백엔드 134 통과**(토글 off 회귀 0).
+
+대부분 `[x]` 완료(1·2.1~2.3·3.1~3.2·4.1~4.3·5·6.2~6.4·7·8.2~8.3·9·10). **남은(부분/후속)**:
+- 2.4 민감 의도 규칙 가드레일 재검증 · 3.3·4.4 프롬프트 규약(출처·위험경고·품절 폴백)은 LLM 출력 의존 → 평가셋 단계
+- 6.1 **빠른 결정적 섹션 먼저(첫 섹션 ≤2~3s)** — 현재 단계별 `delta`. `device_status` LLM 전 `section` 선방출은 후속(컴패니언 2b와 동형)
+- 8.1 **단계별 타임아웃** — try/except 부분 폴백만, 타임아웃·fine abort는 ADR-0018 보류
+- recommend/booking/history 직접 tool: tools.py 미보유 → 현재 `general` 직접 응답, 도구화는 후속

@@ -50,14 +50,26 @@ def _llm_backed() -> bool:
     return os.getenv("LLM_BACKED", "").strip().lower() in ("1", "true", "yes", "on")
 
 
+def _multiagent() -> bool:
+    """멀티에이전트 경로 토글 — LLM_BACKED 위에서 동작(매 호출 평가, 기본 off)."""
+    return os.getenv("MULTIAGENT", "").strip().lower() in ("1", "true", "yes", "on")
+
+
 async def _stream_turn(text: str, screen_context: dict | None) -> AsyncIterator[dict]:
-    """턴 스트림 디스패치(비동기) — LLM_BACKED면 자연어(delta, 비동기 tool-loop),
-    아니면 결정적 섹션(동기 제너레이터, I/O 없음·즉시)."""
+    """턴 스트림 디스패치(비동기) — 세 경로:
+    ① LLM_BACKED off → 결정적 섹션(core.Orchestrator)
+    ② LLM_BACKED on, MULTIAGENT off → 단일 tool-loop(legacy)
+    ③ LLM_BACKED on, MULTIAGENT on → 슈퍼바이저-워커(runtime)."""
     if _llm_backed():
-        from ..orchestrator.legacy import astream_turn as _llm_astream
         memory = _container.companion.context(_container.user.id)  # 이어가기 주입(§0.4)
-        async for chunk in _llm_astream(text, screen_context, memory=memory):
-            yield chunk
+        if _multiagent():
+            from ..orchestrator.runtime import astream_multiagent
+            async for chunk in astream_multiagent(text, screen_context, memory=memory):
+                yield chunk
+        else:
+            from ..orchestrator.legacy import astream_turn as _llm_astream
+            async for chunk in _llm_astream(text, screen_context, memory=memory):
+                yield chunk
     else:
         for chunk in _orch.stream_turn(text, screen_context):
             yield chunk
@@ -177,6 +189,20 @@ def reengagement_deliver():
         return {}
     _container.reengagement.mark_sent(user)
     return cand.model_dump(mode="json")
+
+
+@app.get("/internal/recommendations")
+def recommendations():
+    """반응형 추천(컴패니언·비전 2) — 추천 코어 산출(개인화·동의 차등). recommendation_list 매핑용."""
+    items = _container.recommendation.recommend(_container.user)
+    return {"items": [it.model_dump(mode="json") for it in items]}
+
+
+@app.post("/internal/recommendations/preemptive")
+def recommendations_preemptive():
+    """선제 추천 등록 — 트리거를 open-loop로 적재(전달은 컴패니언 게이트가 규율, ADR-0042)."""
+    n = _container.recommendation.enqueue_preemptive(_container.user, _container.companion)
+    return {"enqueued": n}
 
 
 @app.post("/internal/open-loops/{ref}/resolve")

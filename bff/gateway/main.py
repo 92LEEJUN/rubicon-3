@@ -119,6 +119,10 @@ def create_app(backend: Optional[BackendClient] = None) -> FastAPI:
     async def reengagement(user: str = Depends(require_auth), be: BackendClient = Depends(_backend)):
         return await relay(be.reengagement)
 
+    @app.get("/recommendations")
+    async def recommendations(user: str = Depends(require_auth), be: BackendClient = Depends(_backend)):
+        return await relay(be.recommendations)
+
     @app.post("/reengagement/deliver")
     async def reengagement_deliver(user: str = Depends(require_auth), be: BackendClient = Depends(_backend)):
         return await relay(be.reengagement_deliver)

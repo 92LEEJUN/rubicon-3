@@ -37,6 +37,11 @@ def test_reengagement_relayed(client):
     assert client.get("/reengagement", headers=AUTH).status_code == 200
 
 
+def test_recommendations_relayed(client):
+    body = client.get("/recommendations", headers=AUTH).json()
+    assert "items" in body                     # 추천 코어 산출(개인화·동의 차등)
+
+
 def test_reengagement_deliver_relayed(client):
     assert client.post("/reengagement/deliver", headers=AUTH).status_code == 200
 

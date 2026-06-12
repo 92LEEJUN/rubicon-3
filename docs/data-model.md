@@ -304,7 +304,9 @@ class Consent:                           # 프라이버시 (R19)
     updated_at: datetime
 
 class AnalyticsEvent:                    # 사용 분석 이벤트 (R28). 명세: docs/analytics.md
-    name: str                            # 택소노미 이벤트명 (예: "cta_click")
+    event_id: Id                         # 멱등 dedup용 UUID(배치 재전송 중복 제거)
+    schema_version: int                  # 이벤트 스키마 버전(props 진화 추적)
+    name: str                            # 택소노미 이벤트명 object_action 과거형 (예: "cta_clicked")
     ts: datetime                         # UTC
     session_id: Id
     user_ref: str | None                 # 가명화 식별자(원본 식별자 아님, R19)

@@ -386,6 +386,12 @@ class Conversation:
 - **User** — `addresses` 중 `default=True`는 최대 1개.
 - **Quote** — 조회는 본인(`user_id`) 한정. `ACTIVE`만 주문 전환 가능(→`CONVERTED`), `expires_at` 경과 시 `EXPIRED`. 전환 시 현재가 검증.
 - **Order(픽업)** — `fulfillment=PICKUP`이면 `store_id`·`pickup_status` 필수. 전이 `RESERVED→READY→PICKED_UP|EXPIRED`. `EXPIRED`는 취소/환불(R21) 연계.
+- **Booking(O2O)** — 센터/매장 방문은 `visit_type`(`center` 등)·`store_id`(서비스센터 거점)를 동반한다(O7-4).
+
+> **구현 상태(`specs/o2o-full`)** — 위 O2O 타입(`Store`·`Quote`·`Order` 픽업 필드·`Booking` 거점)과
+> `StorePort`/`QuotePort`/`ActionGatePort`는 BE에 Mock 어댑터로 구현됨(`backend/app/domain/models.py`,
+> `adapters/mock.py`, `ports/base.py`). 선제 알림 전달은 `MockAlertAdapter`(in_app), 픽업 만료는
+> `EXPIRED`→`REFUNDED` 환불 연계로 구현. 실 전환 시 어댑터만 교체(ADR-0020).
 
 ### 동의 scope (R19)
 

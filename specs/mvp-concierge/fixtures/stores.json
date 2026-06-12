@@ -1,0 +1,12 @@
+{
+  "stores": [
+    { "id": "store_gangnam", "name": "삼성 강남 매장", "type": "retail", "address": "서울특별시 강남구 테헤란로 1", "geo": [37.4979, 127.0276], "hours": "10:00-20:00" },
+    { "id": "store_hongdae", "name": "삼성 홍대 익스피리언스", "type": "experience", "address": "서울특별시 마포구 양화로 100", "geo": [37.5563, 126.9226], "hours": "11:00-21:00" },
+    { "id": "store_seocho_svc", "name": "삼성전자 서비스센터 서초점", "type": "service_center", "address": "서울특별시 서초구 서초대로 200", "geo": [37.4836, 127.0327], "hours": "09:00-18:00" }
+  ],
+  "stock": {
+    "store_gangnam": ["part_drain_filter", "part_water_filter"],
+    "store_hongdae": ["part_water_filter"],
+    "store_seocho_svc": []
+  }
+}

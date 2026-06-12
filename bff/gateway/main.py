@@ -56,6 +56,43 @@ def create_app(backend: Optional[BackendClient] = None) -> FastAPI:
     async def list_orders(user: str = Depends(require_auth), be: BackendClient = Depends(_backend)):
         return await relay(lambda: be.list_orders(user))
 
+    @app.get("/orders/{order_id}")
+    async def get_order(order_id: str, user: str = Depends(require_auth),
+                        be: BackendClient = Depends(_backend)):
+        return await relay(lambda: be.get_order(order_id))
+
+    # ── O2O 픽업 상태 전이(§2.2, O3·O4) — 역전이 409 그대로 중계 ────────────
+    @app.post("/orders/{order_id}/pickup")
+    async def advance_pickup(order_id: str, request: Request, user: str = Depends(require_auth),
+                             be: BackendClient = Depends(_backend)):
+        body = await request.json()
+        return await relay(lambda: be.advance_pickup(order_id, body))
+
+    # ── O2O 거점·재고(§2.2, O1·O2) ──────────────────────────────────────────
+    @app.get("/stores")
+    async def list_stores(request: Request, user: str = Depends(require_auth),
+                          be: BackendClient = Depends(_backend)):
+        params = dict(request.query_params)
+        return await relay(lambda: be.list_stores(params or None))
+
+    @app.get("/stores/{store_id}/stock/{part_id}")
+    async def check_stock(store_id: str, part_id: str, user: str = Depends(require_auth),
+                          be: BackendClient = Depends(_backend)):
+        return await relay(lambda: be.check_stock(store_id, part_id))
+
+    # ── O2O 견적 이어보기/전환(§2.2, O5·O6) — 403/410/409 그대로 중계 ───────
+    @app.get("/quotes/{quote_ref}")
+    async def get_quote(quote_ref: str, user: str = Depends(require_auth),
+                        be: BackendClient = Depends(_backend)):
+        return await relay(lambda: be.get_quote(quote_ref, user))
+
+    @app.post("/quotes/{quote_ref}/convert")
+    async def convert_quote(quote_ref: str, request: Request, user: str = Depends(require_auth),
+                            be: BackendClient = Depends(_backend)):
+        body = await request.json()
+        body.setdefault("user_id", user)
+        return await relay(lambda: be.convert_quote(quote_ref, body))
+
     @app.get("/bookings")
     async def list_bookings(user: str = Depends(require_auth), be: BackendClient = Depends(_backend)):
         return await relay(be.list_bookings)

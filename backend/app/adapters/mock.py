@@ -16,6 +16,7 @@ from ..domain import (
     Booking,
     BookingSlot,
     Coverage,
+    Cta,
     Device,
     DeviceStatusResult,
     Order,
@@ -24,8 +25,10 @@ from ..domain import (
     Part,
     PartMatchResult,
     Product,
+    Quote,
     Solution,
     SolutionSearchResult,
+    Store,
 )
 
 # 한국어 별칭 매핑(데모용)
@@ -56,6 +59,14 @@ def _parts() -> list[Part]:
 
 def _products() -> list[Product]:
     return [Product.model_validate(p) for p in fx.PRODUCTS]
+
+
+def _stores() -> list[Store]:
+    return [Store.model_validate(s) for s in fx.STORES]
+
+
+def _quotes() -> list[Quote]:
+    return [Quote.model_validate(q) for q in fx.QUOTES]
 
 
 class MockDeviceAdapter:
@@ -172,9 +183,51 @@ class MockOrderAdapter:
         self._orders[oid] = order
         return order
 
+    def place_pickup_order(
+        self, user_id: str, part_ids: list[str], store_id: str, confirmed: bool = False
+    ) -> Order:
+        """픽업(BOPIS) 주문 생성 — fulfillment=pickup·store_id·pickup_status=RESERVED(O3-1).
+
+        재고 게이트는 도메인 서비스(StoreService)가 호출 전에 검증한다(O2). 픽업은 매장
+        수령이므로 배송비 0.
+        """
+        catalog = {p.id: p for p in _parts()}
+        items = [
+            OrderItem(part_id=p.id, name=p.name, unit_price=p.price, qty=1)
+            for pid in part_ids
+            if (p := catalog.get(pid)) is not None and p.in_stock
+        ]
+        oid = f"ord_{next(self._ids):04d}"
+        summary = OrderSummary(subtotal=sum(i.line_total for i in items), shipping_fee=0,
+                               tax=0, discount=0, total=sum(i.line_total for i in items))
+        order = Order(
+            id=oid, user_id=user_id, items=items,
+            status="CONFIRMED" if confirmed and items else "DRAFT",
+            summary=summary, created_at=datetime.now(timezone.utc),
+            fulfillment="pickup", store_id=store_id,
+            pickup_status="RESERVED" if confirmed and items else None,
+        )
+        self._orders[oid] = order
+        return order
+
+    def get_order(self, order_id: str) -> Optional[Order]:
+        return self._orders.get(order_id)
+
+    def update_pickup_status(self, order_id: str, pickup_status: str) -> Order:
+        """픽업 상태를 갱신(전이 검증은 도메인 OrderService가 수행). EXPIRED는 상태도 갱신."""
+        order = self._orders[order_id]
+        order.pickup_status = pickup_status  # type: ignore[assignment]
+        return order
+
     def cancel_order(self, order_id: str) -> Order:
         order = self._orders[order_id]
         order.status = "CANCELLED"
+        return order
+
+    def refund_order(self, order_id: str) -> Order:
+        """취소→환불 상태 전이(R21). EXPIRED 픽업의 환불 연계."""
+        order = self._orders[order_id]
+        order.status = "REFUNDED"
         return order
 
     def list_orders(self, user_id: Optional[str] = None) -> list[Order]:
@@ -200,9 +253,13 @@ class MockHandoffAdapter:
                                      end=start + timedelta(hours=2), visit_type=visit_type))
         return slots
 
-    def book_slot(self, slot_id: str, context_ref: Optional[str] = None) -> Booking:
+    def book_slot(
+        self, slot_id: str, context_ref: Optional[str] = None,
+        visit_type: str = "REPAIR", store_id: Optional[str] = None,
+    ) -> Booking:
         bid = f"bk_{next(self._ids):04d}"
-        booking = Booking(id=bid, slot_id=slot_id, status="CONFIRMED", context_ref=context_ref)
+        booking = Booking(id=bid, slot_id=slot_id, status="CONFIRMED", context_ref=context_ref,
+                          visit_type=visit_type, store_id=store_id)
         self._bookings[bid] = booking
         return booking
 
@@ -218,3 +275,65 @@ class MockWarrantyAdapter:
             if part_id and part_id in sol.required_parts and sol.coverage != "unknown":
                 return sol.coverage
         return "unknown"
+
+
+class MockStoreAdapter:
+    """StorePort — 거점·픽업 재고 Mock(O1·O2). fixtures → 도메인 타입(ACL).
+
+    실 전환 시 매장/파트너 위치·재고 API로 교체(시그니처 불변, ADR-0020).
+    """
+
+    def find_stores(
+        self, geo: Optional[tuple[float, float]] = None, store_type: Optional[str] = None
+    ) -> list[Store]:
+        stores = _stores()
+        if store_type:
+            stores = [s for s in stores if s.type == store_type]
+        if geo is not None:
+            # 데모용 거리(유클리드 근사) 정렬 — 실 전환 시 실제 지오 검색으로 대체.
+            lat, lng = geo
+            stores = sorted(
+                stores,
+                key=lambda s: ((s.geo[0] - lat) ** 2 + (s.geo[1] - lng) ** 2) if s.geo else 9e9,
+            )
+        return stores
+
+    def check_stock(self, store_id: str, part_id: str) -> bool:
+        return part_id in fx.STORE_STOCK.get(store_id, [])
+
+
+class MockQuoteAdapter:
+    """QuotePort — 오프라인 견적 이어보기 Mock(O5). fixtures → 도메인 타입(ACL).
+
+    본인 확인·만료·현재가 검증은 도메인(StoreService)이 수행한다. 어댑터는 조회만 한다.
+    """
+
+    def get_quote(self, quote_ref: str) -> Optional[Quote]:
+        return next((q for q in _quotes() if q.id == quote_ref), None)
+
+
+class MockActionGateAdapter:
+    """ActionGatePort — 확인 게이트 판정 Mock(R17·ADR-0033). 확인 UX는 실제, 처리는 Mock.
+
+    되돌릴 수 없는 커밋(commit 액션·픽업/전환/취소 kind)은 확인을 요구한다.
+    """
+
+    _COMMIT_KINDS = {"order", "pickup", "convert", "cancel", "reorder"}
+
+    def requires_confirmation(self, cta: Cta) -> bool:
+        return cta.action == "commit" or (cta.kind in self._COMMIT_KINDS)
+
+
+class MockAlertAdapter:
+    """AlertPort — 선제 알림 전달 Mock(R20). 실 전환 시 in_app/push 채널로 교체.
+
+    전달 내역을 보관해 테스트에서 검증 가능하게 한다(architecture.md §10 선제 파이프라인).
+    """
+
+    def __init__(self) -> None:
+        self.delivered: list[dict] = []
+
+    def deliver(self, user_id: str, kind: str, body: str, ref: Optional[str] = None) -> dict:
+        msg = {"user_id": user_id, "kind": kind, "body": body, "ref": ref, "channel": "in_app"}
+        self.delivered.append(msg)
+        return msg

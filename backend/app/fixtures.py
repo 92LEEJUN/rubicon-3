@@ -20,3 +20,9 @@ SOLUTIONS = _load("solutions.json")
 CATALOG = _load("catalog.json")
 PARTS = CATALOG["parts"]
 PRODUCTS = CATALOG["products"]
+
+# O2O — 거점·픽업 재고·오프라인 견적(StorePort/QuotePort Mock 데이터)
+STORES_FIX = _load("stores.json")
+STORES = STORES_FIX["stores"]
+STORE_STOCK = STORES_FIX["stock"]
+QUOTES = _load("quotes.json")["quotes"]

@@ -72,10 +72,15 @@ FE의 **구조화된 호출**(조회·커밋)은 LLM 미경유로 직행(archite
 | `/cart` | GET | – | `Order`(DRAFT) | R4 |
 | `/cart` | POST | `CartRequest` | `Order`(DRAFT) | R4 |
 | `/cart/items/{part_id}` | DELETE | – | `Order`(DRAFT) | R4 |
-| `/orders` | POST | `OrderRequest`(`confirmed=true`) | `Order` / `409 ConfirmationRequired` | R4·R17 |
-| `/orders/{id}` | GET | – | `Order` (상태·이력) | R12 |
-| `/bookings/slots` | GET | – | `list[BookingSlot]` | R18 |
-| `/bookings` | POST | `BookingRequest` | `Booking` | R18 |
+| `/orders` | POST | `OrderRequest`(`confirmed=true`, +`fulfillment`·`store_id`) | `Order` / `409 ConfirmationRequired` / `409 OutOfStock` | R4·R17·O3 |
+| `/orders/{id}` | GET | – | `Order` (상태·이력, 픽업 `pickup_status`·`store_id` 포함) | R12·O3-5 |
+| `/orders/{id}/pickup` | POST | `{ action: "ready"\|"picked_up"\|"expired" }` | `Order` / `409`(전이 위반) | O3·O4 |
+| `/stores` | GET | `?lat&lng&type` | `list[Store]` | O1 |
+| `/stores/{id}/stock/{part_id}` | GET | – | `{ in_stock: bool }` | O2 |
+| `/quotes/{ref}` | GET | `?user_id` | `Quote`(+`price_changes[]`) / `403` / `410` / `404` | O5 |
+| `/quotes/{ref}/convert` | POST | `ConvertRequest`(`confirmed=true`·`fulfillment`·`store_id`) | `{ order, quote_status }` / `409`·`403`·`410` | O6·R17 |
+| `/bookings/slots` | GET | `?visit_type` | `list[BookingSlot]` | R18·O7 |
+| `/bookings` | POST | `BookingRequest`(+`visit_type`·`store_id`) | `Booking` | R18·O7 |
 | `/handoff` | POST | `{type, context_ref}` | `ServiceRequest` | R18 |
 | `/history` | GET | `?limit&cursor` | `Page[Conversation \| Order]` | R12 |
 | `/resume` | GET | `?fresh` | `ResumePayload`(`has_context`·`summary`·`facts`·`open_loops[]`·`elapsed_label`·`suspended_flow`) | 컴패니언 §1·§2 |
@@ -84,6 +89,8 @@ FE의 **구조화된 호출**(조회·커밋)은 LLM 미경유로 직행(archite
 | `/open-loops/{ref}/{action}` | POST | `action`=`resolve`\|`dismiss` | `OpenLoop` / `404` | 컴패니언 §2.3 |
 
 - `/orders` POST는 `confirmed=false`거나 게이트 미통과면 **`409`(`ConfirmationRequired`)** 반환(R17). 클라이언트는 `confirmation` 템플릿으로 확인 후 재요청.
+- **O2O 픽업(BOPIS, `specs/o2o-full`)** — `/orders` POST에 `fulfillment=pickup`·`store_id`를 주면 픽업 주문(`pickup_status=RESERVED`). 재고 없으면 **`409 OutOfStock`**(`alternatives[]`·`delivery_available` 동봉, O2). `/orders/{id}/pickup`은 정의된 전이만 허용하고 역전이/건너뜀은 **`409`**(O3-6), `expired`는 환불(`REFUNDED`) 연계(O4).
+- **O2O 견적(`specs/o2o-full`)** — `/quotes/{ref}`는 본인 아님 **`403`**·만료 **`410`**·미발견 **`404`**, 현재가 변동은 `price_changes[]`로 고지(O5). `/quotes/{ref}/convert`는 `ACTIVE`만 전환(아니면 **`409`**), 미확인 **`409`**(R17), 성공 시 `quote_status=CONVERTED`(O6).
 - 목록은 모두 **커서 페이지네이션**(`Page`, data-model §5).
 
 ### 2.3 카드 탭 — surface 결정 (브릿지 vs 패널)

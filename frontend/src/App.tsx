@@ -1,11 +1,14 @@
 /** 앱 루트 — 메인(홈/고객지원 토글) · 채팅(S3) · 라이브(WS) · 템플릿 갤러리. */
 import React, { useState } from "react";
+import { View } from "react-native";
 import { MainShell } from "./screens/MainShell";
 import { ChatPanel } from "./screens/ChatPanel";
 import { LiveChat } from "./screens/LiveChat";
 import { Gallery } from "./screens/Gallery";
 import { Scenario } from "./screens/Scenario";
 import { Docs } from "./screens/Docs";
+import { DemoBadge } from "./components/DemoBadge";
+import { isMock } from "./mock/mode";
 import { ConsentProvider } from "./state/useConsent";
 import { j1Sections } from "./fixtures/journeys";
 
@@ -20,6 +23,7 @@ export function App({ initialScreen = "home", wsUrl, apiBase, token, scenarioId 
   // 동의 게이트(R19)는 앱 전역에서 공유 — 선제/개인화 표현 훅이 이 Provider를 본다.
   return (
     <ConsentProvider>
+      <View style={{ flex: 1 }}>
       {screen === "live" ? <LiveChat wsUrl={wsUrl || "ws://localhost:8000/chat?token=demo"} apiBase={apiBase} token={token} /> :
        screen === "gallery" ? <Gallery /> :
        screen === "docs" ? <Docs onClose={() => setScreen("home")} /> :
@@ -37,6 +41,8 @@ export function App({ initialScreen = "home", wsUrl, apiBase, token, scenarioId 
           onDocs={() => setScreen("docs")}
         />
       )}
+      {isMock(apiBase) && <DemoBadge />}
+      </View>
     </ConsentProvider>
   );
 }

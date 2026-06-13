@@ -10,21 +10,19 @@ import { useChat } from "../state/useChat";
 import { useCommit } from "../state/useCommit";
 import { track } from "../analytics/track";
 import { color, radius, space } from "../design/tokens";
-import { j1Sections } from "../fixtures/journeys";
-import type { Chunk, Cta } from "../types/contract";
+import { respond } from "../mock/respond";
+import type { ClientMessage, Cta } from "../types/contract";
 
-/** BE 미연결 시 폴백 스크립트 — 자연어 인트로 + J1 섹션. */
-function fallbackChunks(): Chunk[] {
-  return [
-    { type: "delta", text: "지금은 데모 모드예요. 예시 응답을 보여드릴게요." } as Chunk,
-    ...j1Sections.map((section) => ({ type: "section", section } as Chunk)),
-    { type: "flow", active_flow: "troubleshoot" } as Chunk,
-    { type: "done", message_id: "msg_demo" } as Chunk,
-  ];
+/** BE 미연결 시 폴백 — interaction_reply(비-commit)는 라우터용 텍스트로 변환. */
+function msgText(m: ClientMessage): string {
+  if (m.type === "user_message") return m.text;
+  const k = m.kind;
+  return k === "explain" ? "더 알려줘" : k === "recommend" ? "추천해줘" : k === "compare" ? "비교해줘"
+    : k === "restock_alert" ? "입고 알림" : k === "booking" ? "예약" : "";
 }
 
 export function LiveChat({ wsUrl, apiBase, token }: { wsUrl: string; apiBase?: string; token?: string }) {
-  const transport = useMemo(() => new ResilientTransport(wsUrl, () => fallbackChunks()), [wsUrl]);
+  const transport = useMemo(() => new ResilientTransport(wsUrl, (m) => respond(msgText(m))), [wsUrl]);
   const { state, send, replyInteraction } = useChat(transport);
   const [text, setText] = useState("");
   const [sent, setSent] = useState<string | null>(null);

@@ -41,6 +41,7 @@
 | [0048](0048-llm-planner-single-router.md) | **LLM 플래너 단일 라우터** — 게이트 폐기·모든 질의 LLM 라우팅·규칙은 폴백·warranty/booking/explain/clarify 추가 | 채택 |
 | [0049](0049-multiuser-session-and-commit-contract.md) | 멀티유저·세션 격리 경계 + 커밋(CTA→ActionGate) 계약(주문·예약 게이트 동형). 풀 멀티테넌시는 후속 | 채택(부분) |
 | [0050](0050-bff-be-identity-and-commit-contract.md) | BFF↔BE 신원 계약 + 게스트(비로그인) + 커밋 왕복 — 헤더/WS 신원 전달·게스트 허용·401/409 중계·FE 신규 kind | 채택 |
+| [0051](0051-fe-mock-mode.md) | FE 단독 동작 Mock 모드 — 클라이언트 전용·문서 미러·시나리오+키워드 라우터·localStorage·회귀 불변(`!apiBase`) | 채택 |
 
 ### Phase A — 스트리밍 / 동시성 실행 (operations.md §6·§9·§14)
 | # | 결정 | 상태 |

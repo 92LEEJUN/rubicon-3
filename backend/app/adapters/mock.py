@@ -236,6 +236,15 @@ class MockOrderAdapter:
             orders = [o for o in orders if o.user_id == user_id]
         return sorted(orders, key=lambda o: o.created_at or datetime.min.replace(tzinfo=timezone.utc), reverse=True)
 
+    def reassign_user(self, from_user_id: str, to_user_id: str) -> int:
+        """머지(게스트→로그인) — from_user_id 주문을 to_user_id로 re-key. 옮긴 건수 반환."""
+        moved = 0
+        for order in self._orders.values():
+            if order.user_id == from_user_id:
+                order.user_id = to_user_id
+                moved += 1
+        return moved
+
 
 class MockHandoffAdapter:
     """HandoffPort — 방문 예약 슬롯/예약 Mock(R18)."""

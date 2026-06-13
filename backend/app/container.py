@@ -24,6 +24,7 @@ from .repositories.sqlite import (
     SqliteConversationMemoryRepository,
     SqliteEngagementRepository,
     SqliteOpenLoopRepository,
+    SqliteOrderRepository,
 )
 from .services import (
     CatalogService,
@@ -65,10 +66,12 @@ def build_container() -> Container:
         engagement = SqliteEngagementRepository(db_path)
         conversation_memory = SqliteConversationMemoryRepository(db_path)
         open_loops = SqliteOpenLoopRepository(db_path)
+        order_adapter = SqliteOrderRepository(db_path)
     else:
         engagement = InMemoryEngagementRepository()
         conversation_memory = InMemoryConversationMemoryRepository()
         open_loops = InMemoryOpenLoopRepository()
+        order_adapter = mock.MockOrderAdapter()
     # ConversationStore(워킹 메시지·TTL성)는 이번 slice 영속 대상 아님 — 인메모리 유지.
     conversation_store = InMemoryConversationStore()
     # MVP=결정적 컴팩터(LLM 없이 테스트 가능). 실 전환 시 LLMCompactor로 교체(ADR-0020).
@@ -83,7 +86,7 @@ def build_container() -> Container:
     # O2O — StoreService(거점·재고·견적), 픽업 알림(AlertPort), 픽업 게이트는 OrderService와 협력.
     store = StoreService(mock.MockStoreAdapter(), mock.MockQuoteAdapter(), catalog_adapter)
     alert = mock.MockAlertAdapter()
-    order = OrderService(mock.MockOrderAdapter(), store_service=store, alert_port=alert)
+    order = OrderService(order_adapter, store_service=store, alert_port=alert)
     handoff = HandoffService(mock.MockHandoffAdapter())
     notification = NotificationService(device, engagement)
     triage = TriageService(warranty_adapter)

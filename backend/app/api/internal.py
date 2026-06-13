@@ -41,6 +41,8 @@ from ..orchestrator.capability import CapabilityOrchestrator
 from ..principal import (
     Principal,
     UserDirectory,
+    guest_principal,
+    merge_principal_state,
     multitenant_enabled,
     resolve_principal,
 )
@@ -244,6 +246,12 @@ class SurfaceRequest(BaseModel):
     screen_context: dict | None = None
 
 
+class MergeRequest(BaseModel):
+    """게스트→로그인 머지(요구사항 2-4) — 게스트 토큰 상태를 로그인 user_id로 이관."""
+    guest_token: str
+    user_id: str
+
+
 # ── 대화(WS) — 섹션 스트림 ──────────────────────────────────────────────────
 @app.websocket("/internal/turn")
 async def turn_ws(ws: WebSocket) -> None:
@@ -281,6 +289,18 @@ def resume(fresh: bool = False, x_user_id: str | None = Header(None),
     """이어가기(컴패니언 §1) — 영속 메모리·상대 시간 복원. fresh면 '새로 시작'."""
     principal = _principal(x_user_id, x_guest_token)
     return _container.companion.resume(principal.id, fresh=fresh).model_dump(mode="json")
+
+
+@app.post("/internal/principal/merge")
+def merge_principal(req: MergeRequest):
+    """게스트→로그인 머지 — `guest:<token>` 상태(주문·대화·미해결·engagement)를 user_id로 이관.
+
+    상태 리포가 user_id 키잉이므로 re-keying이다. 이관 후 게스트는 비운다(중복/누수 방지).
+    반환: {merged: {orders, conversation, open_loops, engagement}} 건수 요약.
+    """
+    guest_id = guest_principal(req.guest_token).id
+    merged = merge_principal_state(_container, guest_id, req.user_id)
+    return {"merged": merged}
 
 
 @app.get("/internal/reengagement")

@@ -3,11 +3,15 @@ import React, { useMemo, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { Caption, Title } from "../components/primitives";
 import { MessageView } from "../components/message";
+import { ConfirmDialog, LoginWall } from "../components/CommitGate";
 import { ResilientTransport } from "../transport";
+import { isCommitCta } from "../transport/commit";
 import { useChat } from "../state/useChat";
+import { useCommit } from "../state/useCommit";
+import { track } from "../analytics/track";
 import { color, radius, space } from "../design/tokens";
 import { j1Sections } from "../fixtures/journeys";
-import type { Chunk } from "../types/contract";
+import type { Chunk, Cta } from "../types/contract";
 
 /** BE 미연결 시 폴백 스크립트 — 자연어 인트로 + J1 섹션. */
 function fallbackChunks(): Chunk[] {
@@ -19,18 +23,35 @@ function fallbackChunks(): Chunk[] {
   ];
 }
 
-export function LiveChat({ wsUrl }: { wsUrl: string }) {
+export function LiveChat({ wsUrl, apiBase, token }: { wsUrl: string; apiBase?: string; token?: string }) {
   const transport = useMemo(() => new ResilientTransport(wsUrl, () => fallbackChunks()), [wsUrl]);
-  const { state, send } = useChat(transport);
+  const { state, send, replyInteraction } = useChat(transport);
   const [text, setText] = useState("");
   const [sent, setSent] = useState<string | null>(null);
+
+  const cfg = useMemo(() => ({ base: apiBase, token }), [apiBase, token]);
+  const commitCtl = useCommit(cfg);
 
   function onSend() {
     const q = text.trim();
     if (!q) return;
     setSent(q);
+    track("message_sent", { modality: "text" }); // (요구 ⑨)
     send(q);
     setText("");
+  }
+
+  // CTA 라우터 — commit(order/booking) 라운드트립 · login 월 · select_device 프리필 · 그 외 chat 후속(요구 ⑤⑥).
+  function onCta(cta: Cta) {
+    track("cta_clicked", { cta: cta.kind ?? cta.action, action: cta.action });
+    if (isCommitCta(cta)) { void commitCtl.start(cta); return; }
+    if (cta.kind === "login") { commitCtl.openLogin(); return; }
+    if (cta.kind === "select_device") {
+      const id = (cta.payload as any)?.device_id;
+      setText(id ? `${id} 기기에 대해 알려주세요` : text);
+      return;
+    }
+    replyInteraction(cta);
   }
 
   return (
@@ -46,8 +67,17 @@ export function LiveChat({ wsUrl }: { wsUrl: string }) {
         {state.status === "streaming" && state.sections.length === 0 && !state.assistantText ? (
           <Caption>답변을 작성하고 있어요…</Caption>
         ) : null}
-        <MessageView sections={state.sections} onCta={() => {}} />
+        <MessageView sections={state.sections} onCta={onCta} />
       </ScrollView>
+
+      {/* 커밋 게이트 — 409 확인 / 401 로그인(요구 ⑤⑥) */}
+      {commitCtl.confirmTemplate ? (
+        <ConfirmDialog template={commitCtl.confirmTemplate} busy={commitCtl.busy}
+                       onConfirm={() => void commitCtl.confirm()} onCancel={commitCtl.cancelConfirm} />
+      ) : null}
+      {commitCtl.showLogin ? (
+        <LoginWall onLogin={() => void commitCtl.login()} onDismiss={commitCtl.dismissLogin} />
+      ) : null}
       <View style={styles.inputBar}>
         <TextInput
           testID="chat-input"

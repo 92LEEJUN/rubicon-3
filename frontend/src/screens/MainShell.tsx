@@ -10,9 +10,9 @@ import { color, font, gradient, radius, space } from "../design/tokens";
 
 export type MainTab = "home" | "support";
 
-export function MainShell({ initialTab = "home", apiBase, token, onOpenChat, onGallery }:
+export function MainShell({ initialTab = "home", apiBase, token, onOpenChat, onGallery, onDocs }:
   { initialTab?: MainTab; apiBase?: string; token?: string;
-    onOpenChat?: (q?: string) => void; onGallery?: () => void }) {
+    onOpenChat?: (q?: string) => void; onGallery?: () => void; onDocs?: () => void }) {
   const [tab, setTab] = useState<MainTab>(initialTab);
   const [draft, setDraft] = useState("");
   const data = useHomeData({ base: apiBase, token });
@@ -26,7 +26,14 @@ export function MainShell({ initialTab = "home", apiBase, token, onOpenChat, onG
   return (
     <View style={styles.root} testID="screen-main">
       <View style={styles.header}>
-        <Caption>Samsung</Caption>
+        <View style={styles.brandRow}>
+          <Caption>Samsung</Caption>
+          {onDocs && (
+            <Pressable onPress={onDocs} testID="open-docs" accessibilityRole="link">
+              <Text style={styles.docsLink}>아키텍처 문서 →</Text>
+            </Pressable>
+          )}
+        </View>
         <Heading>AI 컨시어지</Heading>
         <View style={{ height: space.md }} />
         <SegmentedTabs
@@ -66,6 +73,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: space.lg, paddingTop: space.lg, paddingBottom: space.md,
     backgroundColor: color.bg, maxWidth: 480, width: "100%", alignSelf: "center",
   },
+  brandRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  docsLink: { fontSize: font.size.sm, color: color.textMuted, fontWeight: "600" },
   chatBar: {
     flexDirection: "row", alignItems: "center", gap: space.sm,
     paddingHorizontal: space.lg, paddingTop: space.sm, paddingBottom: space.lg,

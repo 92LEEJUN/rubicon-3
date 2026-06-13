@@ -4,6 +4,7 @@
 """
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass
 
 from . import fixtures as fx
@@ -18,6 +19,11 @@ from .repositories import (
     InMemoryConversationStore,
     InMemoryEngagementRepository,
     InMemoryOpenLoopRepository,
+)
+from .repositories.sqlite import (
+    SqliteConversationMemoryRepository,
+    SqliteEngagementRepository,
+    SqliteOpenLoopRepository,
 )
 from .services import (
     CatalogService,
@@ -34,8 +40,9 @@ from .services import (
 @dataclass
 class Container:
     user: User
-    engagement: InMemoryEngagementRepository
-    conversation_memory: InMemoryConversationMemoryRepository
+    # 타입은 인메모리 기준 표기(PERSISTENCE=db면 동일 시그니처의 Sqlite* 구현이 주입됨 — duck-typed).
+    engagement: InMemoryEngagementRepository | SqliteEngagementRepository
+    conversation_memory: InMemoryConversationMemoryRepository | SqliteConversationMemoryRepository
     compaction: CompactionService
     companion: CompanionService
     reengagement: ReEngagementService
@@ -51,10 +58,19 @@ class Container:
 
 
 def build_container() -> Container:
-    engagement = InMemoryEngagementRepository()
-    conversation_memory = InMemoryConversationMemoryRepository()
+    # PERSISTENCE 토글(기본 memory=기존 동작). db면 user-키 Repository만 sqlite로 교체.
+    # 나머지 와이어링은 불변 — Sqlite 구현이 인메모리와 동일 시그니처라 duck-typed로 합성된다.
+    if os.environ.get("PERSISTENCE", "memory").lower() == "db":
+        db_path = os.environ.get("SQLITE_PATH", "rubicon.db")
+        engagement = SqliteEngagementRepository(db_path)
+        conversation_memory = SqliteConversationMemoryRepository(db_path)
+        open_loops = SqliteOpenLoopRepository(db_path)
+    else:
+        engagement = InMemoryEngagementRepository()
+        conversation_memory = InMemoryConversationMemoryRepository()
+        open_loops = InMemoryOpenLoopRepository()
+    # ConversationStore(워킹 메시지·TTL성)는 이번 slice 영속 대상 아님 — 인메모리 유지.
     conversation_store = InMemoryConversationStore()
-    open_loops = InMemoryOpenLoopRepository()
     # MVP=결정적 컴팩터(LLM 없이 테스트 가능). 실 전환 시 LLMCompactor로 교체(ADR-0020).
     compaction = CompactionService(RuleBasedCompactor())
     companion = CompanionService(conversation_memory, conversation_store, compaction, open_loops)

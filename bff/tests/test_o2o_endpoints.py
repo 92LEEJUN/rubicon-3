@@ -5,9 +5,9 @@
 from tests.conftest import AUTH
 
 
-# ── 인증 게이트 ──────────────────────────────────────────────────────────────
-def test_stores_requires_auth(client):
-    assert client.get("/stores").status_code == 401
+# ── 신원 해석 — 게스트(비로그인)도 거점 조회 허용 ───────────────────────────
+def test_stores_allows_guest(client):
+    assert client.get("/stores").status_code == 200
 
 
 # ── 거점·재고(O1·O2) ────────────────────────────────────────────────────────

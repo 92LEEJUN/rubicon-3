@@ -10,8 +10,12 @@ import { SectionView } from "../components/message";
 import { ResumeCard } from "../components/ResumeCard";
 import { ReEngagementBanner } from "../components/ReEngagementBanner";
 import { StreamingMessage } from "../components/StreamingMessage";
+import { ConfirmDialog, LoginWall } from "../components/CommitGate";
 import { MockTransport, ResilientTransport } from "../transport";
+import { isCommitCta } from "../transport/commit";
 import { useChat } from "../state/useChat";
+import { useCommit } from "../state/useCommit";
+import { track } from "../analytics/track";
 import { useResume } from "../state/useResume";
 import { useOpenLoops } from "../state/useOpenLoops";
 import { useReEngagement } from "../state/useReEngagement";
@@ -58,6 +62,16 @@ export function ChatPanel({ question, sections, flow = null, wsUrl, apiBase, tok
 
   // 컴패니언 — 패널 open 시 resume·open-loop·선제 배너(요구 1·2·3·6).
   const cfg = useMemo(() => ({ base: apiBase, token }), [apiBase, token]);
+
+  // 커밋 라운드트립(order/booking) + 게이트(409 확인 · 401 로그인) (요구 ⑤⑥).
+  const commitCtl = useCommit(cfg, {
+    onCommitted: (kind) => {
+      setMessages((m) => [...m, {
+        role: "assistant", text: kind === "booking" ? "방문 예약이 확정되었어요." : "주문이 확정되었어요.",
+        sections: [], flow: state.activeFlow,
+      }]);
+    },
+  });
   useEffect(() => {
     companionStore.setPanelOpen(true);
     return () => companionStore.setPanelOpen(false);
@@ -90,8 +104,29 @@ export function ChatPanel({ question, sections, flow = null, wsUrl, apiBase, tok
     setMessages((m) => [...m, { role: "user", text: v }]);
     pending.current = true;
     setTurnSeq((s) => s + 1);
+    track("message_sent", { modality: "text" }); // 턴 전송(요구 ⑨)
     send(v);
     setText("");
+  }
+
+  /**
+   * CTA 라우터(요구 ⑤⑥·login/select_device) — 모든 섹션 CTA가 여기로 모인다.
+   *  - commit(order/booking) → REST 라운드트립(useCommit). 409 확인·401 로그인 게이트.
+   *  - login → 로그인 월.
+   *  - select_device → payload.device_id로 다음 메시지 스코프(입력 프리필).
+   *  - 그 외(explain·restock_alert·compare·booking(chat)·recommend·choices…) → chat 후속(interaction_reply).
+   */
+  function onCta(cta: Cta) {
+    track("cta_clicked", { cta: cta.kind ?? cta.action, action: cta.action }); // (요구 ⑨)
+    if (isCommitCta(cta)) { void commitCtl.start(cta); return; }
+    if (cta.kind === "login") { commitCtl.openLogin(); return; }
+    if (cta.kind === "select_device") {
+      const id = (cta.payload as any)?.device_id;
+      // 기기 스코프 — 다음 메시지를 해당 기기로 프리필(간단하지만 실제 동작).
+      setText(id ? `${id} 기기에 대해 알려주세요` : (text || ""));
+      return;
+    }
+    replyInteraction(cta); // chat 후속
   }
 
   // 첫 질문 자동 전송(데모/실서버 공통)
@@ -165,14 +200,27 @@ export function ChatPanel({ question, sections, flow = null, wsUrl, apiBase, tok
         {messages.map((m, i) =>
           m.role === "user"
             ? <UserMessage key={i} text={m.text} />
-            : <AssistantMessage key={i} text={m.text} sections={m.sections} onCta={replyInteraction} />)}
+            : <AssistantMessage key={i} text={m.text} sections={m.sections} onCta={onCta} />)}
 
         {/* 진행 중인 어시스턴트 턴 — 증분 스트리밍(요구 4) */}
         {streaming ? (
           <StreamingMessage text={state.assistantText} sections={state.sections}
-                            streaming onCta={replyInteraction} />
+                            streaming onCta={onCta} />
         ) : null}
       </ScrollView>
+
+      {/* 커밋 게이트 — 409 확인 다이얼로그 / 401 로그인 월(요구 ⑤⑥) */}
+      {commitCtl.confirmTemplate ? (
+        <ConfirmDialog
+          template={commitCtl.confirmTemplate}
+          busy={commitCtl.busy}
+          onConfirm={() => void commitCtl.confirm()}
+          onCancel={commitCtl.cancelConfirm}
+        />
+      ) : null}
+      {commitCtl.showLogin ? (
+        <LoginWall onLogin={() => void commitCtl.login()} onDismiss={commitCtl.dismissLogin} />
+      ) : null}
 
       {/* 추천 프롬프트 칩 — 항상 접근 가능 */}
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipsBar}

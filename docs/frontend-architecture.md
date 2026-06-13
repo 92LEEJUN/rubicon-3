@@ -6,6 +6,10 @@
 >
 > 각 결정은 **우선안 + 후보안 + 선택/미선택 이유**를 남겨, 추후 교체가 필요할 때 바로 바꿀 수 있게 한다.
 > 트랜스포트·상태관리·카드 surface 결정은 `docs/adr/`(ADR-0022·0023·0027)에도 기록.
+>
+> **BE 계약 연동(최근 작업).** 신원·커밋 라운드트립 계약은 `docs/adr/0050-bff-be-identity-and-commit-contract.md`,
+> 응답 표현(템플릿·CTA)은 `docs/response-templates.md`, 타입 단일 출처는 `frontend/src/types/contract.ts`다.
+> 아래 §12~§19는 이 연동의 FE 측 구현(렌더·게이트·라우팅·검증)을 상세화한다 — **계약 본문은 위 SoT를 따르며 여기서 중복 정의하지 않는다.**
 
 ## 1. 개요 / 범위
 
@@ -113,7 +117,7 @@ frontend/
 │  │  ├─ Home/                 # S1
 │  │  ├─ Support/              # S2 (CS)
 │  │  └─ ChatPanel/            # S3 (전역 오버레이)
-│  ├─ templates/               # kind → 컴포넌트 레지스트리 (§4, 14종)
+│  ├─ templates/               # kind → 컴포넌트 레지스트리 (§4·§12, 현재 REGISTRY 13종 + text 폴백)
 │  ├─ hooks/                   # 커스텀 훅 (§11)
 │  ├─ transport/               # ChatTransport 추상화 + WebSocket 구현 (§5)
 │  ├─ state/                   # 서버상태(쿼리)·UI/세션 store + reducer (§2·§11)
@@ -170,12 +174,159 @@ frontend/
 > 훅은 **계약(api-contract·response-templates·analytics)** 에만 의존 → 트랜스포트/백엔드 교체에 안전.
 > `useAnalytics`는 모든 화면/CTA/흐름 훅에서 호출되지만, 동의 없으면 no-op(R19).
 
-## 12. 후속 / 비범위 (MVP 이후)
+## 12. 응답 계약 표현 — CTA·템플릿 kind (BE 연동)
+
+§4(템플릿 렌더러)를 BE 계약 연동 기준으로 구체화한다. 표현 계약 본문(스키마·선택/CTA 규칙)은
+`docs/response-templates.md`, 타입 union 단일 출처는 `frontend/src/types/contract.ts`다.
+**여기서는 FE가 렌더/분기하는 위치만 매핑**한다.
+
+### 12.1 CtaKind union (`contract.ts`)
+`CtaKind`는 **permissive**(`CtaKind | string`) — BFF가 새 kind를 보내도 깨지지 않게 두되, 코드가
+분기하는 알려진 값만 열거한다. `CtaAction`은 `"chat" | "commit" | "navigate"`.
+
+| CTA kind | action | FE 처리(라우팅) | 처리 위치 |
+|----------|--------|-----------------|-----------|
+| `order`·`booking`(commit) | `commit` | REST 커밋 라운드트립(§13) | `transport/commit.ts`·`state/useCommit.ts` |
+| `login` | `navigate` | 로그인 월 오픈 | `useCommit.openLogin()` → `CommitGate.LoginWall` |
+| `select_device` | (any) | `payload.device_id`로 다음 메시지 프리필 | `onCta`(screens, §14) |
+| `booking`(advisory)·`restock_alert`·`compare`·`explain`·`recommend`·`choices` | `chat` | `/chat` 후속(`interaction_reply`) | `useChat.replyInteraction` |
+
+> `booking`은 **kind 이름이 두 경로에 걸친다**: `action:"commit"`이면 예약 확정(§13), 그 외(advisory)는
+> chat 후속. 분기는 `isCommitCta(cta)`(action+kind 동시 검사)가 판정한다 — kind 이름만으로 판단하지 않는다.
+> CTA 버튼은 `components/message.tsx`의 `CtaRow`가 렌더하며 `action==="commit"`만 primary 강조.
+
+### 12.2 TemplateKind union (`contract.ts`) — 신규 `booking`
+`TemplateKind`도 permissive. 미등록 kind·스키마 불일치는 `text` 폴백(`response-templates.md` §7).
+레지스트리는 `frontend/src/templates/index.tsx`의 `REGISTRY`(13종)이며, **신규 `booking` 템플릿**을 포함한다.
+
+- **`booking` 렌더러(`templates/index.tsx`의 `Booking`)** — `data:{ visit_type?, slots:[{id,start,end}…] }`.
+  방문 유형 배지(`VISIT_KO`) + 슬롯 라디오 리스트(`RadioRow`, `choices`와 공용) + 빈 슬롯 폴백 문구.
+  **슬롯 선택은 표시용**이며, 실제 예약 확정은 섹션의 commit CTA(`kind:"booking", action:"commit"`)가 담당(§13).
+- `clarify`·`warranty`·`explain` 섹션은 별도 kind 없이 기존 kind(`text`·`recommendation_list`·`booking`)를
+  **재사용**한다(`contract.ts` 주석).
+- `TemplateView`는 `REGISTRY[kind] ?? text`로 폴백하고, 폴백 시 `data.message`를 텍스트로 노출(`stringifyFallback`).
+
+## 13. 커밋 게이트 — 409 확인 / 401 로그인 (BE 연동)
+
+§4의 "되돌릴 수 없는 커밋"(ActionGate, R17)을 BE 계약(409/401)으로 구체화한다.
+**커밋/신원 계약 본문은 `docs/adr/0050-bff-be-identity-and-commit-contract.md`·`docs/api-contract.md`**를 따른다.
+
+### 13.1 트랜스포트 (`transport/commit.ts`)
+commit CTA(`kind ∈ {order, booking}`, `action:"commit"`) → REST 커밋 엔드포인트. 경로 매핑은 `PATH`:
+
+| commit kind | BFF 경로 | 비고 |
+|-------------|----------|------|
+| `order` | `POST /orders` | → BE `/internal/orders`(ADR-0050) |
+| `booking` | `POST /bookings` | → BE `/internal/bookings` |
+
+상태코드별 정규화(`CommitResult`):
+- **409 `ConfirmationRequired`** → `{status:"confirm", template, payload}`. 응답의 `template`(kind:`confirmation`)을
+  보관, 사용자가 확정하면 **`confirmed:true`로 재-POST**(2-step). BE가 template을 안 주면 `demoConfirmation` 폴백.
+- **401 `LoginRequired`** → `{status:"login", cta}`. 게스트는 **commit만 게이트**, advisory(chat)는 통과.
+- 그 외 **2xx** → `{status:"ok"}`(확정). 비-OK → `{status:"error", code}`.
+- **`cfg.base` 미설정(정적 배포·BE 미연결)** → 네트워크를 타지 않고 데모로 정규화: 첫 호출은 confirm 게이트,
+  `confirmed`면 ok. `isCommitCta`/`commitFromCta`가 CTA→kind 추출 헬퍼다.
+
+토큰은 `headers()`가 `Authorization: Bearer`로 주입(게스트면 생략).
+
+### 13.2 상태머신 (`state/useCommit.ts`)
+`useCommit(cfg, opts)`가 게이트 상태를 들고 `apply(res, kind)`로 전이한다. 노출 상태:
+`confirmTemplate`(409 다이얼로그 템플릿·null이면 미표시), `showLogin`(401 월), `busy`(중복 탭 방지).
+
+전이(액션):
+- `start(cta)` — kind/payload 추출 후 1차 호출. `pending`(ref)에 보관.
+- `confirm()` — `pending`을 `confirmed:true`로 재제출(2-step). `cancelConfirm()`은 다이얼로그·pending 클리어.
+- `openLogin()` — 보류 커밋 없이 순수 로그인 월(login CTA용). `login()` — 토큰 확보 후(데모 placeholder
+  또는 `opts.onLogin()`) **보류 커밋이 있으면 토큰 동반 1차 재호출**. `dismissLogin()` — 게스트로 계속(닫기).
+- 토큰은 게스트→로그인으로 바뀔 수 있어 `tokenRef`로 동적 주입(`cfgNow()`가 최신 토큰으로 ApiConfig 합성).
+- 분석 emit: confirm→`checkout_shown`, ok→`order_confirmed`, error→`error_shown`(§17).
+
+### 13.3 게이트 UI (`components/CommitGate.tsx`)
+self-contained 오버레이 2종 — 화면이 `useCommit` 상태로 토글한다.
+- **`ConfirmDialog`** — 409. `TemplateView`로 confirmation 템플릿 렌더 + 확정/취소. `busy`면 "확정 중…".
+- **`LoginWall`** — 401 placeholder. "로그인"(`onLogin`)·"게스트로 계속"(`onDismiss`). 실 로그인 연동은 후속.
+
+### 13.4 흐름 시퀀스 (order commit, 게스트)
+```text
+사용자 commit CTA 탭
+  → onCta: isCommitCta → useCommit.start(cta)
+  → commit() POST /orders                         [busy]
+  → 401 LoginRequired → showLogin=true            → LoginWall
+      → login(): token 확보 → POST /orders(토큰)
+  → 409 ConfirmationRequired → confirmTemplate    → ConfirmDialog
+      → confirm(): POST /orders {…, confirmed:true}
+  → 2xx ok → onCommitted 콜백(+order_confirmed 분석) → 확정 메시지
+```
+
+## 14. onCta 라우팅 (screens)
+
+모든 섹션 CTA는 화면의 단일 `onCta(cta)` 라우터로 모인다(`screens/ChatPanel.tsx`·`screens/LiveChat.tsx`,
+두 화면 동일 분기). 라우팅 우선순위:
+
+1. **commit** — `isCommitCta(cta)` → `commitCtl.start(cta)`(§13). 409/401 게이트로 진입.
+2. **login** — `cta.kind==="login"` → `commitCtl.openLogin()`(로그인 월).
+3. **select_device** — `cta.kind==="select_device"` → `payload.device_id`로 입력창 프리필(다음 메시지 기기 스코프).
+4. **그 외(chat 후속)** — `replyInteraction(cta)` → `/chat`으로 `interaction_reply` 전송(explain·restock_alert·
+   compare·booking(advisory)·recommend·choices…).
+
+모든 경로 진입 시 `cta_clicked` 분석 emit(§17).
+
+## 15. 미처리(unhandled) 섹션 — R7
+
+복합 응답(R7)의 섹션 중 `handled=false`는 **정상 답변과 시각적으로 구분**해 렌더한다
+(`components/message.tsx`의 `UnhandledSection`).
+- `SectionView`가 `!section.handled`면 `UnhandledSection`으로 분기(정상은 `Card`).
+- 톤다운 스타일: 점선 테두리·뮤트 배경·"처리 보류" 배지·"이건 아직 도와드리기 어려워요" 리드.
+- `template.data.message`/`detail`을 보조 노출하고, **CTA(입고 알림·대체 추천 등)는 남겨** 대안 행동을 유지.
+
+## 16. 레이턴시 UX — 타이핑/스트리밍 인디케이터 (R14)
+
+§8(스트리밍 타이핑 인디케이터)의 구현. 진행 중 어시스턴트 턴은 `components/StreamingMessage.tsx`가 렌더.
+- delta 누적 텍스트 + section 세로 스택(§4 `SectionView` 재사용) 합성.
+- **아직 아무것도 도착 안 한 수신 중**(`streaming && !text && sections.length===0`) → 순수 타이핑 인디케이터
+  (`TypingDots`, 점 3개 페이드 루프). 내용 도착 시 텍스트/섹션으로 전환, `done`이면 인디케이터 제거.
+- 진행 문구는 **답변 중심**만 — 내부 시스템·대기 상태는 노출하지 않는다.
+- `ChatPanel`은 자체 `TypingDots`·`AssistantMessage`로 동일 패턴, `LiveChat`은 "답변을 작성하고 있어요…" 캡션 폴백.
+- 생성 중에는 입력창·전송·추천 칩을 비활성(`editable={!streaming}`)해 중복 전송을 막는다.
+
+## 17. 분석 (analytics) — `analytics/track.ts`
+
+택소노미 본문은 `docs/analytics.md` §4(이벤트명 `object_action` 과거형)를 따른다. FE는 **가벼운 emit 유틸**만 둔다.
+- `track(name, props?)` — 이벤트 1건 발행, **비차단**(try/catch — 분석은 절대 UX를 막지 않음).
+- 기본 싱크는 **console**(`consoleSink`, 개발 가시성), `setAnalyticsSink`로 교체 가능. **BFF/BE 싱크는 후속(deferred)**.
+- `AnalyticsEventName`은 FE-소유 이벤트명 열거(permissive). 배선 지점: 턴 전송 `message_sent`(screens),
+  CTA 탭 `cta_clicked`(onCta), 커밋 게이트 `checkout_shown`·확정 `order_confirmed`·실패 `error_shown`(`useCommit`).
+- `order_confirmed`의 owner는 BE이나, **FE 데모/오프라인(BE 미연결) 커밋 확정도 가시화**하려고 같은 이름으로 발행
+  (실 연동 시 BE가 진실의 출처).
+
+## 18. 검증 (서브시스템 게이트)
+
+`frontend/` 변경 시 게이트는 **jest + vite build**다. CLAUDE.md §레포 구조와 동일하게 `tsc --noEmit`은 게이트가 아니다
+(react-native 타입 부재로 기존 noise 다수).
+
+- `cd frontend && npx jest` — **현재 67 통과**(13 suites). 컴포넌트·계약(stub)·게이트·라우팅 테스트.
+- `cd frontend && npx vite build` — 웹 빌드 성립 확인.
+- BE 계약(409/401·CTA·template kind)을 바꾸면 **3계층 동기화**(CLAUDE.md): `contract.ts`·`bff/gateway/`·
+  `docs/api-contract.md`·`docs/response-templates.md`·ADR-0050를 함께 갱신·검증.
+
+## 19. 계약 경계 / SoT 링크
+
+FE는 **BFF 계약을 렌더·게이트**할 뿐, 라우팅(LLM/API)·신원 해석은 BE/BFF가 판단한다. 중복 정의 금지 — 본문은 SoT를 따른다.
+
+| 주제 | 단일 출처(SoT) | FE 대응 |
+|------|----------------|---------|
+| 신원·커밋(409/401·헤더·경로) | `docs/adr/0050-bff-be-identity-and-commit-contract.md`·`docs/api-contract.md` | `transport/commit.ts`·`useCommit.ts` |
+| 응답 표현(템플릿·CTA·섹션) | `docs/response-templates.md` | `templates/index.tsx`·`components/message.tsx` |
+| 공유 타입(union·DTO) | `frontend/src/types/contract.ts` | 전 컴포넌트가 import |
+| 분석 택소노미 | `docs/analytics.md` | `analytics/track.ts` |
+
+## 20. 후속 / 비범위 (MVP 이후)
 
 - 접근성(VoiceOver·TalkBack·동적 폰트), 국제화(i18n), 실 푸시(FCM/APNs),
   OTA 업데이트(EAS/CodePush), 크래시 리포팅(Sentry), e2e 테스트(Detox), iOS/Android 차이 대응.
+- **실 로그인 연동**(LoginWall placeholder 대체·토큰 발급·조용한 재인증 §9), **분석 BFF/BE 싱크**(§17 deferred).
 
-## 13. 미해결 / 검증
+## 21. 미해결 / 검증
 
 - **WebSocket 스파이크** 결과로 §5 보정.
 - 상태관리·네비게이션 라이브러리 최종 선택(현재 우선안 수준) — 스파이크/프로토타입 후 확정.

@@ -50,11 +50,51 @@ def test_chat_interaction_reply(client):
     assert chunks[-1]["type"] == "done"      # 회신도 다음 턴으로 처리
 
 
-# ── 인증·폴백 ────────────────────────────────────────────────────────────────
-def test_chat_unauthorized(client):
-    with client.websocket_connect("/chat") as ws:   # 토큰 없음
-        c = ws.receive_json()
-    assert c["type"] == "error" and c["code"] == "unauthorized"
+# ── 게스트(비로그인) — 토큰 없이도 자문 턴 허용 ─────────────────────────────
+def test_chat_guest_advisory_allowed(client):
+    """토큰 없는 게스트도 대화/자문 턴을 진행할 수 있다(401로 막지 않음)."""
+    with client.websocket_connect("/chat") as ws:   # 토큰 없음 → 게스트
+        ws.send_json({"type": "user_message", "text": "세탁기에서 물이 안 빠져요"})
+        chunks = _drain(ws)
+    assert chunks[-1]["type"] == "done"             # 게스트도 정상 스트림
+
+
+def test_chat_guest_forwards_guest_token():
+    """게스트 신원이 BE WS payload로 guest_token 필드로 포워딩된다."""
+    seen = {}
+
+    class _CapturingBackend:
+        async def turn_stream(self, payload, headers=None):
+            seen["payload"] = payload
+            seen["headers"] = headers
+            yield {"type": "done"}
+
+    client = TestClient(create_app(_CapturingBackend()))
+    with client.websocket_connect("/chat?guest_token=g-fixed") as ws:
+        ws.send_json({"type": "user_message", "text": "안녕"})
+        _drain(ws)
+    assert seen["payload"]["guest_token"] == "g-fixed"
+    assert seen["payload"]["user_id"] is None
+    assert seen["headers"]["X-Guest-Token"] == "g-fixed"
+
+
+def test_chat_user_forwards_user_id():
+    """로그인 신원이 BE WS payload로 user_id 필드 + X-User-Id 헤더로 포워딩된다."""
+    seen = {}
+
+    class _CapturingBackend:
+        async def turn_stream(self, payload, headers=None):
+            seen["payload"] = payload
+            seen["headers"] = headers
+            yield {"type": "done"}
+
+    client = TestClient(create_app(_CapturingBackend()))
+    with client.websocket_connect("/chat", headers=AUTH) as ws:
+        ws.send_json({"type": "user_message", "text": "안녕"})
+        _drain(ws)
+    assert seen["payload"]["user_id"] == "usr_01"
+    assert seen["payload"]["guest_token"] is None
+    assert seen["headers"]["X-User-Id"] == "usr_01"
 
 
 def test_chat_fallback_when_backend_down(broken_client):
@@ -68,7 +108,7 @@ def test_chat_fallback_when_backend_down(broken_client):
 # ── 증분 포워딩: 부분 전송 후 스트림 실패 → 마지막 청크 전달 + stream_interrupted ──
 def test_chat_stream_interrupted_after_partial():
     class _PartialBackend:
-        async def turn_stream(self, payload):
+        async def turn_stream(self, payload, headers=None):
             yield {"type": "section", "section": {"intent": "troubleshoot", "handled": True,
                                                   "template": {"kind": "text", "data": {}}}}
             raise RuntimeError("mid-stream boom")

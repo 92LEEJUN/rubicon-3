@@ -36,6 +36,11 @@
 | [0043](0043-capability-orchestrator-hybrid-merge.md) | **capability 통합 오케스트레이터 + 하이브리드 병합**(1b·2c) | 채택 |
 | [0044](0044-recommend-as-agent.md) | **Recommend를 agent로 승격**(자연어 추천 reasoning) | 구현됨 |
 | [0045](0045-capability-structure-detail.md) | capability 상세 — **2채널 출력·LLM플래너(검증)·블랙보드** | 채택 |
+| [0046](0046-advisory-action-cta-bridge.md) | **조언형/행동형 분리 + CTA 브릿지** — 판매·기사 자동라우팅 금지·수리CTA게이팅·추천위임·복합쿼리 | 채택 |
+| [0047](0047-tiered-planning-escalation-gate.md) | 티어드 플래닝 + 에스컬레이션 게이트 — 규칙 1차·LLM은 장문/모호만 | 대체됨(0048) |
+| [0048](0048-llm-planner-single-router.md) | **LLM 플래너 단일 라우터** — 게이트 폐기·모든 질의 LLM 라우팅·규칙은 폴백·warranty/booking/explain/clarify 추가 | 채택 |
+| [0049](0049-multiuser-session-and-commit-contract.md) | 멀티유저·세션 격리 경계 + 커밋(CTA→ActionGate) 계약(주문·예약 게이트 동형). 풀 멀티테넌시는 후속 | 채택(부분) |
+| [0050](0050-bff-be-identity-and-commit-contract.md) | BFF↔BE 신원 계약 + 게스트(비로그인) + 커밋 왕복 — 헤더/WS 신원 전달·게스트 허용·401/409 중계·FE 신규 kind | 채택 |
 
 ### Phase A — 스트리밍 / 동시성 실행 (operations.md §6·§9·§14)
 | # | 결정 | 상태 |

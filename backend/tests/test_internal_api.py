@@ -57,7 +57,13 @@ def test_order_with_confirmation_succeeds():
 def test_booking_slots_and_create():
     slots = client.get("/internal/bookings/slots").json()
     assert slots
-    r = client.post("/internal/bookings", json={"slot_id": slots[0]["id"], "context_ref": "conv_1"})
+    # R17 — 미확인 예약은 409 ConfirmationRequired(주문과 동형)
+    gate = client.post("/internal/bookings", json={"slot_id": slots[0]["id"], "context_ref": "conv_1"})
+    assert gate.status_code == 409 and gate.json()["code"] == "ConfirmationRequired"
+    assert gate.json()["template"]["kind"] == "confirmation"
+    # 확인 시 예약 확정
+    r = client.post("/internal/bookings",
+                    json={"slot_id": slots[0]["id"], "context_ref": "conv_1", "confirmed": True})
     assert r.json()["status"] == "CONFIRMED"
 
 

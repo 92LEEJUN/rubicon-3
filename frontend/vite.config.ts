@@ -6,6 +6,8 @@ import react from "@vitejs/plugin-react";
 export default defineConfig({
   base: process.env.DEPLOY_BASE || "/",
   plugins: [react()],
+  // 아키텍처 문서(../docs/*.md)를 ?raw로 번들 — dev 서버도 레포 루트 상위 접근 허용.
+  server: { fs: { allow: [".."] } },
   resolve: {
     alias: { "react-native": "react-native-web" },
     extensions: [".web.tsx", ".web.ts", ".tsx", ".ts", ".web.js", ".js"],

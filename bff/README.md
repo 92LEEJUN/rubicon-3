@@ -13,7 +13,7 @@ gateway/
 ├─ auth.py            # 인증/세션 게이트(Mock 토큰 → 사용자 컨텍스트, §3)
 ├─ transform.py       # 폴백 정규화(R13)·인터랙션 회신→텍스트
 └─ config.py          # BE_BASE_URL 등
-tests/                # 엔드포인트·WS·계약(FE↔BFF↔BE 인프로세스)·폴백 (16 케이스)
+tests/                # 엔드포인트·WS·계약(FE↔BFF↔BE 인프로세스)·신원/게스트·폴백 (45 케이스)
 ```
 
 ## 클라이언트 표면 (api-contract §2)

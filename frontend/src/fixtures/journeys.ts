@@ -136,10 +136,18 @@ export const handoffCard: Template = {
 
 export const booking: Template = {
   kind: "booking",
-  data: { slots: [
+  data: { visit_type: "REPAIR", slots: [
     { id: "slot_1_10", start: "2026-06-13T10:00:00Z", end: "2026-06-13T12:00:00Z" },
     { id: "slot_1_14", start: "2026-06-13T14:00:00Z", end: "2026-06-13T16:00:00Z" },
   ] },
+};
+
+/** 예약 슬롯 섹션 — booking 템플릿 + 예약 확정 commit CTA(라운드트립 대상). */
+export const bookingSection: MessageSection = {
+  label: "방문 예약", intent: "booking", handled: true,
+  template: booking,
+  ctas: [{ label: "예약 확정", action: "commit", kind: "booking",
+    payload: { visit_type: "REPAIR", slot_id: "slot_1_10" } }],
 };
 
 /** 템플릿 갤러리(시각 카탈로그) — kind별 대표 섹션. */
@@ -153,6 +161,6 @@ export const gallerySections: MessageSection[] = [
     ctas: [{ label: "재주문", action: "commit", kind: "order", payload: { part_ids: ["part_water_filter"] } }], template: bridge },
   { label: "핸드오프", intent: "general", handled: true,
     ctas: [{ label: "방문 예약", action: "chat", kind: "handoff" }], template: handoffCard },
-  { label: "예약 슬롯", intent: "general", handled: true, ctas: [], template: booking },
+  bookingSection,
   { label: "선택지", intent: "troubleshoot", handled: true, ctas: [], template: choicesTemplate },
 ];

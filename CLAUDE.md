@@ -6,6 +6,7 @@
 
 > 이 문서는 에이전트(Claude)가 작업마다 따르는 규칙이다.
 > 사람을 위한 설명은 `docs/WORKFLOW.md` 를 참고한다.
+> 협업·실행 노하우(병렬 subagent·통합 리뷰 등)는 `memory.md` 를 참고한다.
 
 ## 적용 범위
 
@@ -26,6 +27,27 @@
 
 > 애매하면 "이게 큰 기능인가?"를 기준으로 판단하고, 그래도 모호하면
 > 사용자에게 스펙을 만들지 물어본다.
+
+## 레포 구조 / 검증 (서브시스템)
+
+이 레포는 **단일 백엔드가 아니라 여러 서브시스템**으로 구성된다. 변경 시 해당 서브시스템과
+**영향받는 상대 계층**까지 함께 검증한다.
+
+- `backend/` — 도메인·오케스트레이터(Python). 검증: `cd backend && python -m pytest`.
+- `bff/` — FE↔BE 게이트웨이(Python, **별도 suite**). 검증: `cd bff && python -m pytest`.
+- `frontend/` — RN/웹 앱(TypeScript). 검증: `cd frontend && npx jest` (+ `npx vite build`).
+  **`tsc --noEmit`는 게이트가 아니다**(react-native 타입 부재로 기존 noise 다수; jest+babel이 게이트).
+- `e2e/` — 통합 시나리오.
+
+**런타임 토글(env) — 기본 off = 회귀 불변.** 새 기능은 토글 뒤에 두고, off면 기존 동작과 동일해야 한다(스트랭글러).
+- `LLM_BACKED`·`MULTIAGENT`·`CAPABILITY_ORCH` — 오케스트레이터 경로 선택.
+- `MULTITENANT` — Principal/게스트 신원 해석(off면 기본 사용자).
+- `PERSISTENCE=memory|db`(+`SQLITE_PATH`) — 상태 영속.
+- `OPENAI_API_KEY`(backend/.env) — 실 LLM. **실 LLM은 CI에 없다 → 수동 검증**(`backend/verify_*.py`, 정본 코퍼스 `specs/capability-orchestrator/test-set.md`).
+
+**계약 변경은 3계층 동기화.** BE 응답/엔드포인트 계약(템플릿·CTA kind·신원 헤더·게이트 상태코드)을
+바꾸면 `docs/api-contract.md`·`docs/response-templates.md`·ADR **그리고 `bff/gateway/`·
+`frontend/src/types/contract.ts`** 까지 같이 갱신·검증한다. FE/BFF가 BE에 뒤처지면 통합이 조용히 깨진다.
 
 ## 문서 계층 (기반 문서 vs 스펙 문서)
 
@@ -55,6 +77,8 @@
 - 데이터 모델·공개 인터페이스·전체 아키텍처가 바뀌면, 스펙 design이 아니라
   **기반 문서(`docs/`)를 갱신**한다. 스펙 design은 그 변경을 참조한다.
 - 새 스펙을 시작할 때 관련 기반 문서를 먼저 읽고, 그 모델·인터페이스 위에서 설계한다.
+- **설계 결정마다 `docs/adr/` + 인덱스(`docs/adr/README.md`)를 갱신**한다. 기존 ADR을
+  뒤집으면 삭제가 아니라 옛 ADR에 "대체됨" 표기 + 새 ADR에서 사유·기각안을 남긴다.
 
 ## 핵심 원칙
 

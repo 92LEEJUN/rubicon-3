@@ -13,6 +13,7 @@ import { StreamingMessage } from "../components/StreamingMessage";
 import { ConfirmDialog, LoginWall } from "../components/CommitGate";
 import { MockTransport, ResilientTransport } from "../transport";
 import { isCommitCta } from "../transport/commit";
+import { respond } from "../mock/respond";
 import { useChat } from "../state/useChat";
 import { useCommit } from "../state/useCommit";
 import { track } from "../analytics/track";
@@ -47,12 +48,15 @@ const SUGGESTIONS = [
 export function ChatPanel({ question, sections, flow = null, wsUrl, apiBase, token, onClose }:
   { question: string; sections: MessageSection[]; flow?: string | null; wsUrl?: string;
     apiBase?: string; token?: string; onClose?: () => void }) {
-  const transport = useMemo(
-    () => (wsUrl
-      ? new ResilientTransport(wsUrl, (_m: ClientMessage) => toChunks(sections, flow))
-      : new MockTransport((_m: ClientMessage) => toChunks(sections, flow))),
-    [wsUrl, sections, flow],
-  );
+  const transport = useMemo(() => {
+    // 첫 턴은 큐레이트된 sections(홈 질문의 답), 이후 자유 입력은 mock 라우터(respond)로 응답.
+    let first = true;
+    const script = (m: ClientMessage) => {
+      if (first) { first = false; return toChunks(sections, flow); }
+      return respond(m.type === "user_message" ? m.text : "");
+    };
+    return wsUrl ? new ResilientTransport(wsUrl, script) : new MockTransport(script);
+  }, [wsUrl, sections, flow]);
   const { state, send, replyInteraction, resumeFromRef } = useChat(transport);
   const [messages, setMessages] = useState<ChatMsg[]>([]);
   const [text, setText] = useState("");

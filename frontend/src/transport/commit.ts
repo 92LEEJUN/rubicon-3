@@ -11,6 +11,8 @@
  */
 import type { ApiConfig } from "./api";
 import type { Cta, Template } from "../types/contract";
+import { mockStore } from "../mock/store";
+import { PARTS, PRODUCTS } from "../fixtures/mockData";
 
 /** commit 대상 종류(엔드포인트 매핑). */
 export type CommitKind = "order" | "booking";
@@ -62,7 +64,7 @@ export async function commit(
     if (!confirmed) {
       return { status: "confirm", template: demoConfirmation(kind), payload: body };
     }
-    return { status: "ok", data: { committed: true, demo: true } };
+    return { status: "ok", data: { committed: true, demo: true, ...recordDemoCommit(kind, body) } };
   }
 
   try {
@@ -109,6 +111,22 @@ export async function commitFromCta(
   const kind = commitKindOf(cta);
   if (!kind) return null;
   return commit(cfg, kind, (cta.payload as Record<string, unknown>) ?? {}, confirmed);
+}
+
+/** 데모 모드 — 확정 커밋을 mock 스토어에 기록(주문/예약 이력에 반영, ADR-0051). */
+function recordDemoCommit(kind: CommitKind, body: Record<string, unknown>): Record<string, unknown> {
+  if (kind === "booking") {
+    const bk = mockStore.addBooking(String(body.slot_id ?? "slot_1"), String(body.visit_type ?? "REPAIR"));
+    return { booking_id: bk.id };
+  }
+  const partIds = (body.part_ids as string[]) ?? [];
+  const prodIds = (body.product_ids as string[]) ?? [];
+  const items = [
+    ...partIds.map((pid) => ({ part_id: pid, name: PARTS[pid]?.name ?? pid, price: PARTS[pid]?.price ?? 0 })),
+    ...prodIds.map((pid) => { const p = PRODUCTS.find((x) => x.id === pid); return { part_id: pid, name: p?.name ?? pid, price: p?.price ?? 0 }; }),
+  ];
+  const ord = mockStore.addOrder(items.length ? items : [{ part_id: "part_drain_filter", name: PARTS.part_drain_filter.name, price: PARTS.part_drain_filter.price }]);
+  return { order_id: ord.id };
 }
 
 /** 데모/폴백 확인 템플릿 — BE가 confirmation 템플릿을 안 줄 때. */

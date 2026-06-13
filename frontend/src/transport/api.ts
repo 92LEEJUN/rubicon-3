@@ -4,6 +4,8 @@
  * → BE 미연결에도 화면이 항상 채워진다(graceful degradation).
  */
 import { homeSummary, recommendation, statusTracker } from "../fixtures/journeys";
+import { mockStore } from "../mock/store";
+import { SEED_ORDERS, SEED_BOOKINGS } from "../fixtures/mockData";
 
 export interface ApiConfig { base?: string; token?: string }
 
@@ -32,13 +34,15 @@ export async function getRecommendations(cfg: ApiConfig): Promise<any[]> {
   return get<any[]>(cfg, "/catalog/recommend", fb);
 }
 
-/** 주문 이력. 폴백=fixture status_tracker(데모 진행). */
+/** 주문 이력. mock 모드(!base)면 시드 + 사용자가 만든 주문(store) 병합. */
 export async function getOrders(cfg: ApiConfig): Promise<any[]> {
+  if (!cfg.base) return [...mockStore.getOrders(), ...SEED_ORDERS];
   return get<any[]>(cfg, "/orders", []);
 }
 
-/** 예약 이력. */
+/** 예약 이력. mock 모드면 시드 + store. */
 export async function getBookings(cfg: ApiConfig): Promise<any[]> {
+  if (!cfg.base) return [...mockStore.getBookings(), ...SEED_BOOKINGS];
   return get<any[]>(cfg, "/bookings", []);
 }
 

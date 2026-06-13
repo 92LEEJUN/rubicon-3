@@ -8,7 +8,7 @@ export type CtaAction = "chat" | "commit" | "navigate";
  * 알려진 CTA kind(계약). `kind`는 permissive(string)로 두되 — BFF가 새 kind를 보내도
  * 깨지지 않게 — 코드가 분기하는 알려진 값은 여기에 열거한다.
  *  - commit 계열: `order`·`booking`(action:"commit" → REST commit 라운드트립, §commit).
- *  - 게이트/흐름: `login`(로그인 월 트리거), `select_device`(payload.device_id로 다음 메시지 스코프).
+ *  - 게이트/흐름: `login`(로그인 월 트리거), `select_device`(payload.device_id로 **즉시 질의 전송**, 입력 편집 아님).
  *  - 후속 대화(chat): `booking`(advisory)·`restock_alert`·`compare`·`explain`·`recommend` 등 →
  *    interaction_reply/user_message 후속으로 전송.
  */

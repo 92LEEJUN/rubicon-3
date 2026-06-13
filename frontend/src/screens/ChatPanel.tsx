@@ -119,7 +119,7 @@ export function ChatPanel({ question, sections, flow = null, wsUrl, apiBase, tok
    * CTA 라우터(요구 ⑤⑥·login/select_device) — 모든 섹션 CTA가 여기로 모인다.
    *  - commit(order/booking) → REST 라운드트립(useCommit). 409 확인·401 로그인 게이트.
    *  - login → 로그인 월.
-   *  - select_device → payload.device_id로 다음 메시지 스코프(입력 프리필).
+   *  - select_device → payload.device_id로 **바로 질의**(입력창 편집 아님).
    *  - 그 외(explain·restock_alert·compare·booking(chat)·recommend·choices…) → chat 후속(interaction_reply).
    */
   function onCta(cta: Cta) {
@@ -128,8 +128,7 @@ export function ChatPanel({ question, sections, flow = null, wsUrl, apiBase, tok
     if (cta.kind === "login") { commitCtl.openLogin(); return; }
     if (cta.kind === "select_device") {
       const id = (cta.payload as any)?.device_id;
-      // 기기 스코프 — 다음 메시지를 해당 기기로 프리필(간단하지만 실제 동작).
-      setText(id ? `${id} 기기에 대해 알려주세요` : (text || ""));
+      if (id) submit(`${id} 기기에 대해 알려주세요`);   // 입력창 편집이 아니라 바로 질의
       return;
     }
     replyInteraction(cta); // chat 후속

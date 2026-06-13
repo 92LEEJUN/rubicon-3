@@ -39,6 +39,12 @@ cd frontend && npm install && npm run dev
 ```
 실 BE 연결 채팅: http://localhost:5173/?screen=live&api=http://localhost:8000&ws=ws://localhost:8000/chat?token=demo
 
+### C. Docker Compose (한 명령)
+```bash
+docker compose up --build   # be:8001 · bff:8000 · fe:5173(nginx)
+```
+FE는 브라우저에서 BFF로 연결(`?api=http://localhost:8000&ws=ws://localhost:8000/chat?token=demo`).
+
 ### CLI (BE 단독 데모)
 ```bash
 cd backend && python -m app.cli "세탁기에서 물이 안 빠져요. 해결법과 부품 주문 도와줘"
@@ -66,7 +72,7 @@ cd e2e      && npm install && npm --prefix ../frontend install && npm test      
 ## 배포
 - **GitHub Pages** (FE 정적, mock 모드): `main` 푸시 시 `.github/workflows/deploy-pages.yml`가 `frontend/dist`를 **gh-pages 브랜치로 발행**. 최초 1회 **Settings → Pages → Source = "Deploy from a branch" → `gh-pages` /(root)**. 배포 URL: https://92leejun.github.io/rubicon-3/
 - **Vercel**: 저장소 연결 시 `vercel.json`로 `frontend/dist` 빌드.
-- **BE/BFF**(실 서비스): 각각 `uvicorn` ASGI 앱(`app.api.internal:app` / `gateway.main:app`)을 컨테이너/호스트에 배포, BFF에 `BE_BASE_URL` 주입.
+- **BE/BFF**(실 서비스): 각각 `uvicorn` ASGI 앱(`app.api.internal:app` / `gateway.main:app`)을 컨테이너/호스트에 배포, BFF에 `BE_BASE_URL` 주입. 헬스체크 `GET /health`, 메트릭 `GET /metrics`(Prometheus) 제공.
 
 ## 문서
 - 기반 문서 [`docs/`](./docs) — architecture·data-model·api-contract·{backend,bff,frontend}-architecture·orchestration·operations·llm-policy 등, 결정 기록 [`docs/adr/`](./docs/adr)(0043~), 확장 로드맵 [`docs/roadmap.md`](./docs/roadmap.md).

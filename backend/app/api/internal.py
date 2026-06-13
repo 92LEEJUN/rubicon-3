@@ -36,6 +36,7 @@ from ..errors import (
     QuoteForbidden,
     QuoteNotConvertible,
 )
+from ..observability import install_observability
 from ..orchestrator.capability import CapabilityOrchestrator
 from ..principal import (
     Principal,
@@ -45,6 +46,15 @@ from ..principal import (
 )
 
 app = FastAPI(title="MVP 컨시어지 — BE 내부 API")
+
+# 관측성(gap 8) — /health·/metrics + 요청/에러 카운트 미들웨어(stdlib only, 응답 불변).
+_metrics = install_observability(app, service="backend")
+
+
+@app.get("/internal/health")
+def internal_health():
+    """내부망 헬스체크 — /health와 동일(BFF/오케스트레이션용 별칭)."""
+    return {"status": "ok", "uptime_seconds": round(_metrics.uptime(), 3)}
 
 # 공유 컨테이너 — 인메모리 상태 리포는 **이미 user_id 키잉**(멀티테넌트 준비됨, specs/multi-tenant-state).
 # 단일 지점이던 `_container.user`(프로필)는 Principal/UserDirectory로 분리한다.

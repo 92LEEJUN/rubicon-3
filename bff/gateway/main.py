@@ -18,6 +18,7 @@ from fastapi import Depends, FastAPI, Request, WebSocket, WebSocketDisconnect
 
 from .auth import Identity, identity_dep, resolve_identity
 from .backend_client import BackendClient
+from .observability import install_observability
 from .transform import fallback_body, interaction_to_text, relay
 
 
@@ -28,6 +29,10 @@ def _backend(request: Request) -> BackendClient:
 def create_app(backend: Optional[BackendClient] = None) -> FastAPI:
     app = FastAPI(title="MVP 컨시어지 — BFF (클라이언트 표면)")
     app.state.backend = backend or BackendClient()
+
+    # 관측성(gap 8) — /metrics + 요청/에러 카운트 미들웨어(stdlib only, 중계/스트림 불변).
+    # /health 는 아래에 이미 있으므로 add_health=False.
+    install_observability(app, service="bff", add_health=False)
 
     @app.get("/health")
     def health():

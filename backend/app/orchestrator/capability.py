@@ -210,35 +210,9 @@ def _cap_clarify(ctx: TurnCtx, message: str) -> list[MessageSection]:
 
 
 # ── F4: 범위 밖/미충족 의도 명시(요구사항 R7) ───────────────────────────────
-# 결정적 잔여 검사 — 가전 컨시어지 범위 밖 주제 표지. 메시지에 이런 요청이 섞여 있는데
-# 어떤 capability도 그 요청을 커버하지 못하면 침묵 대신 낮은 톤의 out_of_scope 안내를 덧붙인다.
-# (test-findings F4: "주말 날씨" 같은 범위 밖 의도가 unhandled 표기 없이 사라지던 갭.)
-_OUT_OF_SCOPE_KW = {
-    "날씨": "날씨",
-    "기온": "날씨",
-    "미세먼지": "날씨/대기",
-    "뉴스": "뉴스",
-    "주식": "주식",
-    "환율": "환율",
-    "운세": "운세",
-    "로또": "운세",
-    "번역": "번역",
-    "맛집": "맛집",
-    "길찾": "길찾기",
-    "내비": "길찾기",
-}
-
-
-def detect_out_of_scope(message: str) -> list[str]:
-    """메시지에서 범위 밖 주제 표지를 찾아 사람이 읽을 라벨 목록을 돌려준다(중복 제거, 순서 보존)."""
-    t = message or ""
-    labels: list[str] = []
-    for kw, label in _OUT_OF_SCOPE_KW.items():
-        if kw in t and label not in labels:
-            labels.append(label)
-    return labels
-
-
+# 범위 밖 판정은 **LLM 플래너**가 한다(키워드 누락이 많아 폐기). 플래너가 out_of_scope 토픽을
+# 내면(Plan.out_of_scope) 침묵 대신 낮은 톤의 안내를 덧붙인다. 플래너 미연결(규칙 폴백)이면
+# 신호가 없으므로 out_of_scope를 띄우지 않는다(test-findings F4 처방 — LLM 결정).
 def out_of_scope_section(labels: list[str]) -> MessageSection:
     """범위 밖 요청에 대한 낮은 톤의 명시적 미처리(unhandled) 섹션(R7).
 
@@ -368,6 +342,7 @@ def advisory_catalog(registry: dict[str, Capability]) -> list[Capability]:
 @dataclass
 class Plan:
     capabilities: list[str] = field(default_factory=list)
+    out_of_scope: list[str] = field(default_factory=list)   # LLM이 판정한 범위 밖 토픽(F4)
 
 
 def rule_plan(intents: list[str], registry: dict[str, Capability]) -> Plan:
@@ -416,7 +391,8 @@ class CapabilityOrchestrator:
         # §8~11 prose 클라이언트(주입형) — complete(system, user)->str. 없으면 prose capability는
         # 결정적 폴백(explain)으로 동작한다. 기본 None → 테스트·오프라인 결정성 유지.
         self.prose_client = prose_client
-        self._plan_cache: dict[str, list[str]] = {}   # message → LLM 조언형 plan(홉 생략)
+        # message → (조언형 plan, out_of_scope 토픽). 홉 생략(§9.2).
+        self._plan_cache: dict[str, tuple[list[str], list[str]]] = {}
 
     def _ordered_intents(self, message: str) -> list[str]:
         result = self.classifier.classify(message)
@@ -435,56 +411,64 @@ class CapabilityOrchestrator:
         return names
 
     def _cache_get(self, message: str):
-        """캐시된 LLM 조언형 plan(없으면 None). route는 메시지의 순수 함수이므로 캐시 안전(§9.2)."""
+        """캐시된 (조언형 plan, out_of_scope)(없으면 None). route는 메시지의 순수 함수(§9.2)."""
         return self._plan_cache.get(message)
 
-    def _cache_put(self, message: str, advisory: list[str]) -> None:
+    def _cache_put(self, message: str, advisory: list[str], oos: list[str]) -> None:
         if len(self._plan_cache) >= _PLAN_CACHE_MAX:      # 단순 FIFO 경계
             self._plan_cache.pop(next(iter(self._plan_cache)))
-        self._plan_cache[message] = advisory
+        self._plan_cache[message] = (advisory, oos)
+
+    def _route_with(self, message: str, rule: Plan, advisory, oos: list[str]) -> Plan:
+        """LLM 결과(advisory + out_of_scope)를 규칙 행동과 병합해 최종 Plan을 만든다(route/aroute 공통)."""
+        if advisory:
+            names = self._merge_advisory_actions(advisory, rule)
+            if names:
+                return Plan(capabilities=names, out_of_scope=oos)
+        if oos:   # 범위 밖만 있고 고를 capability가 없음 → 규칙 plan + out_of_scope
+            return Plan(capabilities=rule.capabilities, out_of_scope=oos)
+        return rule
 
     def route(self, message: str) -> Plan:
-        """**모든 질의를 LLM 플래너로 라우팅**(ADR-0048). LLM은 조언형을 고르고, 명시 행동(order)은
-        규칙 plan에서 보존·병합한다. 동일 메시지는 캐시로 LLM 홉 생략(§9.2 레이턴시). 플래너
+        """**모든 질의를 LLM 플래너로 라우팅**(ADR-0048). LLM은 조언형 + 범위 밖(out_of_scope)을 내고,
+        명시 행동(order)은 규칙 plan에서 보존·병합한다. 동일 메시지는 캐시로 홉 생략(§9.2). 플래너
         미연결·실패·빈 결과면 규칙 plan으로 폴백(요구사항 14-2)."""
         rule = self.plan(message)
         if self.llm_planner is not None:
-            advisory = self._cache_get(message)
-            if advisory is None:
+            cached = self._cache_get(message)
+            if cached is None:
                 try:
                     intents = self._ordered_intents(message)
                     proposed = self.llm_planner.propose(advisory_catalog(self.registry), message)
                     advisory = validate_plan(proposed, intents, self.registry).capabilities
-                    self._cache_put(message, advisory)
+                    oos = list(getattr(proposed, "out_of_scope", []) or [])
+                    self._cache_put(message, advisory, oos)
                 except Exception:
-                    advisory = None   # 플래너 실패 → 캐시 안 함(일시 오류), 규칙 폴백
-            if advisory:
-                names = self._merge_advisory_actions(advisory, rule)
-                if names:
-                    return Plan(capabilities=names)
+                    advisory, oos = None, []   # 플래너 실패 → 캐시 안 함, 규칙 폴백
+            else:
+                advisory, oos = cached
+            return self._route_with(message, rule, advisory, oos)
         return rule
 
     async def aroute(self, message: str) -> Plan:
         """route()의 비동기 버전 — 플래너에 apropose 코루틴이 있으면 await로 라우팅(ADR-0048).
 
-        병합·캐시 로직은 sync route()와 동일. 플래너가 apropose를 갖지 않거나 예외/빈 결과면
-        sync route()로 폴백(요구사항 14-2)."""
+        병합·캐시·out_of_scope 로직은 sync route()와 동일. apropose가 없거나 예외면 route()로 폴백."""
         if self.llm_planner is not None and hasattr(self.llm_planner, "apropose"):
             rule = self.plan(message)
-            advisory = self._cache_get(message)
-            if advisory is None:
+            cached = self._cache_get(message)
+            if cached is None:
                 try:
                     intents = self._ordered_intents(message)
                     proposed = await self.llm_planner.apropose(advisory_catalog(self.registry), message)
                     advisory = validate_plan(proposed, intents, self.registry).capabilities
-                    self._cache_put(message, advisory)
+                    oos = list(getattr(proposed, "out_of_scope", []) or [])
+                    self._cache_put(message, advisory, oos)
                 except Exception:
-                    advisory = None
-            if advisory:
-                names = self._merge_advisory_actions(advisory, rule)
-                if names:
-                    return Plan(capabilities=names)
-            return rule
+                    advisory, oos = None, []
+            else:
+                advisory, oos = cached
+            return self._route_with(message, rule, advisory, oos)
         # apropose 없음(또는 플래너 미연결) → sync route(propose/규칙 폴백)로 위임
         return self.route(message)
 
@@ -509,9 +493,9 @@ class CapabilityOrchestrator:
         if not sections:   # 빈 턴 방지(R7) — 무엇을 원하는지 되묻기
             sections = handlers.handle_clarify(ctx.c, ctx.user, message)
 
-        # F4(R7) — 메시지에 범위 밖 요청이 섞여 있으면 침묵 대신 명시적 미처리 안내를 덧붙인다.
-        # 결정적 잔여 검사: clarify로만 응답한 경우(전부 미해석)는 이미 되묻기이므로 중복 안내하지 않는다.
-        oos = detect_out_of_scope(message)
+        # F4(R7) — 플래너가 범위 밖 요청(plan.out_of_scope)을 판정하면 침묵 대신 명시적 미처리 안내.
+        # clarify로만 응답한 경우(전부 미해석)는 이미 되묻기이므로 중복 안내하지 않는다.
+        oos = list(getattr(plan, "out_of_scope", []) or [])
         already_only_clarify = all(s.intent == "clarify" for s in sections)
         if oos and not already_only_clarify:
             sections.append(out_of_scope_section(oos))

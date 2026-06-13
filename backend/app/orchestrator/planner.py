@@ -30,7 +30,11 @@ _SYSTEM = (
     "명시적으로 요청했을 때만 고릅니다(예: '추천'이라는 말이 없으면 recommend 금지, '예약/방문'이라는 "
     "말이 없으면 booking 금지). 추가하면 더 도움이 될 것 같다는 이유로 capability를 덧붙이지 않습니다. "
     "예) '고장 해결법 알려주고 필터도 주문해줘' → diagnose·order만 (recommend·explain·general·booking "
-    "넣지 않음). 확신이 없으면 더 적게 고릅니다."
+    "넣지 않음). 확신이 없으면 더 적게 고릅니다.\n"
+    "9) 범위 밖(out_of_scope): 메시지에 **가전 컨시어지와 무관한 요청**(예: 날씨·기온·미세먼지·뉴스·"
+    "주식·환율·운세·번역·맛집·길찾기 등)이 섞여 있으면, 그 주제를 `out_of_scope`에 짧은 한국어 라벨로 "
+    "나열합니다(없으면 빈 배열 []). 이 요청들은 capabilities로 처리하지 않습니다. 가전 관련(상태·고장·"
+    "부품·추천·보증·예약)은 범위 안이므로 out_of_scope에 넣지 않습니다."
 )
 
 
@@ -46,8 +50,12 @@ def _schema(names: list[str]) -> dict:
                         "type": "array",
                         "items": {"type": "string", "enum": names},
                     },
+                    "out_of_scope": {
+                        "type": "array",
+                        "items": {"type": "string"},   # 범위 밖 주제 라벨(자유), 없으면 []
+                    },
                 },
-                "required": ["capabilities"],
+                "required": ["capabilities", "out_of_scope"],
                 "additionalProperties": False,
             },
             "strict": True,
@@ -63,7 +71,8 @@ def _user_prompt(catalog: list[Capability], message: str) -> str:
 def _parse(content: str, names: list[str]) -> Plan:
     data = json.loads(content)
     picked = [n for n in data.get("capabilities", []) if n in names]
-    return Plan(capabilities=picked)
+    oos = [str(t) for t in data.get("out_of_scope", []) if isinstance(t, str) and t.strip()]
+    return Plan(capabilities=picked, out_of_scope=oos)
 
 
 class LLMPlanner:

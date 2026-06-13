@@ -11,6 +11,7 @@ import { useCommit } from "../state/useCommit";
 import { track } from "../analytics/track";
 import { color, radius, space } from "../design/tokens";
 import { respond } from "../mock/respond";
+import { streamDelayMs } from "../mock/mode";
 import type { ClientMessage, Cta } from "../types/contract";
 
 /** BE 미연결 시 폴백 — interaction_reply(비-commit)는 라우터용 텍스트로 변환. */
@@ -22,7 +23,9 @@ function msgText(m: ClientMessage): string {
 }
 
 export function LiveChat({ wsUrl, apiBase, token }: { wsUrl: string; apiBase?: string; token?: string }) {
-  const transport = useMemo(() => new ResilientTransport(wsUrl, (m) => respond(msgText(m))), [wsUrl]);
+  const transport = useMemo(
+    () => new ResilientTransport(wsUrl, (m) => respond(msgText(m)), 3500, { delayMs: streamDelayMs() }),
+    [wsUrl]);
   const { state, send, replyInteraction } = useChat(transport);
   const [text, setText] = useState("");
   const [sent, setSent] = useState<string | null>(null);

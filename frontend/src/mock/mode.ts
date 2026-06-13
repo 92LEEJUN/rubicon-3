@@ -5,6 +5,14 @@ export function isMock(apiBase?: string): boolean {
   return !apiBase;
 }
 
+/** mock 응답 스트리밍 간격(ms). 테스트(NODE_ENV=test)에선 0(동기) — 단언 안정. 앱은 점진 방출. */
+export function streamDelayMs(): number {
+  try {
+    if (process.env.NODE_ENV === "test") return 0;
+  } catch { /* noop */ }
+  return 150;
+}
+
 /** URL 쿼리 플래그(브라우저 전용; 비브라우저/테스트는 빈 값). */
 export function readQueryFlags(): { mock: boolean; reset: boolean } {
   try {

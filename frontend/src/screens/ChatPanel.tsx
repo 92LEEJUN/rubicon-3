@@ -14,6 +14,7 @@ import { ConfirmDialog, LoginWall } from "../components/CommitGate";
 import { MockTransport, ResilientTransport } from "../transport";
 import { isCommitCta } from "../transport/commit";
 import { respond } from "../mock/respond";
+import { streamDelayMs } from "../mock/mode";
 import { useChat } from "../state/useChat";
 import { useCommit } from "../state/useCommit";
 import { track } from "../analytics/track";
@@ -55,7 +56,8 @@ export function ChatPanel({ question, sections, flow = null, wsUrl, apiBase, tok
       if (first) { first = false; return toChunks(sections, flow); }
       return respond(m.type === "user_message" ? m.text : "");
     };
-    return wsUrl ? new ResilientTransport(wsUrl, script) : new MockTransport(script);
+    const opts = { delayMs: streamDelayMs() };
+    return wsUrl ? new ResilientTransport(wsUrl, script, 3500, opts) : new MockTransport(script, opts);
   }, [wsUrl, sections, flow]);
   const { state, send, replyInteraction, resumeFromRef } = useChat(transport);
   const [messages, setMessages] = useState<ChatMsg[]>([]);

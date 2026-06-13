@@ -58,9 +58,10 @@ export class ResilientTransport implements ChatTransport {
   private fellBack = false;
   private timer: ReturnType<typeof setTimeout> | undefined;
 
-  constructor(url: string, mockScript: (m: ClientMessage) => Chunk[], private timeoutMs = 3500) {
+  constructor(url: string, mockScript: (m: ClientMessage) => Chunk[], private timeoutMs = 3500,
+              mockOpts: { delayMs?: number } = {}) {
     this.ws = new WebSocketTransport(url);
-    this.mock = new MockTransport(mockScript);
+    this.mock = new MockTransport(mockScript, mockOpts);   // 폴백 mock 스트리밍 효과(delayMs)
   }
 
   private fallback() {
@@ -93,18 +94,45 @@ export class ResilientTransport implements ChatTransport {
   close() { if (this.timer) clearTimeout(this.timer); this.ws.close(); this.mock.close(); }
 }
 
-/** 스크립트된 청크를 재생하는 Mock(테스트·오프라인 스크린샷). */
+/** 스크립트된 청크를 재생하는 Mock(테스트·오프라인 스크린샷).
+ *  opts.delayMs>0이면 청크를 **점진 방출**(스트리밍 효과) — delta는 글자 단위로 쪼갠다.
+ *  기본 0이면 동기 방출(테스트 단언 안정). */
 export class MockTransport implements ChatTransport {
   private chunkHandler: (c: Chunk) => void = () => {};
   private stateHandler: (s: "open" | "closed" | "error") => void = () => {};
+  private timer: ReturnType<typeof setTimeout> | undefined;
 
-  constructor(private script: (message: ClientMessage) => Chunk[]) {}
+  constructor(private script: (message: ClientMessage) => Chunk[],
+              private opts: { delayMs?: number } = {}) {}
 
   connect() { this.stateHandler("open"); }
+
   send(message: ClientMessage) {
-    for (const c of this.script(message)) this.chunkHandler(c);
+    const chunks = this.script(message);
+    const delay = this.opts.delayMs ?? 0;
+    if (delay <= 0) { for (const c of chunks) this.chunkHandler(c); return; }
+    const queue = this.expand(chunks);
+    let i = 0;
+    const tick = () => {
+      if (i >= queue.length) return;
+      this.chunkHandler(queue[i++]);
+      if (i < queue.length) this.timer = setTimeout(tick, delay);
+    };
+    this.timer = setTimeout(tick, delay);
   }
+
+  /** delta 청크를 글자(3자)로 쪼개 타이핑 효과를 낸다. 그 외 청크는 그대로. */
+  private expand(chunks: Chunk[]): Chunk[] {
+    const out: Chunk[] = [];
+    for (const c of chunks) {
+      if (c.type === "delta" && c.text.length > 3) {
+        for (let j = 0; j < c.text.length; j += 3) out.push({ type: "delta", text: c.text.slice(j, j + 3) });
+      } else { out.push(c); }
+    }
+    return out;
+  }
+
   onChunk(h: (c: Chunk) => void) { this.chunkHandler = h; }
   onState(h: (s: "open" | "closed" | "error") => void) { this.stateHandler = h; }
-  close() { this.stateHandler("closed"); }
+  close() { if (this.timer) clearTimeout(this.timer); this.stateHandler("closed"); }
 }

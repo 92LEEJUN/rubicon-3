@@ -1,0 +1,17 @@
+# Ruff 설정 (코드 품질 도구). 의존성은 requirements.txt 에 유지한다.
+# [project]/빌드 섹션은 두지 않는다 — 이 파일은 ruff 설정 전용.
+
+[tool.ruff]
+line-length = 120
+target-version = "py311"
+
+[tool.ruff.lint]
+# 보수적 기본값(ruff defaults): pycodestyle(E4/E7/E9) + pyflakes(F).
+select = ["E4", "E7", "E9", "F"]
+# bff 소스는 현재 위반이 없다(0건). backend 와 동일한 ignore 집합을 유지해
+# 두 서브시스템의 lint 정책을 통일하고, 향후 코드가 같은 기준으로 green 을 유지하도록 한다.
+#   F401 — unused-import
+#   E741 — ambiguous-variable-name
+#   E702 — multiple-statements-on-one-line-semicolon
+#   F541 — f-string-without-placeholders
+ignore = ["F401", "E741", "E702", "F541"]

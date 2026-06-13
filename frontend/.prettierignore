@@ -1,0 +1,16 @@
+# Prettier 무시 목록.
+#
+# NOTE(advisory): 이 레포는 한 번도 prettier --write 를 돌린 적이 없다.
+# 현재 `prettier --check` 는 43개 파일에서 실패한다(대규모 diff 위험).
+# 따라서 prettier 는 "hard gate" 가 아니라 advisory 다 — CI 의 prettier
+# 단계는 continue-on-error 로 두고, 전체 포맷은 별도 PR 에서 일괄 처리한다.
+# (.prettierrc 는 strict JSON 이라 주석을 못 달아 여기에 기록한다.)
+#
+node_modules
+dist
+public
+mockups
+__screenshots__
+package-lock.json
+*.md
+src/raw-md.d.ts

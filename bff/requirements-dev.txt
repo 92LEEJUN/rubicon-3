@@ -1,4 +1,4 @@
 -r requirements.txt
-pytest>=8.0
+pytest==9.0.3
 # 계약 테스트는 BE를 인프로세스로 import한다 → backend/requirements.txt 도 설치 필요:
 #   pip install -r ../backend/requirements.txt

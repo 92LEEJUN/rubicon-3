@@ -1,0 +1,23 @@
+# EditorConfig — https://editorconfig.org
+# 에디터 간 공통 포맷 규칙(utf-8 / lf / 들여쓰기).
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+indent_style = space
+
+[*.py]
+indent_size = 4
+
+[*.{ts,tsx,js,jsx,json,yml,yaml}]
+indent_size = 2
+
+[*.md]
+# 마크다운은 줄 끝 공백(개행 의미)을 보존한다.
+trim_trailing_whitespace = false
+
+[Makefile]
+indent_style = tab

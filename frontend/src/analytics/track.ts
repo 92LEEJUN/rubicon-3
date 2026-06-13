@@ -8,23 +8,23 @@
 
 /** docs/analytics.md §4 카탈로그의 FE-소유 이벤트명(알려진 값 열거 — permissive). */
 export type AnalyticsEventName =
-  | "screen_viewed"
-  | "screen_exited"
-  | "chat_opened"
-  | "card_tapped"
-  | "message_sent"     // 턴 전송(인게이지먼트 시작, §5)
-  | "template_shown"
-  | "cta_shown"
-  | "cta_clicked"      // CTA 탭(기여 시작)
-  | "checkout_shown"
-  | "resolution_confirmed"
-  | "fallback_shown"
-  | "error_shown"
-  | "notification_opened"
-  | "notification_dismissed"
+  | 'screen_viewed'
+  | 'screen_exited'
+  | 'chat_opened'
+  | 'card_tapped'
+  | 'message_sent' // 턴 전송(인게이지먼트 시작, §5)
+  | 'template_shown'
+  | 'cta_shown'
+  | 'cta_clicked' // CTA 탭(기여 시작)
+  | 'checkout_shown'
+  | 'resolution_confirmed'
+  | 'fallback_shown'
+  | 'error_shown'
+  | 'notification_opened'
+  | 'notification_dismissed'
   // order_confirmed의 owner는 BE이나, FE 데모/오프라인(BE 미연결) 경로의 커밋 확정도
   // 가시화하기 위해 클라 사이드에서 같은 이름으로 발행한다(실 연동 시 BE가 진실의 출처).
-  | "order_confirmed";
+  | 'order_confirmed';
 
 export type AnalyticsProps = Record<string, unknown>;
 
@@ -33,7 +33,8 @@ export type AnalyticsSink = (name: string, props?: AnalyticsProps) => void;
 /** 기본 싱크 — 개발 중 console, 그 외 no-op(비차단). BFF/BE 싱크는 후속. */
 const consoleSink: AnalyticsSink = (name, props) => {
   // eslint-disable-next-line no-console
-  if (typeof console !== "undefined" && console.debug) console.debug("[analytics]", name, props ?? {});
+  if (typeof console !== 'undefined' && console.debug)
+    console.debug('[analytics]', name, props ?? {});
 };
 
 let sink: AnalyticsSink = consoleSink;

@@ -5,12 +5,12 @@
  * 노출 시 POST /reengagement/deliver로 재노출 억제(요구 3.2). `{}`/실패면 미노출(요구 3.4).
  * 동의가 철회되면 노출 중 배너도 즉시 제거(요구 6.3).
  */
-import { useCallback, useEffect, useState } from "react";
-import { getReEngagement } from "../transport/companion";
-import type { ApiConfig } from "../transport/api";
-import type { ReEngagement } from "../types/contract";
-import { companionStore, useCompanionStore } from "./companionStore";
-import { useConsent } from "./useConsent";
+import { useCallback, useEffect, useState } from 'react';
+import { getReEngagement } from '../transport/companion';
+import type { ApiConfig } from '../transport/api';
+import type { ReEngagement } from '../types/contract';
+import { companionStore, useCompanionStore } from './companionStore';
+import { useConsent } from './useConsent';
 
 export function useReEngagement(cfg: ApiConfig, enabled = true) {
   const { optedIn } = useConsent();
@@ -22,7 +22,7 @@ export function useReEngagement(cfg: ApiConfig, enabled = true) {
   useEffect(() => {
     if (!enabled || !optedIn) {
       setBanner(null);
-      companionStore.setBannerState("hidden");
+      companionStore.setBannerState('hidden');
       return;
     }
     if (dismissed) return;
@@ -32,10 +32,10 @@ export function useReEngagement(cfg: ApiConfig, enabled = true) {
       if (!alive) return;
       if (re) {
         setBanner(re);
-        companionStore.setBannerState("shown");
+        companionStore.setBannerState('shown');
       } else {
         setBanner(null);
-        companionStore.setBannerState("hidden"); // {} → 미노출(요구 3.4)
+        companionStore.setBannerState('hidden'); // {} → 미노출(요구 3.4)
       }
     });
     return () => {
@@ -46,11 +46,11 @@ export function useReEngagement(cfg: ApiConfig, enabled = true) {
   const dismiss = useCallback(() => {
     setDismissed(true);
     setBanner(null);
-    companionStore.setBannerState("dismissed"); // 숨김 + 재노출 안 함(요구 3.5)
+    companionStore.setBannerState('dismissed'); // 숨김 + 재노출 안 함(요구 3.5)
   }, []);
 
   // 노출 여부 — 미동의/닫힘/빈 응답이면 노출 안 함
-  const visible = !!banner && optedIn && !dismissed && bannerState === "shown";
+  const visible = !!banner && optedIn && !dismissed && bannerState === 'shown';
 
   return {
     banner: visible ? banner : null,

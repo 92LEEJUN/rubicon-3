@@ -7,7 +7,7 @@
  * 코드베이스 관례(plain React, useHomeData 류)에 맞춰 외부 상태관리 의존 없이
  * 경량 모듈 스토어 + Context로 제공한다(zustand 미설치). 동의 변경 시 구독자에게 즉시 통지(요구 6.3).
  */
-import React, { createContext, useContext, useEffect, useState } from "react";
+import React, { createContext, useContext, useEffect, useState } from 'react';
 
 export interface Consent {
   opted_in: boolean; // 선제/개인화 전반 동의
@@ -50,7 +50,9 @@ export function ConsentProvider({
   store?: ConsentStore;
   children: React.ReactNode;
 }) {
-  return <ConsentContext.Provider value={store ?? defaultStore}>{children}</ConsentContext.Provider>;
+  return (
+    <ConsentContext.Provider value={store ?? defaultStore}>{children}</ConsentContext.Provider>
+  );
 }
 
 export function createConsentStore(initial: Consent): ConsentStore {

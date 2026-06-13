@@ -8,11 +8,11 @@
  *
  * 토큰은 게스트(없음)→로그인(있음)로 바뀔 수 있어 ref로 동적 주입(BFF가 매핑).
  */
-import { useCallback, useRef, useState } from "react";
-import type { ApiConfig } from "../transport/api";
-import { commit, type CommitKind, type CommitResult } from "../transport/commit";
-import { track } from "../analytics/track";
-import type { Cta, Template } from "../types/contract";
+import { useCallback, useRef, useState } from 'react';
+import type { ApiConfig } from '../transport/api';
+import { commit, type CommitKind, type CommitResult } from '../transport/commit';
+import { track } from '../analytics/track';
+import type { Cta, Template } from '../types/contract';
 
 interface PendingCommit {
   kind: CommitKind;
@@ -42,7 +42,10 @@ export interface UseCommit {
 
 export function useCommit(
   cfg: ApiConfig,
-  opts?: { onCommitted?: (kind: CommitKind, data?: any) => void; onLogin?: () => string | undefined },
+  opts?: {
+    onCommitted?: (kind: CommitKind, data?: any) => void;
+    onLogin?: () => string | undefined;
+  },
 ): UseCommit {
   const [confirmTemplate, setConfirmTemplate] = useState<Template | null>(null);
   const [showLogin, setShowLogin] = useState(false);
@@ -51,27 +54,30 @@ export function useCommit(
   // 토큰은 로그인 시 갱신될 수 있으므로 ref로 최신값 유지(게스트→로그인).
   const tokenRef = useRef<string | undefined>(cfg.token);
 
-  const cfgNow = useCallback((): ApiConfig => ({ base: cfg.base, token: tokenRef.current }), [cfg.base]);
+  const cfgNow = useCallback(
+    (): ApiConfig => ({ base: cfg.base, token: tokenRef.current }),
+    [cfg.base],
+  );
 
   const apply = useCallback(
     (res: CommitResult, kind: CommitKind) => {
-      if (res.status === "confirm") {
+      if (res.status === 'confirm') {
         pending.current = { kind, payload: res.payload };
         setConfirmTemplate(res.template);
-        track("checkout_shown", { kind });
-      } else if (res.status === "login") {
+        track('checkout_shown', { kind });
+      } else if (res.status === 'login') {
         setConfirmTemplate(null);
         setShowLogin(true);
-      } else if (res.status === "ok") {
+      } else if (res.status === 'ok') {
         setConfirmTemplate(null);
         setShowLogin(false);
         pending.current = null;
-        track("order_confirmed", { kind });
+        track('order_confirmed', { kind });
         opts?.onCommitted?.(kind, res.data);
       } else {
         // error — 게이트를 닫고 조용히 종료(상위에서 폴백 메시지 가능).
         setConfirmTemplate(null);
-        track("error_shown", { code: res.code ?? "commit_failed" });
+        track('error_shown', { code: res.code ?? 'commit_failed' });
       }
     },
     [opts],
@@ -79,7 +85,7 @@ export function useCommit(
 
   const start = useCallback(
     async (cta: Cta) => {
-      if (cta.action !== "commit" || (cta.kind !== "order" && cta.kind !== "booking")) return;
+      if (cta.action !== 'commit' || (cta.kind !== 'order' && cta.kind !== 'booking')) return;
       const kind = cta.kind as CommitKind;
       pending.current = { kind, payload: (cta.payload as Record<string, unknown>) ?? {} };
       setBusy(true);
@@ -112,7 +118,7 @@ export function useCommit(
 
   const login = useCallback(async () => {
     // 데모 placeholder — 실제 로그인 플로우(토큰 발급)는 후속. onLogin이 토큰을 주면 주입.
-    const tok = opts?.onLogin?.() ?? "demo-user-token";
+    const tok = opts?.onLogin?.() ?? 'demo-user-token';
     tokenRef.current = tok;
     setShowLogin(false);
     // 보류 커밋이 있으면 로그인 후 재시도(다시 1차 호출 — 이번엔 토큰 동반).
@@ -138,5 +144,15 @@ export function useCommit(
     setShowLogin(true);
   }, []);
 
-  return { confirmTemplate, showLogin, busy, start, openLogin, confirm, cancelConfirm, login, dismissLogin };
+  return {
+    confirmTemplate,
+    showLogin,
+    busy,
+    start,
+    openLogin,
+    confirm,
+    cancelConfirm,
+    login,
+    dismissLogin,
+  };
 }

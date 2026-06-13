@@ -2,7 +2,7 @@
  * FE↔BFF 공유 계약 타입(api-contract §2 · response-templates · data-model).
  * BFF가 보내는 청크/섹션/템플릿을 그대로 렌더한다(FE는 BFF 계약만 본다).
  */
-export type CtaAction = "chat" | "commit" | "navigate";
+export type CtaAction = 'chat' | 'commit' | 'navigate';
 
 /**
  * 알려진 CTA kind(계약). `kind`는 permissive(string)로 두되 — BFF가 새 kind를 보내도
@@ -13,16 +13,16 @@ export type CtaAction = "chat" | "commit" | "navigate";
  *    interaction_reply/user_message 후속으로 전송.
  */
 export type CtaKind =
-  | "order"
-  | "booking"
-  | "login"
-  | "select_device"
-  | "restock_alert"
-  | "compare"
-  | "explain"
-  | "recommend"
-  | "choices"
-  | "handoff";
+  | 'order'
+  | 'booking'
+  | 'login'
+  | 'select_device'
+  | 'restock_alert'
+  | 'compare'
+  | 'explain'
+  | 'recommend'
+  | 'choices'
+  | 'handoff';
 
 export interface Cta {
   label: string;
@@ -38,19 +38,19 @@ export interface Cta {
  *  - clarify/warranty/explain 섹션도 이 kind들(text·recommendation_list·booking)을 재사용한다.
  */
 export type TemplateKind =
-  | "text"
-  | "device_status"
-  | "guide_steps"
-  | "product_card"
-  | "order_summary"
-  | "confirmation"
-  | "recommendation_list"
-  | "home_summary"
-  | "status_tracker"
-  | "bridge"
-  | "handoff_card"
-  | "booking"
-  | "choices";
+  | 'text'
+  | 'device_status'
+  | 'guide_steps'
+  | 'product_card'
+  | 'order_summary'
+  | 'confirmation'
+  | 'recommendation_list'
+  | 'home_summary'
+  | 'status_tracker'
+  | 'bridge'
+  | 'handoff_card'
+  | 'booking'
+  | 'choices';
 
 export interface Template<T = Record<string, any>> {
   kind: TemplateKind | string; // 알려진 값은 TemplateKind, 미지의 kind는 text 폴백(§7)
@@ -67,16 +67,27 @@ export interface MessageSection {
 
 /** WS /chat 서버→클라이언트 청크(api-contract §2.1) */
 export type Chunk =
-  | { type: "delta"; text: string }
-  | { type: "section"; section: MessageSection }
-  | { type: "flow"; active_flow: string | null }
-  | { type: "done"; message_id?: string }
-  | { type: "error"; code: string; fallback?: Template; message?: string };
+  | { type: 'delta'; text: string }
+  | { type: 'section'; section: MessageSection }
+  | { type: 'flow'; active_flow: string | null }
+  | { type: 'done'; message_id?: string }
+  | { type: 'error'; code: string; fallback?: Template; message?: string };
 
 /** 클라이언트→서버 메시지 */
 export type ClientMessage =
-  | { type: "user_message"; session_id?: string; text: string; screen_context?: Record<string, unknown> | null }
-  | { type: "interaction_reply"; session_id?: string; ref?: string; kind: string; payload: Record<string, unknown> };
+  | {
+      type: 'user_message';
+      session_id?: string;
+      text: string;
+      screen_context?: Record<string, unknown> | null;
+    }
+  | {
+      type: 'interaction_reply';
+      session_id?: string;
+      ref?: string;
+      kind: string;
+      payload: Record<string, unknown>;
+    };
 
 /**
  * 컴패니언 DTO(api-contract §2.2 · always-present-companion design).
@@ -84,8 +95,8 @@ export type ClientMessage =
  */
 
 /** 미해결 스레드(always-present-companion: OpenLoop). */
-export type OpenLoopKind = "issue" | "order" | "flow";
-export type OpenLoopStatus = "open" | "resolved" | "dismissed";
+export type OpenLoopKind = 'issue' | 'order' | 'flow';
+export type OpenLoopStatus = 'open' | 'resolved' | 'dismissed';
 
 export interface OpenLoop {
   id: string;

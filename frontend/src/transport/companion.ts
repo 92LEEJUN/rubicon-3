@@ -7,10 +7,10 @@
  * 따라서 결과를 명시적 형태({ ok | notFound | error })로 돌려 호출 훅이 분기한다.
  * apiBase 미설정(정적 배포)이면 네트워크를 타지 않고 빈/null 결과를 돌려준다(폴백·게이트는 훅 책임).
  */
-import type { ApiConfig } from "./api";
-import type { OpenLoop, ReEngagement, ResumePayload } from "../types/contract";
+import type { ApiConfig } from './api';
+import type { OpenLoop, ReEngagement, ResumePayload } from '../types/contract';
 
-export type ActionKind = "resolve" | "dismiss";
+export type ActionKind = 'resolve' | 'dismiss';
 
 export interface MutationResult<T> {
   ok: boolean;
@@ -30,7 +30,9 @@ export async function getResume(cfg: ApiConfig, fresh = false): Promise<ResumePa
   const empty: ResumePayload = { has_context: false };
   if (!cfg.base) return empty;
   try {
-    const r = await fetch(cfg.base + "/resume" + (fresh ? "?fresh=true" : ""), { headers: headers(cfg) });
+    const r = await fetch(cfg.base + '/resume' + (fresh ? '?fresh=true' : ''), {
+      headers: headers(cfg),
+    });
     if (!r.ok) return empty;
     const body = (await r.json()) as ResumePayload;
     return body ?? empty;
@@ -43,12 +45,15 @@ export async function getResume(cfg: ApiConfig, fresh = false): Promise<ResumePa
  * GET /reengagement. `{}`/실패면 null(미노출). deliver=true면 POST /reengagement/deliver로
  * 전달 확정(재노출 억제, 요구 3.2).
  */
-export async function getReEngagement(cfg: ApiConfig, deliver = false): Promise<ReEngagement | null> {
+export async function getReEngagement(
+  cfg: ApiConfig,
+  deliver = false,
+): Promise<ReEngagement | null> {
   if (!cfg.base) return null;
-  const path = deliver ? "/reengagement/deliver" : "/reengagement";
+  const path = deliver ? '/reengagement/deliver' : '/reengagement';
   try {
     const r = await fetch(cfg.base + path, {
-      method: deliver ? "POST" : "GET",
+      method: deliver ? 'POST' : 'GET',
       headers: headers(cfg),
     });
     if (!r.ok) return null;
@@ -71,7 +76,7 @@ export async function postOpenLoopAction(
   }
   try {
     const r = await fetch(`${cfg.base}/open-loops/${encodeURIComponent(ref)}/${action}`, {
-      method: "POST",
+      method: 'POST',
       headers: headers(cfg),
     });
     if (r.status === 404) return { ok: false, notFound: true };
@@ -84,5 +89,5 @@ export async function postOpenLoopAction(
 }
 
 function isEmpty(o: unknown): boolean {
-  return !o || (typeof o === "object" && Object.keys(o as object).length === 0);
+  return !o || (typeof o === 'object' && Object.keys(o as object).length === 0);
 }

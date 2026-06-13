@@ -5,12 +5,12 @@
  * has_context=false면 렌더 안 함(빈 상태, 요구 1.6) — 가시성 판단은 useResume.hasContext가 한다.
  * degraded(부분 실패)면 요약만/축소 노출(요구 5.4). 동의 게이트는 useResume가 요약을 비운다(요구 6.2).
  */
-import React from "react";
-import { StyleSheet, Text, View } from "react-native";
-import { Button, Caption, Card, Title } from "./primitives";
-import { OpenLoopList } from "./OpenLoopList";
-import { color, font, space } from "../design/tokens";
-import type { OpenLoop, ResumePayload } from "../types/contract";
+import React from 'react';
+import { StyleSheet, Text, View } from 'react-native';
+import { Button, Caption, Card, Title } from './primitives';
+import { OpenLoopList } from './OpenLoopList';
+import { color, font, space } from '../design/tokens';
+import type { OpenLoop, ResumePayload } from '../types/contract';
 
 export function ResumeCard({
   resume,
@@ -58,7 +58,9 @@ export function ResumeCard({
         </Text>
       )}
 
-      {degraded ? <Caption>일부 정보를 불러오지 못했어요. 가능한 내용만 보여드려요.</Caption> : null}
+      {degraded ? (
+        <Caption>일부 정보를 불러오지 못했어요. 가능한 내용만 보여드려요.</Caption>
+      ) : null}
 
       {!degraded ? (
         <OpenLoopList
@@ -74,7 +76,12 @@ export function ResumeCard({
 
       <View style={styles.actions}>
         <Button label="이어가기" testID="resume-continue" variant="primary" onPress={onContinue} />
-        <Button label="새로 시작" testID="resume-fresh" variant="secondary" onPress={onStartFresh} />
+        <Button
+          label="새로 시작"
+          testID="resume-fresh"
+          variant="secondary"
+          onPress={onStartFresh}
+        />
       </View>
     </Card>
   );
@@ -82,8 +89,8 @@ export function ResumeCard({
 
 const styles = StyleSheet.create({
   card: { marginBottom: space.md, gap: space.sm },
-  head: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
+  head: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   summary: { fontSize: font.size.md, color: color.text, lineHeight: 22 },
   summaryMuted: { fontSize: font.size.md, color: color.textSub, lineHeight: 22 },
-  actions: { flexDirection: "row", gap: space.sm, marginTop: space.sm },
+  actions: { flexDirection: 'row', gap: space.sm, marginTop: space.sm },
 });

@@ -1,11 +1,11 @@
 /** Mock 상태 스토어(ADR-0051) — 주문·예약·candidates·대화를 localStorage에 영속.
  *  영속 실패(프라이빗 모드 등)면 메모리 폴백(throw 금지, R7). 클라이언트 전용. */
 
-const KEY = "rubicon.mock.v1";
+const KEY = 'rubicon.mock.v1';
 
 export interface MockOrder {
   id: string;
-  status: string;             // CONFIRMED
+  status: string; // CONFIRMED
   items: { part_id: string; name: string; qty: number; price: number }[];
   total: number;
   created_at: string;
@@ -14,20 +14,20 @@ export interface MockBooking {
   id: string;
   slot_id: string;
   visit_type: string;
-  status: string;             // CONFIRMED
+  status: string; // CONFIRMED
   start?: string;
   created_at: string;
 }
 export interface MockState {
   orders: MockOrder[];
   bookings: MockBooking[];
-  candidates: string[];       // 직전 추천 후보 product id(explain carry)
-  conversation: { role: "user" | "assistant"; text: string }[];
+  candidates: string[]; // 직전 추천 후보 product id(explain carry)
+  conversation: { role: 'user' | 'assistant'; text: string }[];
 }
 
 const EMPTY: MockState = { orders: [], bookings: [], candidates: [], conversation: [] };
 
-let memory: MockState | null = null;   // localStorage 불가 시 폴백
+let memory: MockState | null = null; // localStorage 불가 시 폴백
 
 function load(): MockState {
   if (memory) return memory;
@@ -57,13 +57,20 @@ export const mockStore = {
     return load();
   },
   getOrders(): MockOrder[] {
-    return [...load().orders].reverse();   // 최신순
+    return [...load().orders].reverse(); // 최신순
   },
   addOrder(items: { part_id: string; name: string; qty?: number; price?: number }[]): MockOrder {
     const s = load();
-    const norm = items.map((it) => ({ part_id: it.part_id, name: it.name, qty: it.qty ?? 1, price: it.price ?? 0 }));
+    const norm = items.map((it) => ({
+      part_id: it.part_id,
+      name: it.name,
+      qty: it.qty ?? 1,
+      price: it.price ?? 0,
+    }));
     const order: MockOrder = {
-      id: id("ord"), status: "CONFIRMED", items: norm,
+      id: id('ord'),
+      status: 'CONFIRMED',
+      items: norm,
       total: norm.reduce((a, it) => a + it.price * it.qty, 0),
       created_at: new Date().toISOString(),
     };
@@ -73,10 +80,14 @@ export const mockStore = {
   getBookings(): MockBooking[] {
     return [...load().bookings].reverse();
   },
-  addBooking(slot_id: string, visit_type = "REPAIR", start?: string): MockBooking {
+  addBooking(slot_id: string, visit_type = 'REPAIR', start?: string): MockBooking {
     const s = load();
     const bk: MockBooking = {
-      id: id("bk"), slot_id, visit_type, status: "CONFIRMED", start,
+      id: id('bk'),
+      slot_id,
+      visit_type,
+      status: 'CONFIRMED',
+      start,
       created_at: new Date().toISOString(),
     };
     persist({ ...s, bookings: [...s.bookings, bk] });
@@ -90,6 +101,10 @@ export const mockStore = {
   },
   reset(): void {
     memory = { ...EMPTY };
-    try { window.localStorage.removeItem(KEY); } catch { /* noop */ }
+    try {
+      window.localStorage.removeItem(KEY);
+    } catch {
+      /* noop */
+    }
   },
 };

@@ -8,34 +8,34 @@
  *
  * React Query 미설치라 동일 역할(패칭·캐시·무효화)을 경량 훅으로 구현(코드베이스 관례, useHomeData 류).
  */
-import { useCallback, useEffect, useState } from "react";
-import { getResume } from "../transport/companion";
-import type { ApiConfig } from "../transport/api";
-import type { ResumePayload } from "../types/contract";
-import { companionStore, useCompanionStore } from "./companionStore";
-import { useConsent } from "./useConsent";
+import { useCallback, useEffect, useState } from 'react';
+import { getResume } from '../transport/companion';
+import type { ApiConfig } from '../transport/api';
+import type { ResumePayload } from '../types/contract';
+import { companionStore, useCompanionStore } from './companionStore';
+import { useConsent } from './useConsent';
 
-export type FetchStatus = "idle" | "loading" | "success" | "error";
+export type FetchStatus = 'idle' | 'loading' | 'success' | 'error';
 
 export function useResume(cfg: ApiConfig, panelOpen: boolean) {
   const { optedIn } = useConsent();
   const { resumeVisibility } = useCompanionStore();
   const [resume, setResume] = useState<ResumePayload | null>(null);
-  const [status, setStatus] = useState<FetchStatus>("idle");
+  const [status, setStatus] = useState<FetchStatus>('idle');
   const [fresh, setFresh] = useState(false);
 
   const fetchResume = useCallback(
     (asFresh: boolean) => {
       let alive = true;
-      setStatus("loading");
+      setStatus('loading');
       getResume(cfg, asFresh)
         .then((p) => {
           if (!alive) return;
           setResume(p);
-          setStatus("success");
+          setStatus('success');
         })
         .catch(() => {
-          if (alive) setStatus("error");
+          if (alive) setStatus('error');
         });
       return () => {
         alive = false;
@@ -51,7 +51,7 @@ export function useResume(cfg: ApiConfig, panelOpen: boolean) {
   }, [panelOpen, fresh, fetchResume]);
 
   const startFresh = useCallback(() => {
-    companionStore.setResumeVisibility("dismissed"); // 이전 요약 화면 제거(요구 1.5)
+    companionStore.setResumeVisibility('dismissed'); // 이전 요약 화면 제거(요구 1.5)
     setFresh(true);
     setResume(null);
   }, []);
@@ -60,7 +60,7 @@ export function useResume(cfg: ApiConfig, panelOpen: boolean) {
   const gated = applyConsentGate(resume, optedIn);
 
   // has_context=false거나 사용자가 '새로 시작'으로 닫았으면 카드 미표시(요구 1.6)
-  const hasContext = !!gated?.has_context && resumeVisibility === "shown" && !fresh;
+  const hasContext = !!gated?.has_context && resumeVisibility === 'shown' && !fresh;
 
   return {
     resume: gated,
@@ -68,7 +68,7 @@ export function useResume(cfg: ApiConfig, panelOpen: boolean) {
     startFresh,
     status,
     /** 부분 실패(요약만 있고 open_loops 누락)면 degraded(요구 5.4). */
-    degraded: !!gated?.has_context && (gated.open_loops === undefined),
+    degraded: !!gated?.has_context && gated.open_loops === undefined,
   };
 }
 

@@ -33,23 +33,24 @@ export function LiveChat({ wsUrl, apiBase, token }: { wsUrl: string; apiBase?: s
   const cfg = useMemo(() => ({ base: apiBase, token }), [apiBase, token]);
   const commitCtl = useCommit(cfg);
 
-  function onSend() {
-    const q = text.trim();
-    if (!q) return;
-    setSent(q);
+  function sendQuery(q: string) {
+    const t = (q || "").trim();
+    if (!t) return;
+    setSent(t);
     track("message_sent", { modality: "text" }); // (요구 ⑨)
-    send(q);
+    send(t);
     setText("");
   }
+  function onSend() { sendQuery(text); }
 
-  // CTA 라우터 — commit(order/booking) 라운드트립 · login 월 · select_device 프리필 · 그 외 chat 후속(요구 ⑤⑥).
+  // CTA 라우터 — commit(order/booking) 라운드트립 · login 월 · select_device 즉시 질의 · 그 외 chat 후속(요구 ⑤⑥).
   function onCta(cta: Cta) {
     track("cta_clicked", { cta: cta.kind ?? cta.action, action: cta.action });
     if (isCommitCta(cta)) { void commitCtl.start(cta); return; }
     if (cta.kind === "login") { commitCtl.openLogin(); return; }
     if (cta.kind === "select_device") {
       const id = (cta.payload as any)?.device_id;
-      setText(id ? `${id} 기기에 대해 알려주세요` : text);
+      sendQuery(id ? `${id} 기기에 대해 알려주세요` : "");   // 입력창 편집이 아니라 바로 질의
       return;
     }
     replyInteraction(cta);

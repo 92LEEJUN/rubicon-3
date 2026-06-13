@@ -188,7 +188,7 @@ frontend/
 |----------|--------|-----------------|-----------|
 | `order`·`booking`(commit) | `commit` | REST 커밋 라운드트립(§13) | `transport/commit.ts`·`state/useCommit.ts` |
 | `login` | `navigate` | 로그인 월 오픈 | `useCommit.openLogin()` → `CommitGate.LoginWall` |
-| `select_device` | (any) | `payload.device_id`로 다음 메시지 프리필 | `onCta`(screens, §14) |
+| `select_device` | (any) | `payload.device_id`로 **즉시 질의 전송**(입력창 편집 아님) | `onCta`(screens, §14) |
 | `booking`(advisory)·`restock_alert`·`compare`·`explain`·`recommend`·`choices` | `chat` | `/chat` 후속(`interaction_reply`) | `useChat.replyInteraction` |
 
 > `booking`은 **kind 이름이 두 경로에 걸친다**: `action:"commit"`이면 예약 확정(§13), 그 외(advisory)는
@@ -265,7 +265,7 @@ self-contained 오버레이 2종 — 화면이 `useCommit` 상태로 토글한�
 
 1. **commit** — `isCommitCta(cta)` → `commitCtl.start(cta)`(§13). 409/401 게이트로 진입.
 2. **login** — `cta.kind==="login"` → `commitCtl.openLogin()`(로그인 월).
-3. **select_device** — `cta.kind==="select_device"` → `payload.device_id`로 입력창 프리필(다음 메시지 기기 스코프).
+3. **select_device** — `cta.kind==="select_device"` → `payload.device_id`로 **즉시 질의 전송**(`sendQuery`/`submit`). 입력창에 채워 편집하는 방식이 아니라 탭 즉시 해당 기기 질의를 보낸다.
 4. **그 외(chat 후속)** — `replyInteraction(cta)` → `/chat`으로 `interaction_reply` 전송(explain·restock_alert·
    compare·booking(advisory)·recommend·choices…).
 

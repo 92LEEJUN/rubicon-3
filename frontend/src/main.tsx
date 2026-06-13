@@ -1,10 +1,10 @@
 /** 웹 진입(react-native-web) — AppRegistry로 루트 마운트.
- *  쿼리: ?screen=home|support|chat|live|gallery, ?ws=<bff ws>, ?api=<bff base>, ?token=<auth>. */
+ *  쿼리: ?screen=home|support|chat|live|gallery|docs, ?ws=<bff ws>, ?api=<bff base>, ?token=<auth>. */
 import React from "react";
 import { AppRegistry } from "react-native";
 import { App, type ScreenName } from "./App";
 
-const SCREENS: ScreenName[] = ["home", "support", "chat", "live", "gallery", "scenario"];
+const SCREENS: ScreenName[] = ["home", "support", "chat", "live", "gallery", "scenario", "docs"];
 
 function Root() {
   const params = new URLSearchParams(typeof location !== "undefined" ? location.search : "");

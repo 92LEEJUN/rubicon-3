@@ -18,10 +18,8 @@ from __future__ import annotations
 import threading
 from datetime import datetime, timezone
 
-import pytest
 
 from app.concurrency import KeyedLock
-from app.container import build_container
 from app.domain import Order, OrderItem, OrderSummary
 from app.errors import OutOfStock
 from app.services.services import OrderService

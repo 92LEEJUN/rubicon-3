@@ -4,10 +4,10 @@
  * ADR-0023은 zustand를 권하지만 이 코드베이스는 plain React를 쓰므로(zustand 미설치),
  * 동일 역할을 하는 경량 모듈 스토어 + 구독 훅으로 둔다. 패널/배너/resume 노출 여부만 담는다.
  */
-import { useEffect, useState } from "react";
+import { useEffect, useState } from 'react';
 
-export type ResumeVisibility = "shown" | "dismissed";
-export type BannerState = "hidden" | "shown" | "dismissed";
+export type ResumeVisibility = 'shown' | 'dismissed';
+export type BannerState = 'hidden' | 'shown' | 'dismissed';
 
 export interface CompanionState {
   panelOpen: boolean;
@@ -18,8 +18,8 @@ export interface CompanionState {
 
 const initial: CompanionState = {
   panelOpen: false,
-  resumeVisibility: "shown",
-  bannerState: "hidden",
+  resumeVisibility: 'shown',
+  bannerState: 'hidden',
   screenContext: null,
 };
 

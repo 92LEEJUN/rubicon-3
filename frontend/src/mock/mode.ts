@@ -8,8 +8,10 @@ export function isMock(apiBase?: string): boolean {
 /** mock 응답 스트리밍 간격(ms). 테스트(NODE_ENV=test)에선 0(동기) — 단언 안정. 앱은 점진 방출. */
 export function streamDelayMs(): number {
   try {
-    if (process.env.NODE_ENV === "test") return 0;
-  } catch { /* noop */ }
+    if (process.env.NODE_ENV === 'test') return 0;
+  } catch {
+    /* noop */
+  }
   return 150;
 }
 
@@ -17,7 +19,7 @@ export function streamDelayMs(): number {
 export function readQueryFlags(): { mock: boolean; reset: boolean } {
   try {
     const p = new URLSearchParams(window.location.search);
-    return { mock: p.get("mock") === "1", reset: p.get("reset") === "1" };
+    return { mock: p.get('mock') === '1', reset: p.get('reset') === '1' };
   } catch {
     return { mock: false, reset: false };
   }

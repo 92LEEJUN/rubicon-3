@@ -19,8 +19,8 @@ class InMemoryOpenLoopRepository:
         return self._store.get(user_id, {}).get(ref)
 
     def list_open(self, user_id: str) -> list[OpenLoop]:
-        loops = [l for l in self._store.get(user_id, {}).values() if l.status == "open"]
-        return sorted(loops, key=lambda l: (l.priority, l.last_touch), reverse=True)  # 우선순위·최근순
+        loops = [loop for loop in self._store.get(user_id, {}).values() if loop.status == "open"]
+        return sorted(loops, key=lambda loop: (loop.priority, loop.last_touch), reverse=True)  # 우선순위·최근순
 
     def set_status(self, user_id: str, ref: str, status: str) -> OpenLoop | None:
         loop = self.get(user_id, ref)

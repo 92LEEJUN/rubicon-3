@@ -7,10 +7,10 @@
  *
  * 초기 목록은 resume의 open_loops[]를 받는다(소유는 useResume). 여기서는 로컬 표현 상태만 관리.
  */
-import { useEffect, useState } from "react";
-import { postOpenLoopAction, type ActionKind } from "../transport/companion";
-import type { ApiConfig } from "../transport/api";
-import type { OpenLoop } from "../types/contract";
+import { useEffect, useState } from 'react';
+import { postOpenLoopAction, type ActionKind } from '../transport/companion';
+import type { ApiConfig } from '../transport/api';
+import type { OpenLoop } from '../types/contract';
 
 export function sortByPriority(loops: OpenLoop[]): OpenLoop[] {
   return [...loops].sort((a, b) => (b.priority ?? 0) - (a.priority ?? 0));
@@ -48,16 +48,16 @@ export function useOpenLoops(cfg: ApiConfig, source: OpenLoop[] | undefined) {
     if (removed) setLoops(() => sortByPriority(prev));
     setError(
       res.notFound
-        ? "이미 처리된 항목이에요. 목록을 새로고침했어요."
-        : "처리에 실패했어요. 잠시 후 다시 시도해 주세요.",
+        ? '이미 처리된 항목이에요. 목록을 새로고침했어요.'
+        : '처리에 실패했어요. 잠시 후 다시 시도해 주세요.',
     );
     return false;
   }
 
   return {
     loops,
-    resolve: (ref: string) => act(ref, "resolve"),
-    dismiss: (ref: string) => act(ref, "dismiss"),
+    resolve: (ref: string) => act(ref, 'resolve'),
+    dismiss: (ref: string) => act(ref, 'dismiss'),
     isPending: (ref: string) => pending.has(ref),
     error,
     clearError: () => setError(null),

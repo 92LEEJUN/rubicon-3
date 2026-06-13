@@ -13,7 +13,7 @@ from dataclasses import dataclass, field
 from ..llm import MODEL, chat_completion
 from ..tools import TOOLS, call
 from .legacy import INTENT_SCHEMA
-from .prompts import COMMERCE_PROMPT, DIAGNOSIS_PROMPT, REVIEW_PROMPT, SUPERVISOR_PROMPT
+from .prompts import COMMERCE_PROMPT, DIAGNOSIS_PROMPT, REVIEW_PROMPT
 
 _DIAG_TOOLS = ("get_device_status", "search_solutions")
 _COMM_TOOLS = ("match_parts",)
@@ -59,7 +59,8 @@ def _agent(system: str, user_msg: str, allowed: tuple | None = None, max_steps: 
         resp = chat_completion(model=MODEL, messages=messages,
                                tools=tools or None, tool_choice="auto" if tools else None)
         dt = time.time() - t0
-        max_call = max(max_call, dt); n_llm += 1
+        max_call = max(max_call, dt)
+        n_llm += 1
         msg = resp.choices[0].message
         if not msg.tool_calls:
             return StageTiming("", time.time() - t_stage, n_llm, n_tool, max_call)
@@ -73,7 +74,8 @@ def _agent(system: str, user_msg: str, allowed: tuple | None = None, max_steps: 
     # 루프 한계 — 마지막 생성 1회
     t0 = time.time()
     chat_completion(model=MODEL, messages=messages)
-    max_call = max(max_call, time.time() - t0); n_llm += 1
+    max_call = max(max_call, time.time() - t0)
+    n_llm += 1
     return StageTiming("", time.time() - t_stage, n_llm, n_tool, max_call)
 
 
@@ -98,10 +100,12 @@ def run_multiagent(message: str) -> TurnResult:
 
     # 2) 워커 위임(우선순위: 안전/CS 먼저)
     if any(i in ("troubleshoot", "device_status") for i in intents):
-        st = _agent(DIAGNOSIS_PROMPT, message, _DIAG_TOOLS); st.name = "diagnosis"
+        st = _agent(DIAGNOSIS_PROMPT, message, _DIAG_TOOLS)
+        st.name = "diagnosis"
         res.stages.append(st)
     if has_order:
-        st = _agent(COMMERCE_PROMPT, message, _COMM_TOOLS); st.name = "commerce"
+        st = _agent(COMMERCE_PROMPT, message, _COMM_TOOLS)
+        st.name = "commerce"
         res.stages.append(st)
 
     # 3) Review — 조건부(커밋/안전/불확실). 여기선 주문(커밋) 포함 시 발동

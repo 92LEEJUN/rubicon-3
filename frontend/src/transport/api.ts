@@ -3,11 +3,14 @@
  * apiBase 미설정(정적 배포)이거나 호출 실패면 **조용히 fixtures로 폴백**(에러 노출 없음).
  * → BE 미연결에도 화면이 항상 채워진다(graceful degradation).
  */
-import { homeSummary, recommendation, statusTracker } from "../fixtures/journeys";
-import { mockStore } from "../mock/store";
-import { SEED_ORDERS, SEED_BOOKINGS } from "../fixtures/mockData";
+import { homeSummary, recommendation, statusTracker } from '../fixtures/journeys';
+import { mockStore } from '../mock/store';
+import { SEED_ORDERS, SEED_BOOKINGS } from '../fixtures/mockData';
 
-export interface ApiConfig { base?: string; token?: string }
+export interface ApiConfig {
+  base?: string;
+  token?: string;
+}
 
 async function get<T>(cfg: ApiConfig, path: string, fallback: T): Promise<T> {
   if (!cfg.base) return fallback;
@@ -24,26 +27,26 @@ async function get<T>(cfg: ApiConfig, path: string, fallback: T): Promise<T> {
 
 /** 홈 요약(home_summary.data) — 기기·알림·추천. 폴백=fixture. */
 export async function getHome(cfg: ApiConfig): Promise<any> {
-  const res = await get<any>(cfg, "/home", homeSummary);
+  const res = await get<any>(cfg, '/home', homeSummary);
   return res?.data ?? res;
 }
 
 /** 추천 제품 목록. 폴백=fixture 추천. */
 export async function getRecommendations(cfg: ApiConfig): Promise<any[]> {
   const fb = (recommendation.template.data as any).products ?? [];
-  return get<any[]>(cfg, "/catalog/recommend", fb);
+  return get<any[]>(cfg, '/catalog/recommend', fb);
 }
 
 /** 주문 이력. mock 모드(!base)면 시드 + 사용자가 만든 주문(store) 병합. */
 export async function getOrders(cfg: ApiConfig): Promise<any[]> {
   if (!cfg.base) return [...mockStore.getOrders(), ...SEED_ORDERS];
-  return get<any[]>(cfg, "/orders", []);
+  return get<any[]>(cfg, '/orders', []);
 }
 
 /** 예약 이력. mock 모드면 시드 + store. */
 export async function getBookings(cfg: ApiConfig): Promise<any[]> {
   if (!cfg.base) return [...mockStore.getBookings(), ...SEED_BOOKINGS];
-  return get<any[]>(cfg, "/bookings", []);
+  return get<any[]>(cfg, '/bookings', []);
 }
 
 export { statusTracker };

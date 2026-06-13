@@ -102,7 +102,7 @@ def test_open_loop_list_open_sorted_and_filtered(kind, tmp_path):
     repo.upsert("alice", _loop("closed", status="resolved", priority=99))
     open_loops = repo.list_open("alice")
     # resolved는 제외, 우선순위 내림차순.
-    assert [l.ref for l in open_loops] == ["high", "low"]
+    assert [loop.ref for loop in open_loops] == ["high", "low"]
 
 
 @pytest.mark.parametrize("kind", BACKENDS)

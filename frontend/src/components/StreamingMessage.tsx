@@ -6,11 +6,11 @@
  * - 수신 중(typing=true이거나 아직 내용 없음) 타이핑 인디케이터, done(streaming=false)이면 제거(요구 4.5).
  * - 진행 문구는 답변 중심만 — 내부 시스템·대기 상태는 노출하지 않는다(요구 4.6).
  */
-import React, { useEffect, useRef } from "react";
-import { Animated, StyleSheet, Text, View } from "react-native";
-import { SectionView } from "./message";
-import { color, font, radius, space } from "../design/tokens";
-import type { Cta, MessageSection } from "../types/contract";
+import React, { useEffect, useRef } from 'react';
+import { Animated, StyleSheet, Text, View } from 'react-native';
+import { SectionView } from './message';
+import { color, font, radius, space } from '../design/tokens';
+import type { Cta, MessageSection } from '../types/contract';
 
 export function StreamingMessage({
   text,
@@ -74,18 +74,18 @@ export function TypingDots() {
 }
 
 const styles = StyleSheet.create({
-  row: { flexDirection: "row", gap: space.sm, marginBottom: space.sm, alignItems: "flex-start" },
+  row: { flexDirection: 'row', gap: space.sm, marginBottom: space.sm, alignItems: 'flex-start' },
   avatar: {
     width: 28,
     height: 28,
     borderRadius: 14,
     backgroundColor: color.primaryTint,
-    alignItems: "center",
-    justifyContent: "center",
+    alignItems: 'center',
+    justifyContent: 'center',
     marginTop: 2,
   },
   avatarText: { color: color.primaryDark, fontWeight: font.weight.bold as any, fontSize: 11 },
-  col: { flex: 1, gap: space.sm, alignItems: "flex-start" },
+  col: { flex: 1, gap: space.sm, alignItems: 'flex-start' },
   bubble: {
     backgroundColor: color.surface,
     borderWidth: 1,
@@ -96,9 +96,9 @@ const styles = StyleSheet.create({
     borderTopRightRadius: radius.lg,
     borderBottomLeftRadius: radius.lg,
     borderBottomRightRadius: radius.lg,
-    maxWidth: "92%",
+    maxWidth: '92%',
   },
   text: { color: color.text, fontSize: font.size.md, lineHeight: 22 },
-  typing: { flexDirection: "row", gap: 5, paddingVertical: 4 },
+  typing: { flexDirection: 'row', gap: 5, paddingVertical: 4 },
   typingDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: color.textMuted },
 });

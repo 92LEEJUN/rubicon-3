@@ -26,7 +26,9 @@ def show(orch, sid, text):
 
 
 def header(t):
-    print("=" * 80); print(t); print("=" * 80)
+    print("=" * 80)
+    print(t)
+    print("=" * 80)
 
 
 def main():

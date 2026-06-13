@@ -1,6 +1,6 @@
 """도메인 모델 — fixtures 로딩·불변식·계산 속성 검증."""
 from app import fixtures as fx
-from app.domain import Consumable, Device, Order, OrderItem, User
+from app.domain import Consumable, Device, OrderItem, User
 
 
 def test_device_loads_from_fixture():

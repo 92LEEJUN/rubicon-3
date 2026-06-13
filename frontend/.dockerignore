@@ -1,0 +1,7 @@
+node_modules/
+dist/
+__screenshots__/
+.pytest_cache/
+*.db
+.env
+.git/

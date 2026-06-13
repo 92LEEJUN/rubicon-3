@@ -6,21 +6,21 @@
  * - resolve/dismiss 버튼(요구 2.3) — 낙관적 갱신·실패 롤백은 useOpenLoops가 담당.
  * - 실패 시 에러 안내·재시도(요구 2.5).
  */
-import React from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
-import { Badge, Caption } from "./primitives";
-import { color, font, radius, space } from "../design/tokens";
-import type { OpenLoop, OpenLoopKind } from "../types/contract";
+import React from 'react';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Badge, Caption } from './primitives';
+import { color, font, radius, space } from '../design/tokens';
+import type { OpenLoop, OpenLoopKind } from '../types/contract';
 
 const KIND_KO: Record<OpenLoopKind, string> = {
-  issue: "미해결 이슈",
-  order: "진행 주문",
-  flow: "보류 흐름",
+  issue: '미해결 이슈',
+  order: '진행 주문',
+  flow: '보류 흐름',
 };
-const KIND_TONE: Record<OpenLoopKind, "danger" | "primary" | "warning"> = {
-  issue: "danger",
-  order: "primary",
-  flow: "warning",
+const KIND_TONE: Record<OpenLoopKind, 'danger' | 'primary' | 'warning'> = {
+  issue: 'danger',
+  order: 'primary',
+  flow: 'warning',
 };
 
 export function OpenLoopItem({
@@ -45,7 +45,7 @@ export function OpenLoopItem({
         style={styles.itemMain}
         disabled={pending}
       >
-        <Badge label={KIND_KO[loop.kind] ?? loop.kind} tone={KIND_TONE[loop.kind] ?? "neutral"} />
+        <Badge label={KIND_KO[loop.kind] ?? loop.kind} tone={KIND_TONE[loop.kind] ?? 'neutral'} />
         <View style={{ flex: 1 }}>
           <Text style={styles.summary}>{loop.summary ?? loop.ref}</Text>
         </View>
@@ -123,18 +123,18 @@ const styles = StyleSheet.create({
     padding: space.md,
     gap: space.sm,
   },
-  itemMain: { flexDirection: "row", alignItems: "center", gap: space.sm },
+  itemMain: { flexDirection: 'row', alignItems: 'center', gap: space.sm },
   summary: { fontSize: font.size.sm, color: color.text, lineHeight: 20 },
-  actions: { flexDirection: "row", justifyContent: "flex-end", gap: space.md },
+  actions: { flexDirection: 'row', justifyContent: 'flex-end', gap: space.md },
   actionBtn: { paddingVertical: 4, paddingHorizontal: space.sm },
   actionText: { fontSize: font.size.sm, fontWeight: font.weight.semibold as any },
   errorBox: {
     backgroundColor: color.dangerTint,
     borderRadius: radius.md,
     padding: space.sm,
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
   },
   retry: { fontSize: font.size.sm, color: color.danger, fontWeight: font.weight.semibold as any },
 });

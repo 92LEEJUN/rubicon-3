@@ -53,7 +53,7 @@ def test_guest_can_chat(monkeypatch):
     monkeypatch.setenv("MULTITENANT", "1")
     r = client.post("/internal/turn", json={"text": "세탁기 물이 안 빠져요"})   # user_id 없음 → 게스트
     assert r.status_code == 200
-    lines = [json.loads(l) for l in r.text.strip().split("\n")]
+    lines = [json.loads(line) for line in r.text.strip().split("\n")]
     assert any(c["type"] == "section" for c in lines) and lines[-1]["type"] == "done"
 
 

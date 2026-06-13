@@ -5,28 +5,44 @@
  * 보강: 미디어(이미지·영상) 렌더, 인터랙션(choices·booking 선택·수량 스텝퍼),
  *      시각 강화(소모품 수명 게이지·추천 카드·진행 타임라인), 주문/확인 흐름.
  */
-import React, { useState } from "react";
-import { Image, Pressable, StyleSheet, View } from "react-native";
-import { Badge, Body, Caption, Card, Title } from "../components/primitives";
-import { color, font, space } from "../design/tokens";
-import type { Template } from "../types/contract";
+import React, { useState } from 'react';
+import { Image, Pressable, StyleSheet, View } from 'react-native';
+import { Badge, Body, Caption, Card, Title } from '../components/primitives';
+import { color, font, space } from '../design/tokens';
+import type { Template } from '../types/contract';
 
 const DEVICE_KO: Record<string, string> = {
-  washer: "세탁기", refrigerator: "냉장고", air_purifier: "공기청정기",
+  washer: '세탁기',
+  refrigerator: '냉장고',
+  air_purifier: '공기청정기',
 };
 const CONS_KO: Record<string, string> = {
-  drain_filter: "배수 필터", water_filter: "정수필터", hepa_filter: "HEPA 필터",
+  drain_filter: '배수 필터',
+  water_filter: '정수필터',
+  hepa_filter: 'HEPA 필터',
 };
-const won = (n: number) => `₩${Number(n).toLocaleString("ko-KR")}`;
-const sevTone = (s: string) => (s === "critical" ? "danger" : s === "warning" ? "warning" : "neutral");
+const won = (n: number) => `₩${Number(n).toLocaleString('ko-KR')}`;
+const sevTone = (s: string) =>
+  s === 'critical' ? 'danger' : s === 'warning' ? 'warning' : 'neutral';
 const fmtTime = (iso: string) => {
-  try { const d = new Date(iso); return `${d.getMonth() + 1}/${d.getDate()} ${String(d.getHours()).padStart(2, "0")}:00`; }
-  catch { return iso; }
+  try {
+    const d = new Date(iso);
+    return `${d.getMonth() + 1}/${d.getDate()} ${String(d.getHours()).padStart(2, '0')}:00`;
+  } catch {
+    return iso;
+  }
 };
 
 /** 썸네일 — 이미지 URL 있으면 렌더, 없으면 아이콘 플레이스홀더(오프라인 안전). */
-function Thumb({ uri, icon = "📦", size = 56 }: { uri?: string; icon?: string; size?: number }) {
-  if (uri) return <Image source={{ uri }} style={{ width: size, height: size, borderRadius: 12 }} resizeMode="cover" />;
+function Thumb({ uri, icon = '📦', size = 56 }: { uri?: string; icon?: string; size?: number }) {
+  if (uri)
+    return (
+      <Image
+        source={{ uri }}
+        style={{ width: size, height: size, borderRadius: 12 }}
+        resizeMode="cover"
+      />
+    );
   return (
     <View style={[styles.thumb, { width: size, height: size }]}>
       <Body>{icon}</Body>
@@ -42,40 +58,61 @@ function Gauge({ label, value, threshold }: { label: string; value: number; thre
     <View style={styles.gauge}>
       <View style={styles.rowBetween}>
         <Caption>{label}</Caption>
-        <Caption>{pct}%{low ? " · 교체 권장" : ""}</Caption>
+        <Caption>
+          {pct}%{low ? ' · 교체 권장' : ''}
+        </Caption>
       </View>
       <View style={styles.gaugeTrack}>
-        <View style={[styles.gaugeFill, { width: `${pct}%` as any, backgroundColor: low ? color.warning : color.success }]} />
+        <View
+          style={[
+            styles.gaugeFill,
+            { width: `${pct}%` as any, backgroundColor: low ? color.warning : color.success },
+          ]}
+        />
       </View>
     </View>
   );
 }
 
 function TextTemplate({ data }: { data: any }) {
-  return <Body>{data?.message ?? ""}</Body>;
+  return <Body>{data?.message ?? ''}</Body>;
 }
 
 function DeviceStatus({ data }: { data: any }) {
   const d = data.device ?? {};
-  const healthy = d.status === "ONLINE";
+  const healthy = d.status === 'ONLINE';
   const consumables = d.consumables ?? [];
   return (
     <View>
       <View style={styles.rowBetween}>
-        <Title>{DEVICE_KO[d.type] ?? d.type} · {d.model}</Title>
-        <Badge label={healthy ? "정상" : d.status === "UNHEALTHY" ? "점검 필요" : "오프라인"}
-               tone={healthy ? "success" : "warning"} />
+        <Title>
+          {DEVICE_KO[d.type] ?? d.type} · {d.model}
+        </Title>
+        <Badge
+          label={healthy ? '정상' : d.status === 'UNHEALTHY' ? '점검 필요' : '오프라인'}
+          tone={healthy ? 'success' : 'warning'}
+        />
       </View>
       {(data.anomalies ?? []).map((a: any, i: number) => (
         <View key={i} style={styles.anomaly}>
-          <Badge label={a.type === "error_code" ? "오류코드" : "소모품"} tone={sevTone(a.severity)} />
-          <View style={{ flex: 1 }}><Body>{a.detail}</Body></View>
+          <Badge
+            label={a.type === 'error_code' ? '오류코드' : '소모품'}
+            tone={sevTone(a.severity)}
+          />
+          <View style={{ flex: 1 }}>
+            <Body>{a.detail}</Body>
+          </View>
         </View>
       ))}
       {consumables.length ? (
         <View style={styles.gaugeGroup}>
           {consumables.map((c: any, i: number) => (
-            <Gauge key={i} label={CONS_KO[c.name] ?? c.name} value={c.life_remaining} threshold={c.threshold} />
+            <Gauge
+              key={i}
+              label={CONS_KO[c.name] ?? c.name}
+              value={c.life_remaining}
+              threshold={c.threshold}
+            />
           ))}
         </View>
       ) : null}
@@ -89,7 +126,10 @@ function MediaChips({ media }: { media: any[] }) {
     <View style={styles.mediaRow}>
       {media.map((m: any, i: number) => (
         <View key={i} style={styles.mediaChip}>
-          <Caption>{m.type === "video" ? "▶ " : "🖼 "}{m.title ?? (m.type === "video" ? "영상" : "이미지")}</Caption>
+          <Caption>
+            {m.type === 'video' ? '▶ ' : '🖼 '}
+            {m.title ?? (m.type === 'video' ? '영상' : '이미지')}
+          </Caption>
         </View>
       ))}
     </View>
@@ -101,18 +141,25 @@ function GuideSteps({ data }: { data: any }) {
     <View>
       <View style={styles.rowBetween}>
         <Title>해결 가이드</Title>
-        {data.coverage === "free" ? <Badge label="무상" tone="success" /> :
-         data.coverage === "paid" ? <Badge label="유상" tone="warning" /> : null}
+        {data.coverage === 'free' ? (
+          <Badge label="무상" tone="success" />
+        ) : data.coverage === 'paid' ? (
+          <Badge label="유상" tone="warning" />
+        ) : null}
       </View>
       {(data.steps ?? []).map((s: any) => (
         <View key={s.order} style={styles.step}>
-          <View style={styles.stepNum}><Body>{s.order}</Body></View>
+          <View style={styles.stepNum}>
+            <Body>{s.order}</Body>
+          </View>
           <View style={{ flex: 1 }}>
             <Body>{s.instruction}</Body>
-            {s.safety && s.safety !== "none" ? (
+            {s.safety && s.safety !== 'none' ? (
               <View style={{ marginTop: space.xs }}>
-                <Badge label={s.safety === "danger" ? "위험" : "주의"}
-                       tone={s.safety === "danger" ? "danger" : "warning"} />
+                <Badge
+                  label={s.safety === 'danger' ? '위험' : '주의'}
+                  tone={s.safety === 'danger' ? 'danger' : 'warning'}
+                />
               </View>
             ) : null}
             <MediaChips media={s.media} />
@@ -133,9 +180,19 @@ function QtyStepper({ price }: { price: number }) {
     <View style={styles.qtyRow}>
       <Caption>수량</Caption>
       <View style={styles.stepper}>
-        <Pressable testID="qty-dec" onPress={() => setQty((q) => Math.max(1, q - 1))} style={styles.stepBtn}><Body>−</Body></Pressable>
-        <View style={styles.qtyVal}><Body>{qty}</Body></View>
-        <Pressable testID="qty-inc" onPress={() => setQty((q) => q + 1)} style={styles.stepBtn}><Body>＋</Body></Pressable>
+        <Pressable
+          testID="qty-dec"
+          onPress={() => setQty((q) => Math.max(1, q - 1))}
+          style={styles.stepBtn}
+        >
+          <Body>−</Body>
+        </Pressable>
+        <View style={styles.qtyVal}>
+          <Body>{qty}</Body>
+        </View>
+        <Pressable testID="qty-inc" onPress={() => setQty((q) => q + 1)} style={styles.stepBtn}>
+          <Body>＋</Body>
+        </Pressable>
       </View>
       <View style={{ flex: 1 }} />
       <Body muted>합계 {won(price * qty)}</Body>
@@ -153,7 +210,10 @@ function ProductCard({ data }: { data: any }) {
           <Caption>{data.sku ?? data.model}</Caption>
           <Body>{won(data.price)}</Body>
         </View>
-        <Badge label={data.in_stock ? "재고 있음" : "품절"} tone={data.in_stock ? "success" : "danger"} />
+        <Badge
+          label={data.in_stock ? '재고 있음' : '품절'}
+          tone={data.in_stock ? 'success' : 'danger'}
+        />
       </View>
       {data.in_stock ? <QtyStepper price={data.price} /> : null}
     </View>
@@ -176,15 +236,20 @@ function OrderSummary({ data }: { data: any }) {
     <View>
       <Title>주문 요약</Title>
       {(o.items ?? []).map((it: any, i: number) => (
-        <View key={i} style={styles.rowBetween}><Body>{it.name} × {it.qty}</Body><Body>{won(it.unit_price * it.qty)}</Body></View>
+        <View key={i} style={styles.rowBetween}>
+          <Body>
+            {it.name} × {it.qty}
+          </Body>
+          <Body>{won(it.unit_price * it.qty)}</Body>
+        </View>
       ))}
       <View style={styles.divider} />
       <AmountRow label="상품 금액" value={won(s.subtotal)} />
-      <AmountRow label="배송비" value={s.shipping_fee ? won(s.shipping_fee) : "무료"} />
+      <AmountRow label="배송비" value={s.shipping_fee ? won(s.shipping_fee) : '무료'} />
       {s.discount ? <AmountRow label="할인" value={`-${won(s.discount)}`} /> : null}
       <View style={styles.divider} />
       <AmountRow label="총 결제금액" value={won(s.total)} strong />
-      {(data.delivery_eta || data.address) ? (
+      {data.delivery_eta || data.address ? (
         <View style={styles.metaBox}>
           {data.delivery_eta ? <Caption>🚚 도착 예정: {data.delivery_eta}</Caption> : null}
           {data.address ? <Caption>📍 {data.address}</Caption> : null}
@@ -222,7 +287,9 @@ function RecommendationList({ data }: { data: any }) {
             </View>
             <View style={styles.specRow}>
               {Object.values(p.specs ?? {}).map((v: any, k: number) => (
-                <View key={k} style={styles.specChip}><Caption>{String(v)}</Caption></View>
+                <View key={k} style={styles.specChip}>
+                  <Caption>{String(v)}</Caption>
+                </View>
               ))}
             </View>
             <Body>{won(p.price)}</Body>
@@ -238,10 +305,19 @@ function HomeSummary({ data }: { data: any }) {
     <View>
       <Title>{data.user}님, 안녕하세요</Title>
       {(data.alerts ?? []).map((a: any, i: number) => (
-        <Card key={i} style={{ marginTop: space.sm, backgroundColor: color.warningTint, borderColor: "transparent" }}>
+        <Card
+          key={i}
+          style={{
+            marginTop: space.sm,
+            backgroundColor: color.warningTint,
+            borderColor: 'transparent',
+          }}
+        >
           <View style={styles.anomaly}>
             <Badge label="알림" tone={sevTone(a.severity)} />
-            <View style={{ flex: 1 }}><Body>{a.detail}</Body></View>
+            <View style={{ flex: 1 }}>
+              <Body>{a.detail}</Body>
+            </View>
           </View>
         </Card>
       ))}
@@ -250,7 +326,10 @@ function HomeSummary({ data }: { data: any }) {
       {(data.devices ?? []).map((d: any, i: number) => (
         <View key={i} style={styles.deviceRow}>
           <Body>{DEVICE_KO[d.type] ?? d.type}</Body>
-          <Badge label={d.status === "ONLINE" ? "정상" : "점검 필요"} tone={d.status === "ONLINE" ? "success" : "warning"} />
+          <Badge
+            label={d.status === 'ONLINE' ? '정상' : '점검 필요'}
+            tone={d.status === 'ONLINE' ? 'success' : 'warning'}
+          />
         </View>
       ))}
     </View>
@@ -260,13 +339,15 @@ function HomeSummary({ data }: { data: any }) {
 function StatusTracker({ data }: { data: any }) {
   return (
     <View>
-      <Title>{data.title ?? "진행 상태"}</Title>
+      <Title>{data.title ?? '진행 상태'}</Title>
       {(data.steps ?? []).map((s: any, i: number) => (
         <View key={i} style={styles.trackRow}>
           <View style={[styles.dot, s.done ? styles.dotDone : null]}>
-            <Caption>{s.done ? "✓" : String(i + 1)}</Caption>
+            <Caption>{s.done ? '✓' : String(i + 1)}</Caption>
           </View>
-          <View style={{ flex: 1 }}><Body muted={!s.done}>{s.label}</Body></View>
+          <View style={{ flex: 1 }}>
+            <Body muted={!s.done}>{s.label}</Body>
+          </View>
           {s.at ? <Caption>{s.at}</Caption> : null}
         </View>
       ))}
@@ -280,7 +361,11 @@ function Bridge({ data }: { data: any }) {
     <View>
       <Badge label="빠른 보기" tone="primary" />
       <View style={{ height: space.sm }} />
-      {summary.device ? <DeviceStatus data={summary} /> : <Body>{summary.message ?? data.message ?? ""}</Body>}
+      {summary.device ? (
+        <DeviceStatus data={summary} />
+      ) : (
+        <Body>{summary.message ?? data.message ?? ''}</Body>
+      )}
     </View>
   );
 }
@@ -289,20 +374,31 @@ function HandoffCard({ data }: { data: any }) {
   return (
     <View>
       <View style={styles.rowBetween}>
-        <Title>{data.title ?? "방문 수리 예약"}</Title>
-        <Badge label={data.visit_type === "REPAIR" ? "출장 수리" : "상담"} tone="primary" />
+        <Title>{data.title ?? '방문 수리 예약'}</Title>
+        <Badge label={data.visit_type === 'REPAIR' ? '출장 수리' : '상담'} tone="primary" />
       </View>
-      <Body muted>{data.message ?? "전문 기사의 방문 수리를 예약할 수 있어요."}</Body>
+      <Body muted>{data.message ?? '전문 기사의 방문 수리를 예약할 수 있어요.'}</Body>
     </View>
   );
 }
 
 /** 라디오 행 — booking·choices 공용 선택 UI. */
-function RadioRow({ on, onPress, children, testID }:
-  { on: boolean; onPress: () => void; children: React.ReactNode; testID?: string }) {
+function RadioRow({
+  on,
+  onPress,
+  children,
+  testID,
+}: {
+  on: boolean;
+  onPress: () => void;
+  children: React.ReactNode;
+  testID?: string;
+}) {
   return (
     <Pressable testID={testID} onPress={onPress} style={[styles.radioRow, on && styles.radioRowOn]}>
-      <View style={[styles.radio, on && styles.radioOn]}>{on ? <View style={styles.radioDot} /> : null}</View>
+      <View style={[styles.radio, on && styles.radioOn]}>
+        {on ? <View style={styles.radioDot} /> : null}
+      </View>
       <View style={{ flex: 1 }}>{children}</View>
     </Pressable>
   );
@@ -310,7 +406,10 @@ function RadioRow({ on, onPress, children, testID }:
 
 /** 방문 유형 라벨(booking.data.visit_type). */
 const VISIT_KO: Record<string, string> = {
-  REPAIR: "출장 수리", CONSULT: "상담", INSTALL: "설치", INSPECTION: "점검",
+  REPAIR: '출장 수리',
+  CONSULT: '상담',
+  INSTALL: '설치',
+  INSPECTION: '점검',
 };
 
 /**
@@ -336,7 +435,9 @@ function Booking({ data }: { data: any }) {
         slots.map((s: any, i: number) => (
           <RadioRow key={s.id ?? i} testID={`slot-${i}`} on={sel === i} onPress={() => setSel(i)}>
             <View style={styles.rowBetween}>
-              <Body>{fmtTime(s.start)} ~ {fmtTime(s.end)}</Body>
+              <Body>
+                {fmtTime(s.start)} ~ {fmtTime(s.end)}
+              </Body>
               <Badge label="선택 가능" tone="success" />
             </View>
           </RadioRow>
@@ -344,7 +445,9 @@ function Booking({ data }: { data: any }) {
       )}
       {slots.length ? (
         <Caption>
-          {sel == null ? "시간을 선택한 뒤 아래 예약 버튼을 눌러주세요." : "선택한 시간으로 예약을 진행할 수 있어요."}
+          {sel == null
+            ? '시간을 선택한 뒤 아래 예약 버튼을 눌러주세요.'
+            : '선택한 시간으로 예약을 진행할 수 있어요.'}
         </Caption>
       ) : null}
     </View>
@@ -356,11 +459,15 @@ function Choices({ data }: { data: any }) {
   const opts: any[] = data.options ?? data.choices ?? [];
   return (
     <View>
-      <Body>{data.question ?? data.prompt ?? "선택해 주세요"}</Body>
+      <Body>{data.question ?? data.prompt ?? '선택해 주세요'}</Body>
       <View style={{ height: space.sm }} />
       {opts.map((o, i) => {
-        const label = typeof o === "string" ? o : (o.label ?? o.value ?? "");
-        return <RadioRow key={i} testID={`choice-${i}`} on={sel === i} onPress={() => setSel(i)}><Body>{label}</Body></RadioRow>;
+        const label = typeof o === 'string' ? o : (o.label ?? o.value ?? '');
+        return (
+          <RadioRow key={i} testID={`choice-${i}`} on={sel === i} onPress={() => setSel(i)}>
+            <Body>{label}</Body>
+          </RadioRow>
+        );
       })}
     </View>
   );
@@ -394,48 +501,123 @@ function stringifyFallback(t: Template): string {
 }
 
 const styles = StyleSheet.create({
-  rowBetween: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", gap: space.sm },
-  anomaly: { flexDirection: "row", alignItems: "center", gap: space.sm, marginTop: space.sm },
-  step: { flexDirection: "row", gap: space.md, marginTop: space.md, alignItems: "flex-start" },
+  rowBetween: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: space.sm,
+  },
+  anomaly: { flexDirection: 'row', alignItems: 'center', gap: space.sm, marginTop: space.sm },
+  step: { flexDirection: 'row', gap: space.md, marginTop: space.md, alignItems: 'flex-start' },
   stepNum: {
-    width: 24, height: 24, borderRadius: 12, backgroundColor: color.primaryTint,
-    alignItems: "center", justifyContent: "center",
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: color.primaryTint,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   divider: { height: 1, backgroundColor: color.border, marginVertical: space.sm },
-  amountRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingVertical: 2 },
+  amountRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 2,
+  },
 
-  thumb: { backgroundColor: color.surfaceAlt, borderRadius: 12, alignItems: "center", justifyContent: "center" },
-  prodRow: { flexDirection: "row", gap: space.md, alignItems: "center" },
-  qtyRow: { flexDirection: "row", alignItems: "center", gap: space.sm, marginTop: space.md },
-  stepper: { flexDirection: "row", alignItems: "center", backgroundColor: color.surfaceAlt, borderRadius: 999 },
-  stepBtn: { width: 32, height: 32, alignItems: "center", justifyContent: "center" },
-  qtyVal: { minWidth: 28, alignItems: "center" },
+  thumb: {
+    backgroundColor: color.surfaceAlt,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  prodRow: { flexDirection: 'row', gap: space.md, alignItems: 'center' },
+  qtyRow: { flexDirection: 'row', alignItems: 'center', gap: space.sm, marginTop: space.md },
+  stepper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: color.surfaceAlt,
+    borderRadius: 999,
+  },
+  stepBtn: { width: 32, height: 32, alignItems: 'center', justifyContent: 'center' },
+  qtyVal: { minWidth: 28, alignItems: 'center' },
 
-  mediaRow: { flexDirection: "row", flexWrap: "wrap", gap: space.xs, marginTop: space.sm },
-  mediaChip: { backgroundColor: color.primaryTint, borderRadius: 999, paddingHorizontal: space.sm, paddingVertical: 3 },
+  mediaRow: { flexDirection: 'row', flexWrap: 'wrap', gap: space.xs, marginTop: space.sm },
+  mediaChip: {
+    backgroundColor: color.primaryTint,
+    borderRadius: 999,
+    paddingHorizontal: space.sm,
+    paddingVertical: 3,
+  },
 
   gauge: { marginTop: space.sm },
   gaugeGroup: { marginTop: space.md, gap: space.xs },
-  gaugeTrack: { height: 8, borderRadius: 4, backgroundColor: color.surfaceAlt, marginTop: 4, overflow: "hidden" },
+  gaugeTrack: {
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: color.surfaceAlt,
+    marginTop: 4,
+    overflow: 'hidden',
+  },
   gaugeFill: { height: 8, borderRadius: 4 },
 
   metaBox: { marginTop: space.sm, gap: 2 },
-  gateBanner: { backgroundColor: color.primaryTint, borderRadius: 12, padding: space.md, gap: space.xs },
+  gateBanner: {
+    backgroundColor: color.primaryTint,
+    borderRadius: 12,
+    padding: space.md,
+    gap: space.xs,
+  },
 
-  recCard: { flexDirection: "row", gap: space.md, alignItems: "center", marginTop: space.md },
-  specRow: { flexDirection: "row", flexWrap: "wrap", gap: space.xs, marginVertical: 4 },
-  specChip: { backgroundColor: color.surfaceAlt, borderRadius: 999, paddingHorizontal: space.sm, paddingVertical: 2 },
+  recCard: { flexDirection: 'row', gap: space.md, alignItems: 'center', marginTop: space.md },
+  specRow: { flexDirection: 'row', flexWrap: 'wrap', gap: space.xs, marginVertical: 4 },
+  specChip: {
+    backgroundColor: color.surfaceAlt,
+    borderRadius: 999,
+    paddingHorizontal: space.sm,
+    paddingVertical: 2,
+  },
 
-  deviceRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingVertical: space.sm,
-    borderBottomWidth: 1, borderBottomColor: color.border },
-  trackRow: { flexDirection: "row", alignItems: "center", gap: space.md, marginTop: space.sm },
-  dot: { width: 24, height: 24, borderRadius: 12, backgroundColor: color.surfaceAlt, alignItems: "center", justifyContent: "center" },
+  deviceRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: space.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: color.border,
+  },
+  trackRow: { flexDirection: 'row', alignItems: 'center', gap: space.md, marginTop: space.sm },
+  dot: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: color.surfaceAlt,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   dotDone: { backgroundColor: color.successTint },
 
-  radioRow: { flexDirection: "row", alignItems: "center", gap: space.sm, paddingVertical: space.sm, paddingHorizontal: space.sm,
-    borderRadius: 12, borderWidth: 1, borderColor: color.border, marginTop: space.sm },
+  radioRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: space.sm,
+    paddingVertical: space.sm,
+    paddingHorizontal: space.sm,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: color.border,
+    marginTop: space.sm,
+  },
   radioRowOn: { borderColor: color.primary, backgroundColor: color.primaryTint },
-  radio: { width: 20, height: 20, borderRadius: 10, borderWidth: 2, borderColor: color.textMuted, alignItems: "center", justifyContent: "center" },
+  radio: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    borderWidth: 2,
+    borderColor: color.textMuted,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   radioOn: { borderColor: color.primary },
   radioDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: color.primary },
 });

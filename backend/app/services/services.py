@@ -31,7 +31,6 @@ from ..errors import (
     QuoteNotConvertible,
 )
 from ..ports import (
-    ActionGatePort,
     CatalogPort,
     CSKnowledgePort,
     DevicePort,

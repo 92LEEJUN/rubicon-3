@@ -78,7 +78,7 @@ def test_open_loops_auto_created_from_facts():
     svc = _svc(keep=1)
     svc.record_turn("u1", "세탁기 5C 떠요", "주문 ord_x1 넣었어요", now=NOW)
     loops = svc.open_loops("u1")
-    refs = {l.ref for l in loops}
+    refs = {loop.ref for loop in loops}
     assert "5C" in refs and "ord_x1" in refs
     # 안전·CS(오류)가 주문보다 우선순위 높음 → 먼저
     assert loops[0].ref == "5C"
@@ -97,7 +97,7 @@ def test_resume_includes_open_loops():
     svc = _svc(keep=1)
     svc.record_turn("u1", "ord_a1 주문함", "네", now=NOW)
     r = svc.resume("u1", now=NOW)
-    assert any(l.ref == "ord_a1" for l in r.open_loops)
+    assert any(loop.ref == "ord_a1" for loop in r.open_loops)
 
 
 # ── 상대 시간 라벨 ────────────────────────────────────────────────────────────

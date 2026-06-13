@@ -1,7 +1,9 @@
 """레거시 오케스트레이터 — LLM tool-loop 데모(CLI용).
 
-OpenAI function calling으로 tool을 자유 호출하는 프로토타입 경로. 실제 내부 API는
-`core.Orchestrator`(결정적 섹션 생성, 테스트 가능)를 쓴다. 본 모듈은 CLI 데모에 한정한다.
+OpenAI function calling으로 tool을 자유 호출하는 프로토타입 경로. 내부 API의 결정적 경로는
+`CapabilityOrchestrator`(플래너 없음, 옛 core.Orchestrator를 수렴·대체 — ADR-0048·§12.3)를 쓴다.
+본 모듈의 `astream_turn`은 LLM_BACKED on·MULTIAGENT off일 때의 prose 경로로 아직 쓰이며,
+`run`은 CLI 데모용이다.
 """
 import asyncio
 import json

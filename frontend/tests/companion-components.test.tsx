@@ -89,6 +89,6 @@ test("StreamingMessage — 수신 중 타이핑, 내용 도착 시 텍스트+섹
   rerender(<StreamingMessage text="확인했어요" sections={sections} streaming />);
   expect(screen.queryByTestId("streaming-typing")).not.toBeInTheDocument();
   expect(screen.getByTestId("streaming-text")).toHaveTextContent("확인했어요");
-  // 모르는 kind는 text 폴백, 미처리 섹션은 "미처리" 라벨(§7·요구 4.3)
-  expect(screen.getByText("미처리")).toBeInTheDocument();
+  // 미처리 섹션은 톤다운 안내로 노출(정상 답변 카드 아님, §7·요구 ⑦)
+  expect(screen.getByText("이건 아직 도와드리기 어려워요.")).toBeInTheDocument();
 });

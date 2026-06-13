@@ -4,15 +4,56 @@
  */
 export type CtaAction = "chat" | "commit" | "navigate";
 
+/**
+ * 알려진 CTA kind(계약). `kind`는 permissive(string)로 두되 — BFF가 새 kind를 보내도
+ * 깨지지 않게 — 코드가 분기하는 알려진 값은 여기에 열거한다.
+ *  - commit 계열: `order`·`booking`(action:"commit" → REST commit 라운드트립, §commit).
+ *  - 게이트/흐름: `login`(로그인 월 트리거), `select_device`(payload.device_id로 다음 메시지 스코프).
+ *  - 후속 대화(chat): `booking`(advisory)·`restock_alert`·`compare`·`explain`·`recommend` 등 →
+ *    interaction_reply/user_message 후속으로 전송.
+ */
+export type CtaKind =
+  | "order"
+  | "booking"
+  | "login"
+  | "select_device"
+  | "restock_alert"
+  | "compare"
+  | "explain"
+  | "recommend"
+  | "choices"
+  | "handoff";
+
 export interface Cta {
   label: string;
   action: CtaAction;
-  kind?: string;
+  kind?: CtaKind | string; // 알려진 값은 CtaKind, 미지의 kind도 허용(permissive)
   payload?: Record<string, unknown>;
 }
 
+/**
+ * 알려진 template kind(계약). `kind`는 permissive(string) — 미등록 kind는 text 폴백(§7).
+ * 코드가 렌더러를 가진 알려진 값은 여기에 열거한다.
+ *  - 신규: `booking`(data: {visit_type?, slots:[{id,start,end}...]}) — 방문 슬롯 리스트.
+ *  - clarify/warranty/explain 섹션도 이 kind들(text·recommendation_list·booking)을 재사용한다.
+ */
+export type TemplateKind =
+  | "text"
+  | "device_status"
+  | "guide_steps"
+  | "product_card"
+  | "order_summary"
+  | "confirmation"
+  | "recommendation_list"
+  | "home_summary"
+  | "status_tracker"
+  | "bridge"
+  | "handoff_card"
+  | "booking"
+  | "choices";
+
 export interface Template<T = Record<string, any>> {
-  kind: string; // device_status · guide_steps · product_card · order_summary · confirmation · recommendation_list · home_summary · text ...
+  kind: TemplateKind | string; // 알려진 값은 TemplateKind, 미지의 kind는 text 폴백(§7)
   data: T;
 }
 

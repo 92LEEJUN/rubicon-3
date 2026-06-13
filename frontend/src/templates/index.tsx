@@ -308,22 +308,45 @@ function RadioRow({ on, onPress, children, testID }:
   );
 }
 
+/** 방문 유형 라벨(booking.data.visit_type). */
+const VISIT_KO: Record<string, string> = {
+  REPAIR: "출장 수리", CONSULT: "상담", INSTALL: "설치", INSPECTION: "점검",
+};
+
+/**
+ * booking 템플릿 — 방문 슬롯 리스트(계약 신규 kind, 요구 ④⑩).
+ * data: { visit_type?, slots: [{id, start, end}...] }. 슬롯을 읽기 쉽게 나열하고 선택을 제공한다.
+ * 실제 예약 확정은 섹션 commit CTA(kind:"booking", action:"commit")가 담당(SectionView → CtaRow).
+ * 슬롯이 없으면 안내 문구로 폴백.
+ */
 function Booking({ data }: { data: any }) {
   const [sel, setSel] = useState<number | null>(null);
+  const slots: any[] = data?.slots ?? [];
   return (
     <View>
-      <Title>방문 시간 선택</Title>
-      {(data.slots ?? []).map((s: any, i: number) => (
-        <RadioRow key={i} testID={`slot-${i}`} on={sel === i} onPress={() => setSel(i)}>
-          <View style={styles.rowBetween}>
-            <Body>{fmtTime(s.start)} ~ {fmtTime(s.end)}</Body>
-            <Badge label="선택 가능" tone="success" />
-          </View>
-        </RadioRow>
-      ))}
-      <View style={[styles.confirmBtn, sel == null && { opacity: 0.5 }]}>
-        <Body>{sel == null ? "시간을 선택하세요" : "예약 확정"}</Body>
+      <View style={styles.rowBetween}>
+        <Title>방문 시간 선택</Title>
+        {data?.visit_type ? (
+          <Badge label={VISIT_KO[data.visit_type] ?? data.visit_type} tone="primary" />
+        ) : null}
       </View>
+      {slots.length === 0 ? (
+        <Body muted>예약 가능한 시간이 없어요. 잠시 후 다시 확인해 주세요.</Body>
+      ) : (
+        slots.map((s: any, i: number) => (
+          <RadioRow key={s.id ?? i} testID={`slot-${i}`} on={sel === i} onPress={() => setSel(i)}>
+            <View style={styles.rowBetween}>
+              <Body>{fmtTime(s.start)} ~ {fmtTime(s.end)}</Body>
+              <Badge label="선택 가능" tone="success" />
+            </View>
+          </RadioRow>
+        ))
+      )}
+      {slots.length ? (
+        <Caption>
+          {sel == null ? "시간을 선택한 뒤 아래 예약 버튼을 눌러주세요." : "선택한 시간으로 예약을 진행할 수 있어요."}
+        </Caption>
+      ) : null}
     </View>
   );
 }
@@ -415,5 +438,4 @@ const styles = StyleSheet.create({
   radio: { width: 20, height: 20, borderRadius: 10, borderWidth: 2, borderColor: color.textMuted, alignItems: "center", justifyContent: "center" },
   radioOn: { borderColor: color.primary },
   radioDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: color.primary },
-  confirmBtn: { marginTop: space.md, backgroundColor: color.primaryTint, borderRadius: 999, paddingVertical: space.md, alignItems: "center" },
 });

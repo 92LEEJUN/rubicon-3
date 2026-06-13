@@ -19,7 +19,7 @@ export function App({ initialScreen = "home", wsUrl, apiBase, token, scenarioId 
   // 동의 게이트(R19)는 앱 전역에서 공유 — 선제/개인화 표현 훅이 이 Provider를 본다.
   return (
     <ConsentProvider>
-      {screen === "live" ? <LiveChat wsUrl={wsUrl || "ws://localhost:8000/chat?token=demo"} /> :
+      {screen === "live" ? <LiveChat wsUrl={wsUrl || "ws://localhost:8000/chat?token=demo"} apiBase={apiBase} token={token} /> :
        screen === "gallery" ? <Gallery /> :
        screen === "scenario" ? <Scenario id={scenarioId} /> :
        screen === "chat" ? (

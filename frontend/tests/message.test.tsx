@@ -11,9 +11,11 @@ test("renders one card per section (복합 R7)", () => {
   expect(screen.getByTestId("section-order")).toBeInTheDocument();
 });
 
-test("unhandled section shows 미처리 badge (R7-3)", () => {
+test("unhandled section shows toned-down affordance (R7-3, 요구 ⑦)", () => {
   render(<MessageView sections={[j5UnhandledHepa]} />);
-  expect(screen.getByText("미처리")).toBeInTheDocument();
+  // 정상 답변처럼 보이지 않게 — 톤다운 안내 + 보류 배지(일반 카드 렌더 아님).
+  expect(screen.getByText("이건 아직 도와드리기 어려워요.")).toBeInTheDocument();
+  expect(screen.getByText("처리 보류")).toBeInTheDocument();
 });
 
 test("CTA press fires handler", () => {

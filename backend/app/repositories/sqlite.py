@@ -12,11 +12,14 @@ from __future__ import annotations
 import sqlite3
 from datetime import datetime, timezone
 
+from typing import Optional
+
 from ..domain import (
     ConversationMemory,
     EngagementRecord,
     EngagementState,
     OpenLoop,
+    Order,
 )
 
 
@@ -173,3 +176,167 @@ class SqliteEngagementRepository:
         """이미 열람/확인/무시했는지 — 중복 노출 억제용."""
         rec = self.get(user_id, ref)
         return rec is not None and rec.state in self._SEEN_STATES
+
+    def list_all_user(self, user_id: str) -> list[EngagementRecord]:
+        """머지(게스트→로그인)용 — 상태 무관 전체 행. `list`와 동일하지만 의미 명시."""
+        return self.list(user_id)
+
+    def delete_user(self, user_id: str) -> None:
+        """머지 후 게스트 비우기(R re-key). user_id 키 행 전부 삭제."""
+        self._conn.execute("DELETE FROM engagement WHERE user_id = ?", (user_id,))
+        self._conn.commit()
+
+
+class SqliteOrderRepository:
+    """OrderPort(sqlite) — `MockOrderAdapter`와 **동일 시그니처**, 저장만 sqlite.
+
+    주문 도메인 객체(Order)를 JSON 1컬럼에 보관(user_id·created_at은 정렬/필터용 보조 컬럼).
+    주문 생성/금액/재고 판정 로직은 Mock과 동일하게 재사용(adapters.mock 헬퍼) — 저장소만 교체.
+
+    ID 충돌 주의: ID는 `ord_NNNN` 시퀀스. 새 인스턴스는 기존 최대 시퀀스+1부터 발급해
+    재시작·복원 후에도 충돌하지 않는다(인메모리 itertools.count의 영속 대체).
+    """
+
+    def __init__(self, db_path: str = "rubicon.db") -> None:
+        self._conn = _connect(db_path)
+        self._conn.execute(
+            "CREATE TABLE IF NOT EXISTS orders ("
+            "  id         TEXT PRIMARY KEY,"
+            "  user_id    TEXT NOT NULL,"
+            "  created_at TEXT,"
+            "  data       TEXT NOT NULL"
+            ")"
+        )
+        self._conn.commit()
+
+    def _next_id(self) -> str:
+        # 기존 최대 시퀀스를 읽어 +1 — 재시작 후에도 단조 증가(충돌 회피).
+        rows = self._conn.execute("SELECT id FROM orders").fetchall()
+        max_seq = 0
+        for r in rows:
+            try:
+                max_seq = max(max_seq, int(str(r["id"]).split("_")[-1]))
+            except (ValueError, IndexError):
+                continue
+        return f"ord_{max_seq + 1:04d}"
+
+    def _save(self, order: Order) -> None:
+        created = order.created_at.isoformat() if order.created_at else None
+        self._conn.execute(
+            "INSERT INTO orders (id, user_id, created_at, data) VALUES (?, ?, ?, ?) "
+            "ON CONFLICT(id) DO UPDATE SET user_id = excluded.user_id, "
+            "  created_at = excluded.created_at, data = excluded.data",
+            (order.id, order.user_id, created, order.model_dump_json()),
+        )
+        self._conn.commit()
+
+    def place_order(self, user_id: str, part_ids: list[str], confirmed: bool = False) -> Order:
+        from ..adapters.mock import _parts, _summarize  # 재고/금액 로직 재사용(저장만 교체)
+        from ..domain import OrderItem
+
+        catalog = {p.id: p for p in _parts()}
+        items, out_of_stock = [], []
+        for pid in part_ids:
+            part = catalog.get(pid)
+            if part is None:
+                continue
+            if not part.in_stock:
+                out_of_stock.append(pid)
+                continue
+            items.append(OrderItem(part_id=part.id, name=part.name, unit_price=part.price, qty=1))
+        status = "DRAFT"
+        if out_of_stock and not items:
+            status = "FAILED"
+        elif confirmed and items:
+            status = "CONFIRMED"
+        order = Order(id=self._next_id(), user_id=user_id, items=items, status=status,
+                      summary=_summarize(items), created_at=datetime.now(timezone.utc))
+        self._save(order)
+        return order
+
+    def place_pickup_order(
+        self, user_id: str, part_ids: list[str], store_id: str, confirmed: bool = False
+    ) -> Order:
+        from ..adapters.mock import _parts
+        from ..domain import OrderItem, OrderSummary
+
+        catalog = {p.id: p for p in _parts()}
+        items = [
+            OrderItem(part_id=p.id, name=p.name, unit_price=p.price, qty=1)
+            for pid in part_ids
+            if (p := catalog.get(pid)) is not None and p.in_stock
+        ]
+        total = sum(i.line_total for i in items)
+        order = Order(
+            id=self._next_id(), user_id=user_id, items=items,
+            status="CONFIRMED" if confirmed and items else "DRAFT",
+            summary=OrderSummary(subtotal=total, shipping_fee=0, tax=0, discount=0, total=total),
+            created_at=datetime.now(timezone.utc),
+            fulfillment="pickup", store_id=store_id,
+            pickup_status="RESERVED" if confirmed and items else None,
+        )
+        self._save(order)
+        return order
+
+    def get_order(self, order_id: str) -> Optional[Order]:
+        row = self._conn.execute(
+            "SELECT data FROM orders WHERE id = ?", (order_id,)
+        ).fetchone()
+        if row is None:
+            return None
+        return Order.model_validate_json(row["data"])
+
+    def update_pickup_status(self, order_id: str, pickup_status: str) -> Order:
+        order = self.get_order(order_id)
+        if order is None:
+            raise KeyError(order_id)
+        order.pickup_status = pickup_status  # type: ignore[assignment]
+        self._save(order)
+        return order
+
+    def cancel_order(self, order_id: str) -> Order:
+        order = self.get_order(order_id)
+        if order is None:
+            raise KeyError(order_id)
+        order.status = "CANCELLED"
+        self._save(order)
+        return order
+
+    def refund_order(self, order_id: str) -> Order:
+        order = self.get_order(order_id)
+        if order is None:
+            raise KeyError(order_id)
+        order.status = "REFUNDED"
+        self._save(order)
+        return order
+
+    def list_orders(self, user_id: Optional[str] = None) -> list[Order]:
+        if user_id:
+            rows = self._conn.execute(
+                "SELECT data FROM orders WHERE user_id = ?", (user_id,)
+            ).fetchall()
+        else:
+            rows = self._conn.execute("SELECT data FROM orders").fetchall()
+        orders = [Order.model_validate_json(r["data"]) for r in rows]
+        return sorted(
+            orders,
+            key=lambda o: o.created_at or datetime.min.replace(tzinfo=timezone.utc),
+            reverse=True,
+        )
+
+    def reassign_user(self, from_user_id: str, to_user_id: str) -> int:
+        """머지(게스트→로그인) — from_user_id 주문을 to_user_id로 re-key. 옮긴 건수 반환.
+
+        각 행의 user_id 보조 컬럼과 JSON 내부 Order.user_id 둘 다 갱신한다(일관성)."""
+        rows = self._conn.execute(
+            "SELECT id, data FROM orders WHERE user_id = ?", (from_user_id,)
+        ).fetchall()
+        for r in rows:
+            order = Order.model_validate_json(r["data"])
+            order.user_id = to_user_id
+            self._conn.execute(
+                "UPDATE orders SET user_id = ?, data = ? WHERE id = ?",
+                (to_user_id, order.model_dump_json(), r["id"]),
+            )
+        self._conn.commit()
+        return len(rows)

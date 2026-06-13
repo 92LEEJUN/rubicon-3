@@ -16,6 +16,7 @@ from typing import Optional
 
 from fastapi import Depends, FastAPI, Request, WebSocket, WebSocketDisconnect
 
+from .analytics import AnalyticsSink
 from .auth import Identity, identity_dep, resolve_identity
 from .backend_client import BackendClient
 from .observability import install_observability
@@ -34,9 +35,51 @@ def create_app(backend: Optional[BackendClient] = None) -> FastAPI:
     # /health 는 아래에 이미 있으므로 add_health=False.
     install_observability(app, service="bff", add_health=False)
 
+    # 분석 싱크(gap: FE emit만 있고 수신 없음) — 인프로세스 수집기(stdlib only).
+    app.state.analytics = AnalyticsSink()
+
     @app.get("/health")
     def health():
         return {"status": "ok"}
+
+    # ── 분석 이벤트 수신(docs/analytics.md) — FE→BFF 싱크 배선 ────────────────
+    # POST /internal/events: {name, props?, ts?} 단건 또는 {events:[...]} / [...] 배치.
+    # 느슨히 검증(미상 이벤트명도 받되 태깅), 비차단(절대 UX/중계를 막지 않음).
+    # 신원 인지(identity_dep로 principal 태깅). 비범위: DW/ETL·대시보드·BE-side emit.
+    @app.post("/internal/events")
+    async def ingest_events(request: Request, idy: Identity = Depends(identity_dep)):
+        sink: AnalyticsSink = request.app.state.analytics
+        principal = idy.user_id or idy.guest_token
+        try:
+            body = await request.json()
+        except Exception:
+            body = None
+        # 단건 {name,...} | 배치 {events:[...]} | 배치 [...] 모두 허용.
+        if isinstance(body, dict) and "events" in body:
+            items = body.get("events") or []
+        elif isinstance(body, list):
+            items = body
+        elif isinstance(body, dict):
+            items = [body]
+        else:
+            items = []
+        accepted = 0
+        for item in items:
+            if not isinstance(item, dict):
+                continue
+            name = item.get("name")
+            if not name:
+                continue
+            sink.record(name=name, props=item.get("props"),
+                        ts=item.get("ts"), principal=principal)
+            accepted += 1
+        return {"accepted": accepted, **sink.snapshot()}
+
+    # GET /internal/events: 최근 이벤트 read-back(검증·로컬 가시성). limit 기본 100.
+    @app.get("/internal/events")
+    def recent_events(limit: int = 100):
+        sink: AnalyticsSink = app.state.analytics
+        return {"events": sink.recent(limit), **sink.snapshot()}
 
     # ── 결정적 조회(§2.2) — 신원 해석(로그인/게스트) 후 헤더 포워딩 ──────────
     @app.get("/devices")

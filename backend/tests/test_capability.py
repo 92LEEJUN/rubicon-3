@@ -145,14 +145,15 @@ def test_advisory_catalog_includes_new_caps():
 
 # ── LLM 플래너 = 단일 라우터(ADR-0048, stub로 결정적 검증) ──────────────────
 class _StubPlanner:
-    def __init__(self, caps):
+    def __init__(self, caps, out_of_scope=None):
         self.caps = caps
+        self.out_of_scope = list(out_of_scope or [])
         self.calls = 0
 
     def propose(self, catalog, message):
         self.calls += 1
         from app.orchestrator.capability import Plan
-        return Plan(capabilities=list(self.caps))
+        return Plan(capabilities=list(self.caps), out_of_scope=list(self.out_of_scope))
 
 
 def test_planner_routes_every_query(container):
@@ -242,6 +243,111 @@ def test_empty_plan_falls_back_to_clarify(container):
     ctx = _ctx(container)
     secs = orch._run_capabilities(Plan([]), ctx, "음...", {})
     assert secs and secs[0].intent == "clarify"           # 빈 턴 금지 — 되묻기
+
+
+# ── F4: 범위 밖/미충족 의도 명시(R7) — LLM 플래너가 판정 ─────────────────────
+def _orch_p(container, caps, oos=None):
+    return CapabilityOrchestrator(container=container, classifier=RuleBasedClassifier(),
+                                  llm_planner=_StubPlanner(caps, oos))
+
+
+def test_out_of_scope_ack_with_in_scope(container):
+    # 플래너가 in-scope(diagnose) + out_of_scope(['날씨'])를 내면 둘 다 표면화
+    turn = _orch_p(container, ["diagnose"], ["날씨"]).build_turn("세탁기 물 안 빠져요 + 주말 날씨도")
+    intents = [s.intent for s in turn.sections]
+    assert "troubleshoot" in intents                      # in-scope 처리됨
+    oos = [s for s in turn.sections if s.intent == "out_of_scope"]
+    assert oos and oos[0].handled is False                # 범위 밖 명시(미처리)
+    assert "날씨" in oos[0].template.data["message"]
+    assert "날씨" in oos[0].template.data["topics"]
+
+
+def test_route_carries_out_of_scope_from_planner(container):
+    plan = _orch_p(container, ["diagnose"], ["날씨", "환율"]).route("세탁기 + 날씨 + 환율")
+    assert plan.out_of_scope == ["날씨", "환율"]
+
+
+def test_no_out_of_scope_when_planner_reports_none(container):
+    turn = _orch_p(container, ["diagnose"], []).build_turn("세탁기 물이 안 빠져요")
+    assert not any(s.intent == "out_of_scope" for s in turn.sections)
+
+
+def test_no_out_of_scope_without_planner(container):
+    # 플래너 미연결(규칙 폴백) → out_of_scope 신호 없음 → ack 없음(LLM이 결정)
+    turn = _orch(container).build_turn("세탁기 물이 안 빠져요 주말 날씨")
+    assert not any(s.intent == "out_of_scope" for s in turn.sections)
+
+
+def test_out_of_scope_not_duplicated_when_only_clarify(container):
+    # clarify 되묻기뿐일 때는 별도 out_of_scope 안내를 덧붙이지 않음(중복 금지)
+    secs = _orch(container)._run_capabilities(
+        Plan([], out_of_scope=["날씨"]), _ctx(container), "x", {})
+    assert secs and secs[0].intent == "clarify"
+    assert not any(s.intent == "out_of_scope" for s in secs)
+
+
+# ── §8~11: LLM prose agent capability(stub로 결정적 검증) ────────────────────
+class _StubProseClient:
+    def __init__(self, text="비스포크 큐브는 저소음이고 필터 관리가 편해요."):
+        self.text = text
+        self.calls = 0
+
+    def complete(self, system, user):
+        self.calls += 1
+        return self.text
+
+
+def test_prose_capability_emits_text_when_llm_on(container, monkeypatch):
+    monkeypatch.setenv("LLM_BACKED", "1")
+    stub = _StubProseClient()
+    orch = CapabilityOrchestrator(container=container, classifier=RuleBasedClassifier(),
+                                  prose_client=stub)
+    ctx = _ctx(container)
+    ctx.write("_prose_client", stub)
+    ctx.write("candidates", ["prod_purifier_cube"])
+    sec = orch.registry["explain_prose"].run(ctx, "비스포크 큐브 더 알려줘")[0]
+    assert stub.calls == 1
+    assert sec.intent == "explain" and sec.template.kind == "text"
+    assert sec.template.data.get("prose") is True
+    assert "비스포크" in sec.template.data["message"]
+
+
+def test_prose_capability_deterministic_fallback_when_off(container, monkeypatch):
+    monkeypatch.setenv("LLM_BACKED", "")
+    stub = _StubProseClient()
+    orch = CapabilityOrchestrator(container=container, classifier=RuleBasedClassifier(),
+                                  prose_client=stub)
+    ctx = _ctx(container)
+    ctx.write("_prose_client", stub)
+    ctx.write("candidates", ["prod_purifier_cube"])
+    sec = orch.registry["explain_prose"].run(ctx, "비스포크 큐브 더 알려줘")[0]
+    assert stub.calls == 0                                 # LLM 미호출
+    assert sec.intent == "explain"
+    assert sec.template.kind == "recommendation_list"      # 결정적 explain 폴백
+
+
+def test_prose_capability_fallback_without_client(container, monkeypatch):
+    # LLM on이어도 prose 클라이언트 미주입 → 결정적 폴백(기본 결정성)
+    monkeypatch.setenv("LLM_BACKED", "1")
+    orch = _orch(container)
+    ctx = _ctx(container)
+    ctx.write("candidates", ["prod_purifier_cube"])
+    sec = orch.registry["explain_prose"].run(ctx, "비스포크 큐브 더 알려줘")[0]
+    assert sec.template.kind == "recommendation_list"
+
+
+def test_prose_capability_is_agent_kind():
+    reg = build_registry()
+    assert reg["explain_prose"].kind == "agent"
+    assert reg["explain_prose"] in advisory_catalog(reg)   # 플래너 후보
+
+
+def test_planner_can_route_to_prose(container):
+    stub = _StubPlanner(["explain_prose"])
+    orch = CapabilityOrchestrator(container=container, classifier=RuleBasedClassifier(),
+                                  llm_planner=stub)
+    plan = orch.route("비스포크 큐브 더 자세히 설명해줘")
+    assert "explain_prose" in plan.capabilities
 
 
 # ── 봉투 패리티(요구사항 13) ────────────────────────────────────────────────

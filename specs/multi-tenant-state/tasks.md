@@ -23,6 +23,9 @@
 - [x] 3.4 영속 복원 — 파일 sqlite에 쓰고 새 인스턴스로 복원 단언.
   - [ ] 3.5 **order 영속 보류** — `MockOrderAdapter`(stock/place_order)는 `adapters/`라 별도 작업. 후속.
 
+> **실 SSO 보류(사용자 지정).** 외부 IdP 연동 실 신원은 본 작업 범위 외. 현재는 fixture 사용자 +
+> 게스트 토큰 합성(§1, ADR-0050)으로 대체한다. 추적: [`docs/deferred.md`](../../docs/deferred.md) #2.
+
 ## 4. 동시성 _(요구사항 5)_ ✅
 - [x] 4.1 read-modify-write 임계구역 — `KeyedLock`(`app/concurrency.py`, key별 `threading.Lock`)을 OrderService `checkout`(user_id)·`checkout_pickup`(user_id)·`advance_pickup`(order_id)에 적용. 생성자 불변. (DB 트랜잭션은 어댑터 책임.)
 - [x] 4.2 동시 체크아웃 원자성 테스트(`test_concurrency.py`, 4) — 계측 어댑터+barrier로 실제 race 재현(잠금 시 무oversell·해제 시 oversell 양방향 입증). GIL 한계 정직 명시.

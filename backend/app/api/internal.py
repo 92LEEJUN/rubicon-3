@@ -60,11 +60,36 @@ def _principal(user_id: str | None = None, guest_token: str | None = None) -> Pr
     return resolve_principal(user_id, guest_token)
 
 
-def _guest_commit_gate(x_user_id: str | None, x_guest_token: str | None):
-    """게스트(비로그인) 커밋 차단(요구사항 2-3). 토글 off면 게이트 없음(회귀)."""
+def _resolve_commit_identity(
+    x_user_id: str | None,
+    x_guest_token: str | None,
+    body_user_id: str | None = None,
+    body_guest_token: str | None = None,
+) -> tuple[str | None, str | None]:
+    """커밋 신원 해석 — 헤더 우선, 본문 폴백(gap ②).
+
+    우선순위: 헤더 `X-User-Id` > 헤더 `X-Guest-Token` > 본문 `user_id` > 본문 `guest_token`.
+    BFF는 HTTP 호출에 헤더를 싣지만, 본문 `user_id`로 신원을 중계하기도 한다(TurnRequest·OrderRequest).
+    어느 쪽이든 일관되게 받는다. `body_user_id`는 **명시적으로 제공된 경우에만** 넘겨야 한다
+    (OrderRequest.user_id 기본값 "usr_01"을 로그인으로 오인하지 않도록 — place_order 참조).
+    """
+    user_id = x_user_id or body_user_id
+    guest_token = x_guest_token or body_guest_token
+    return user_id or None, guest_token or None
+
+
+def _guest_commit_gate(x_user_id: str | None, x_guest_token: str | None,
+                       body_user_id: str | None = None,
+                       body_guest_token: str | None = None):
+    """게스트(비로그인) 커밋 차단(요구사항 2-3). 토글 off면 게이트 없음(회귀).
+
+    신원은 헤더 우선·본문 폴백으로 해석한다(gap ② — BFF가 본문 user_id로 중계하는 경우 포함).
+    """
     if not multitenant_enabled():
         return None
-    if _principal(x_user_id, x_guest_token).is_guest:
+    user_id, guest_token = _resolve_commit_identity(
+        x_user_id, x_guest_token, body_user_id, body_guest_token)
+    if _principal(user_id, guest_token).is_guest:
         return JSONResponse(status_code=401, content={
             "code": "LoginRequired",
             "message": "주문·예약은 로그인 후 확정할 수 있어요.",
@@ -178,6 +203,7 @@ class OrderRequest(BaseModel):
     # O2O — 픽업(BOPIS) 이행 방식·픽업 매장(O3). delivery면 store_id 무시.
     fulfillment: str = "delivery"
     store_id: str | None = None
+    guest_token: str | None = None   # 본문 신원 폴백(gap ②) — 헤더 없을 때 게스트 식별
 
 
 class BookingRequest(BaseModel):
@@ -187,6 +213,8 @@ class BookingRequest(BaseModel):
     visit_type: str = "REPAIR"
     store_id: str | None = None
     confirmed: bool = False   # R17 커밋 게이트 — 미확인이면 409(주문과 동일)
+    user_id: str | None = None     # 본문 신원 폴백(gap ②) — 헤더 없을 때 로그인 식별
+    guest_token: str | None = None
 
 
 class PickupActionRequest(BaseModel):
@@ -222,10 +250,15 @@ async def turn_ws(ws: WebSocket) -> None:
 
 
 @app.post("/internal/turn")
-def turn_http(req: TurnRequest) -> StreamingResponse:
+def turn_http(req: TurnRequest, x_user_id: str | None = Header(None),
+              x_guest_token: str | None = Header(None)) -> StreamingResponse:
     """BFF 중계용 HTTP 스트림(NDJSON) — 한 줄당 청크 1개(§2.1 봉투). 비동기 제너레이터로
-    스트리밍(이벤트 루프 비차단 — 스레드-당-턴 점유 제거)."""
-    principal = _principal(req.user_id, req.guest_token)
+    스트리밍(이벤트 루프 비차단 — 스레드-당-턴 점유 제거).
+
+    신원은 헤더 우선·본문 폴백(gap ②) — BFF가 헤더(X-User-Id/X-Guest-Token)를 싣는 경우 지원."""
+    user_id, guest_token = _resolve_commit_identity(
+        x_user_id, x_guest_token, req.user_id, req.guest_token)
+    principal = _principal(user_id, guest_token)
     async def gen():
         async for chunk in _stream_and_record(req.text, req.screen_context, principal):
             yield json.dumps(chunk, ensure_ascii=False) + "\n"
@@ -383,7 +416,10 @@ def _out_of_stock_409(err: OutOfStock) -> JSONResponse:
 @app.post("/internal/orders")
 def place_order(req: OrderRequest, x_user_id: str | None = Header(None),
                 x_guest_token: str | None = Header(None)):
-    gate = _guest_commit_gate(x_user_id, x_guest_token)   # 게스트 커밋 차단(요구사항 2-3)
+    # 본문 user_id는 **명시적으로 보낸 경우만** 신원으로 인정한다(기본값 "usr_01"을 로그인으로 오인 방지).
+    body_user_id = req.user_id if "user_id" in req.model_fields_set else None
+    gate = _guest_commit_gate(x_user_id, x_guest_token,   # 게스트 커밋 차단(요구사항 2-3, gap ②)
+                              body_user_id, req.guest_token)
     if gate is not None:
         return gate
     try:
@@ -507,7 +543,8 @@ def create_booking(req: BookingRequest, x_user_id: str | None = Header(None),
                    x_guest_token: str | None = Header(None)):
     """방문 예약 — 게스트 차단(요구사항 2-3) → 미확인이면 409 ConfirmationRequired(R17).
     확인 시 센터 방문(O7-4)은 visit_type/store_id 동반, 맥락 전달(context_ref, O7-5)."""
-    gate = _guest_commit_gate(x_user_id, x_guest_token)
+    gate = _guest_commit_gate(x_user_id, x_guest_token,   # gap ② — 헤더 우선·본문 폴백
+                              req.user_id, req.guest_token)
     if gate is not None:
         return gate
     if not req.confirmed:

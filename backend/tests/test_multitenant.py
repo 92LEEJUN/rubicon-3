@@ -78,3 +78,39 @@ def test_order_ungated_when_toggle_off(monkeypatch):
     r = client.post("/internal/orders",
                     json={"part_ids": ["part_drain_filter"], "confirmed": True})
     assert r.status_code == 200
+
+
+# ── gap ② — 헤더 우선·본문 폴백 신원 해석(BFF 중계) ──────────────────────────
+def test_order_with_body_user_id_succeeds_when_on(monkeypatch):
+    """(a) BFF 중계 케이스 — 헤더 없이 본문 user_id로 신원을 보내면 통과해야 한다(401 아님)."""
+    monkeypatch.setenv("MULTITENANT", "1")
+    r = client.post("/internal/orders",
+                    json={"user_id": "usr_01", "part_ids": ["part_drain_filter"], "confirmed": True})
+    assert r.status_code == 200 and r.json()["user_id"] == "usr_01"
+
+
+def test_order_with_header_user_id_succeeds_when_on(monkeypatch):
+    """(b) 헤더 X-User-Id만으로도 신원이 인정돼 통과한다."""
+    monkeypatch.setenv("MULTITENANT", "1")
+    r = client.post("/internal/orders",
+                    json={"part_ids": ["part_drain_filter"], "confirmed": True},
+                    headers={"X-User-Id": "usr_77"})
+    assert r.status_code == 200
+
+
+def test_order_true_guest_blocked_when_on(monkeypatch):
+    """(c) 진짜 게스트 — 본문에 user_id를 빼고 게스트 토큰만(헤더) 보내면 401."""
+    monkeypatch.setenv("MULTITENANT", "1")
+    r = client.post("/internal/orders",
+                    json={"part_ids": ["part_drain_filter"], "confirmed": True},
+                    headers={"X-Guest-Token": "tok_guest_1"})
+    assert r.status_code == 401 and r.json()["code"] == "LoginRequired"
+
+
+def test_order_with_body_user_id_ungated_when_off(monkeypatch):
+    """(d) 토글 off — 본문 신원과 무관하게 게이트 없음(회귀 보존)."""
+    monkeypatch.delenv("MULTITENANT", raising=False)
+    r = client.post("/internal/orders",
+                    json={"part_ids": ["part_drain_filter"], "confirmed": True},
+                    headers={"X-Guest-Token": "tok_guest_1"})
+    assert r.status_code == 200

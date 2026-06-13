@@ -233,25 +233,30 @@ def turn_http(req: TurnRequest) -> StreamingResponse:
 
 
 @app.get("/internal/resume")
-def resume(fresh: bool = False):
+def resume(fresh: bool = False, x_user_id: str | None = Header(None),
+           x_guest_token: str | None = Header(None)):
     """이어가기(컴패니언 §1) — 영속 메모리·상대 시간 복원. fresh면 '새로 시작'."""
-    return _container.companion.resume(_container.user.id, fresh=fresh).model_dump(mode="json")
+    principal = _principal(x_user_id, x_guest_token)
+    return _container.companion.resume(principal.id, fresh=fresh).model_dump(mode="json")
 
 
 @app.get("/internal/reengagement")
-def reengagement():
+def reengagement(x_user_id: str | None = Header(None),
+                 x_guest_token: str | None = Header(None)):
     """선제 재관여(컴패니언 §3) — 엄격 게이트 통과분 1건(peek). 없으면 {}."""
-    cand = _container.reengagement.candidate(_container.user)
+    user = _users.get(_principal(x_user_id, x_guest_token))
+    cand = _container.reengagement.candidate(user)
     return cand.model_dump(mode="json") if cand else {}
 
 
 @app.post("/internal/reengagement/deliver")
-def reengagement_deliver():
+def reengagement_deliver(x_user_id: str | None = Header(None),
+                         x_guest_token: str | None = Header(None)):
     """전달 액션(§3.3) — 게이트 통과분을 전달 처리하고 mark_sent(빈도·중복 갱신). 없으면 {}.
 
     실 채널은 AlertPort(§10); 여기서는 전달 확정 + 재노출 억제를 담당한다.
     """
-    user = _container.user
+    user = _users.get(_principal(x_user_id, x_guest_token))
     cand = _container.reengagement.candidate(user)
     if not cand:
         return {}
@@ -260,32 +265,40 @@ def reengagement_deliver():
 
 
 @app.get("/internal/recommendations")
-def recommendations():
+def recommendations(x_user_id: str | None = Header(None),
+                    x_guest_token: str | None = Header(None)):
     """반응형 추천(컴패니언·비전 2) — 추천 코어 산출(개인화·동의 차등). recommendation_list 매핑용."""
-    items = _container.recommendation.recommend(_container.user)
+    user = _users.get(_principal(x_user_id, x_guest_token))
+    items = _container.recommendation.recommend(user)
     return {"items": [it.model_dump(mode="json") for it in items]}
 
 
 @app.post("/internal/recommendations/preemptive")
-def recommendations_preemptive():
+def recommendations_preemptive(x_user_id: str | None = Header(None),
+                               x_guest_token: str | None = Header(None)):
     """선제 추천 등록 — 트리거를 open-loop로 적재(전달은 컴패니언 게이트가 규율, ADR-0042)."""
-    n = _container.recommendation.enqueue_preemptive(_container.user, _container.companion)
+    user = _users.get(_principal(x_user_id, x_guest_token))
+    n = _container.recommendation.enqueue_preemptive(user, _container.companion)
     return {"enqueued": n}
 
 
 @app.post("/internal/open-loops/{ref}/resolve")
-def resolve_open_loop(ref: str):
+def resolve_open_loop(ref: str, x_user_id: str | None = Header(None),
+                      x_guest_token: str | None = Header(None)):
     """미해결 스레드 해소(§2.3) — R25 해결확인·주문 배송완료 등."""
-    loop = _container.companion.resolve_loop(_container.user.id, ref)
+    principal = _principal(x_user_id, x_guest_token)
+    loop = _container.companion.resolve_loop(principal.id, ref)
     if loop is None:
         return JSONResponse(status_code=404, content={"code": "not_found", "message": "open-loop 없음"})
     return loop.model_dump(mode="json")
 
 
 @app.post("/internal/open-loops/{ref}/dismiss")
-def dismiss_open_loop(ref: str):
+def dismiss_open_loop(ref: str, x_user_id: str | None = Header(None),
+                      x_guest_token: str | None = Header(None)):
     """미해결 스레드 닫기(§2.3) — 사용자 dismiss."""
-    loop = _container.companion.dismiss_loop(_container.user.id, ref)
+    principal = _principal(x_user_id, x_guest_token)
+    loop = _container.companion.dismiss_loop(principal.id, ref)
     if loop is None:
         return JSONResponse(status_code=404, content={"code": "not_found", "message": "open-loop 없음"})
     return loop.model_dump(mode="json")
@@ -306,9 +319,10 @@ def get_device(device_id: str):
 
 
 @app.get("/internal/home")
-def home_summary():
+def home_summary(x_user_id: str | None = Header(None),
+                 x_guest_token: str | None = Header(None)):
     """홈 aggregation — 기기 + 선제 알림 + 개인화 추천(동의/중복 게이트 통과분)."""
-    user = _container.user
+    user = _users.get(_principal(x_user_id, x_guest_token))
     alerts = _container.notification.pending_alerts(user)
     recs = _container.catalog.recommend(user)
     return Template(kind="home_summary", data={
@@ -320,8 +334,10 @@ def home_summary():
 
 
 @app.get("/internal/catalog/recommend")
-def recommend():
-    products = _container.catalog.recommend(_container.user)
+def recommend(x_user_id: str | None = Header(None),
+              x_guest_token: str | None = Header(None)):
+    user = _users.get(_principal(x_user_id, x_guest_token))
+    products = _container.catalog.recommend(user)
     return [p.model_dump(mode="json") for p in products]
 
 

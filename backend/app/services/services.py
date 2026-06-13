@@ -7,6 +7,7 @@ from __future__ import annotations
 
 from typing import Optional
 
+from ..concurrency import KeyedLock
 from ..domain import (
     Anomaly,
     Booking,
@@ -104,6 +105,12 @@ class CatalogService:
         return recs
 
 
+# 동시성 게이트(멀티테넌트 slice 4) — 같은 키의 read-modify-write 임계구역을 직렬화한다.
+# 생성자 시그니처를 바꾸지 않도록 모듈 레벨 인스턴스로 둔다(container.py 소유 불변).
+# checkout/checkout_pickup 은 user_id 로, advance_pickup 은 order_id 로 키잉한다.
+_ORDER_LOCKS = KeyedLock()
+
+
 # 픽업 라이프사이클 허용 전이(O3-6) — RESERVED→READY→PICKED_UP | (RESERVED|READY)→EXPIRED
 _PICKUP_TRANSITIONS: dict[Optional[str], set[str]] = {
     "RESERVED": {"READY", "EXPIRED"},
@@ -127,24 +134,34 @@ class OrderService:
         self._alert = alert_port
 
     def checkout(self, user_id: str, part_ids: list[str], confirmed: bool = False) -> Order:
-        """확인 없이 호출되면 DRAFT를 만들어 ConfirmationRequired로 게이트한다(R17)."""
-        if not confirmed:
-            draft = self._port.place_order(user_id, part_ids, confirmed=False)
-            raise ConfirmationRequired(draft)
-        return self._port.place_order(user_id, part_ids, confirmed=True)
+        """확인 없이 호출되면 DRAFT를 만들어 ConfirmationRequired로 게이트한다(R17).
+
+        동시성(slice 4): 같은 user_id 의 동시 커밋을 직렬화해 재고 read-modify-write
+        경쟁/oversell을 막는다. 다른 user_id 끼리는 독립적으로 진행한다.
+        """
+        with _ORDER_LOCKS.acquire(user_id):
+            if not confirmed:
+                draft = self._port.place_order(user_id, part_ids, confirmed=False)
+                raise ConfirmationRequired(draft)
+            return self._port.place_order(user_id, part_ids, confirmed=True)
 
     # ── 픽업(BOPIS) 라이프사이클 (O3·O4) ────────────────────────────────────
     def checkout_pickup(self, user_id: str, part_ids: list[str], store_id: str,
                         confirmed: bool = False) -> Order:
-        """픽업 주문 — 생성 전 재고 게이트(O2), 확정 직전 확인(R17), RESERVED 시작(O3-1)."""
-        if self._store is not None:
-            for pid in part_ids:
-                if not self._store.check_stock(store_id, pid):
-                    raise OutOfStock(store_id, pid)
-        if not confirmed:
-            draft = self._port.place_pickup_order(user_id, part_ids, store_id, confirmed=False)
-            raise ConfirmationRequired(draft, "픽업 주문 확인이 필요합니다.")
-        return self._port.place_pickup_order(user_id, part_ids, store_id, confirmed=True)
+        """픽업 주문 — 생성 전 재고 게이트(O2), 확정 직전 확인(R17), RESERVED 시작(O3-1).
+
+        동시성(slice 4): 재고 확인(read)부터 주문 생성(write)까지를 user_id 키로
+        직렬화해, 같은 사용자의 동시 픽업 커밋이 같은 재고를 중복 점유하지 못하게 한다.
+        """
+        with _ORDER_LOCKS.acquire(user_id):
+            if self._store is not None:
+                for pid in part_ids:
+                    if not self._store.check_stock(store_id, pid):
+                        raise OutOfStock(store_id, pid)
+            if not confirmed:
+                draft = self._port.place_pickup_order(user_id, part_ids, store_id, confirmed=False)
+                raise ConfirmationRequired(draft, "픽업 주문 확인이 필요합니다.")
+            return self._port.place_pickup_order(user_id, part_ids, store_id, confirmed=True)
 
     def advance_pickup(self, order_id: str, action: str) -> Order:
         """픽업 상태 전이 — `ready`/`picked_up`/`expired`. 정의된 전이만 허용(O3-6).
@@ -152,24 +169,27 @@ class OrderService:
         `READY` 전이 시 준비완료 선제 알림(O3-3·R20). `EXPIRED`는 취소/환불(R21) 연계(O4).
         """
         target = {"ready": "READY", "picked_up": "PICKED_UP", "expired": "EXPIRED"}.get(action)
-        order = self._port.get_order(order_id)
-        if order is None:
-            raise KeyError(order_id)
-        current = order.pickup_status
-        if target is None or target not in _PICKUP_TRANSITIONS.get(current, set()):
-            raise PickupTransitionError(current, target or action)
-        updated = self._port.update_pickup_status(order_id, target)
-        if target == "READY" and self._alert is not None:
-            try:
-                self._alert.deliver(order.user_id, "pickup_ready",
-                                    f"{order_id} 픽업 준비가 완료되었습니다.", ref=order_id)
-            except Exception:
-                pass  # 알림 실패는 흐름을 막지 않는다(R13)
-        if target == "EXPIRED":
-            # 미수령 만료 → 취소/환불 경로(R21) 연계(O4-2).
-            self._port.refund_order(order_id)
-            updated = self._port.get_order(order_id) or updated
-        return updated
+        # 동시성(slice 4): 같은 order_id 의 상태 read-modify-write 를 직렬화한다.
+        # 두 전이가 같은 현재상태를 읽고 둘 다 통과시키는(이중 전이) 경쟁을 막는다.
+        with _ORDER_LOCKS.acquire(order_id):
+            order = self._port.get_order(order_id)
+            if order is None:
+                raise KeyError(order_id)
+            current = order.pickup_status
+            if target is None or target not in _PICKUP_TRANSITIONS.get(current, set()):
+                raise PickupTransitionError(current, target or action)
+            updated = self._port.update_pickup_status(order_id, target)
+            if target == "READY" and self._alert is not None:
+                try:
+                    self._alert.deliver(order.user_id, "pickup_ready",
+                                        f"{order_id} 픽업 준비가 완료되었습니다.", ref=order_id)
+                except Exception:
+                    pass  # 알림 실패는 흐름을 막지 않는다(R13)
+            if target == "EXPIRED":
+                # 미수령 만료 → 취소/환불 경로(R21) 연계(O4-2).
+                self._port.refund_order(order_id)
+                updated = self._port.get_order(order_id) or updated
+            return updated
 
     # ── 견적 → 주문 전환 (O6) ───────────────────────────────────────────────
     def convert_quote(self, quote: Quote, confirmed: bool = False,

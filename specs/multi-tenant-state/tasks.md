@@ -13,18 +13,19 @@
 - [x] 2.1 공유 무상태 서비스는 기존 단일 컨테이너 그대로(이미 싱글턴). _리포가 user_id 키잉돼 별도 AppContext 불필요._
 - [x] 2.2 상태 리포는 **이미 user_id 키잉**(conversation_memory·open_loop·engagement·order) — 재사용. user 프로필만 `UserDirectory`로 분리.
 - [x] 2.3 턴 경로 — `TurnCtx.user`(Principal 사용자), `build_turn/stream_turn/astream(user=)`, capability는 `ctx.user`. `internal.py` 턴 디스패치·`record_turn`·companion이 `principal.id` 사용.
-  - [ ] 2.3b 잔여 GET 엔드포인트(resume·reengagement·recommendations·home)도 principal로 — 현재 기본 사용자. _후속._
+  - [x] 2.3b 잔여 엔드포인트(resume·reengagement(+deliver)·recommendations(+preemptive)·open-loops resolve/dismiss·home·catalog/recommend)도 `X-User-Id`/`X-Guest-Token` 헤더로 principal 스코프. 응답 shape 불변. `test_multitenant_endpoints.py`(8).
 - [x] 2.4 테스트 `test_multitenant.py`(8) — Principal 해석·UserDirectory·companion 격리·게스트 채팅 허용·게스트 커밋 401·로그인 주문·토글 off 회귀.
 
-## 3. DB 영속 + 토글 _(요구사항 4)_
-- [ ] 3.1 sqlite 스키마 — principal_id 키 상태 테이블(orders·conversation_memory·open_loops·engagement·device_ownership·user_profile) + 게스트 `expires_at`(TTL).
-- [ ] 3.2 DB 어댑터 — 기존 Port를 구현하는 sqlite 백엔드(인터페이스 불변).
-- [ ] 3.3 `PERSISTENCE=memory|db` 토글 + **계약 테스트 memory/DB 파라미터화**.
-- [ ] 3.4 영속 복원 테스트 — 쓰고 새 인스턴스로 복원.
+## 3. DB 영속 + 토글 _(요구사항 4)_ ✅(3개 리포)
+- [x] 3.1 sqlite 스키마(`app/repositories/sqlite.py`) — `conversation_memory(user_id PK)`·`open_loops(user_id,ref)`·`engagement(user_id,ref)`, 도메인 객체 JSON 직렬화(pydantic). `CREATE TABLE IF NOT EXISTS`.
+- [x] 3.2 DB 어댑터 — `Sqlite{ConversationMemory,OpenLoop,Engagement}Repository`(인메모리와 동일 시그니처).
+- [x] 3.3 `PERSISTENCE=memory|db` 토글(`container.py`, 시그니처 불변·기본 memory) + 계약 테스트 memory/DB 파라미터화(`test_persistence.py`, 25).
+- [x] 3.4 영속 복원 — 파일 sqlite에 쓰고 새 인스턴스로 복원 단언.
+  - [ ] 3.5 **order 영속 보류** — `MockOrderAdapter`(stock/place_order)는 `adapters/`라 별도 작업. 후속.
 
-## 4. 동시성 _(요구사항 5)_
-- [ ] 4.1 read-modify-write 임계구역 — 인메모리 principal별 `asyncio.Lock` / DB 트랜잭션(낙관적 버전).
-- [ ] 4.2 동시 체크아웃 원자성 테스트.
+## 4. 동시성 _(요구사항 5)_ ✅
+- [x] 4.1 read-modify-write 임계구역 — `KeyedLock`(`app/concurrency.py`, key별 `threading.Lock`)을 OrderService `checkout`(user_id)·`checkout_pickup`(user_id)·`advance_pickup`(order_id)에 적용. 생성자 불변. (DB 트랜잭션은 어댑터 책임.)
+- [x] 4.2 동시 체크아웃 원자성 테스트(`test_concurrency.py`, 4) — 계측 어댑터+barrier로 실제 race 재현(잠금 시 무oversell·해제 시 oversell 양방향 입증). GIL 한계 정직 명시.
 
 ## 5. 게스트 커밋 게이트 + 머지 _(요구사항 2-3, 2-4)_
 - [x] 5.1 게스트 커밋(주문·예약) 차단 — 401 LoginRequired + `login` CTA(slice 1-2에서 구현, `_guest_commit_gate`).

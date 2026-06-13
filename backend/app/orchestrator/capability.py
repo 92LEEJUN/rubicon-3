@@ -14,6 +14,7 @@ core.Orchestrator(결정적 백본)를 capability 레지스트리로 감싼 1차
 """
 from __future__ import annotations
 
+import os
 import uuid
 from dataclasses import dataclass, field
 from typing import AsyncIterator, Callable, Iterator, Literal, Optional
@@ -208,6 +209,120 @@ def _cap_clarify(ctx: TurnCtx, message: str) -> list[MessageSection]:
     return handlers.handle_clarify(ctx.c, ctx.user, message)
 
 
+# ── F4: 범위 밖/미충족 의도 명시(요구사항 R7) ───────────────────────────────
+# 결정적 잔여 검사 — 가전 컨시어지 범위 밖 주제 표지. 메시지에 이런 요청이 섞여 있는데
+# 어떤 capability도 그 요청을 커버하지 못하면 침묵 대신 낮은 톤의 out_of_scope 안내를 덧붙인다.
+# (test-findings F4: "주말 날씨" 같은 범위 밖 의도가 unhandled 표기 없이 사라지던 갭.)
+_OUT_OF_SCOPE_KW = {
+    "날씨": "날씨",
+    "기온": "날씨",
+    "미세먼지": "날씨/대기",
+    "뉴스": "뉴스",
+    "주식": "주식",
+    "환율": "환율",
+    "운세": "운세",
+    "로또": "운세",
+    "번역": "번역",
+    "맛집": "맛집",
+    "길찾": "길찾기",
+    "내비": "길찾기",
+}
+
+
+def detect_out_of_scope(message: str) -> list[str]:
+    """메시지에서 범위 밖 주제 표지를 찾아 사람이 읽을 라벨 목록을 돌려준다(중복 제거, 순서 보존)."""
+    t = message or ""
+    labels: list[str] = []
+    for kw, label in _OUT_OF_SCOPE_KW.items():
+        if kw in t and label not in labels:
+            labels.append(label)
+    return labels
+
+
+def out_of_scope_section(labels: list[str]) -> MessageSection:
+    """범위 밖 요청에 대한 낮은 톤의 명시적 미처리(unhandled) 섹션(R7).
+
+    예: "그 외 요청(예: 날씨)은 제가 도와드리기 어려워요." handled=False로 표면화한다.
+    """
+    examples = ", ".join(labels[:3]) if labels else "일부 요청"
+    return MessageSection(
+        label="안내", intent="out_of_scope", handled=False,
+        template=Template(kind="text", data={
+            "message": (f"그 외 요청(예: {examples})은 제가 도와드리기 어려워요. "
+                        "가전 상태 점검·문제 해결·부품 주문·추천은 도와드릴 수 있어요."),
+            "topics": labels}))
+
+
+# ── §8~11: LLM 자연어(prose) agent capability — BOUNDED scaffold ─────────────
+def _env_on(name: str) -> bool:
+    return os.getenv(name, "").strip().lower() in ("1", "true", "yes", "on")
+
+
+def llm_backed() -> bool:
+    """LLM_BACKED 토글(매 호출 평가, 기본 off). prose capability의 게이트."""
+    return _env_on("LLM_BACKED")
+
+
+_PROSE_SYSTEM = (
+    "당신은 삼성 가전 AI 컨시어지입니다. 사용자에게 친절하고 간결한 한국어로, "
+    "추천 제품의 특징(소음·필터·관리 편의 등)을 자연스러운 문장으로 설명하세요. "
+    "과장·허위 없이 주어진 제품 정보 범위 안에서만 말합니다."
+)
+
+
+def _prose_fallback(ctx: TurnCtx, message: str) -> list[MessageSection]:
+    """LLM off(또는 prose 클라이언트 미주입) 시 결정적 폴백 — 기존 explain 동작 그대로(회귀 불변)."""
+    return handlers.handle_explain(ctx.c, ctx.user, message, candidates=ctx.read("candidates"))
+
+
+def _prose_prompt(items, message: str) -> str:
+    lines = []
+    for it in items:
+        p = it.product
+        lines.append(f"- {p.name}: {getattr(p, 'summary', '') or it.reason}")
+    catalog = "\n".join(lines) or "(제품 정보 없음)"
+    return f"제품 정보:\n{catalog}\n\n사용자 질문:\n{message}"
+
+
+def _cap_explain_prose(ctx: TurnCtx, message: str) -> list[MessageSection]:
+    """§8~11 entry point — kind:"agent" prose capability.
+
+    이 capability는 §8~11(LLM 자연어 prose 응답)의 **첫 진입점(scaffold)**이다.
+    전체 prose 마이그레이션과 legacy/runtime 제거는 후속 작업이다(여기선 하지 않는다).
+
+    동작:
+    - LLM_BACKED on **그리고** prose 클라이언트가 주입돼 있으면 → LLM이 자연어 text 섹션 생성.
+    - 그 외(off·미주입·예외) → 결정적 폴백(_prose_fallback = 기존 explain). 기본 테스트는 결정적.
+
+    prose 클라이언트는 ctx.c.prose_client가 아니라 오케스트레이터가 ctx.turn에 주입한다(아래 참조).
+    동기 capability 계약(handler는 sync)을 깨지 않기 위해, 비동기 LLM 호출은 prose 클라이언트의
+    동기 어댑터(`complete`)로 감싼다. 실 품질은 수동 검증(verify_*); 테스트는 stub을 쓴다.
+    """
+    client = ctx.read("_prose_client")
+    if not (llm_backed() and client is not None):
+        return _prose_fallback(ctx, message)
+
+    items = ctx.c.recommendation.recommend(ctx.user)
+    cand = set(ctx.read("candidates") or [])
+    chosen = [it for it in items if (not cand or it.product.id in cand)]
+    if not chosen:
+        return _prose_fallback(ctx, message)
+
+    try:
+        text = client.complete(_PROSE_SYSTEM, _prose_prompt(chosen, message))
+    except Exception:
+        # prose 생성 실패 → 결정적 폴백(침묵·턴 붕괴 방지, §13.1)
+        return _prose_fallback(ctx, message)
+    if not text:
+        return _prose_fallback(ctx, message)
+    return [MessageSection(
+        label=handlers.LABELS.get("explain", "상세 설명"), intent="explain",
+        template=Template(kind="text", data={
+            "message": text,
+            "prose": True,
+            "products": [{"id": it.product.id} for it in chosen]}))]
+
+
 def build_registry() -> dict[str, Capability]:
     caps = [
         Capability("device_status", "advisory", "tool", ("device_status",), _cap_device_status,
@@ -231,6 +346,11 @@ def build_registry() -> dict[str, Capability]:
         Capability("recommend", "advisory", "tool", ("recommend",), _cap_recommend,
                    emits=("candidates",), priority=3,
                    desc="새 제품 추천(개인화). '추천해줘/뭐가 좋아/새로 장만' 류."),
+        # §8~11 — LLM 자연어(prose) agent capability(scaffold). kind="agent"로 결정적 tool과 구분.
+        # LLM_BACKED on + prose 클라이언트 주입 시 자연어 text, 아니면 결정적 explain 폴백(기본).
+        Capability("explain_prose", "advisory", "agent", ("explain_prose",), _cap_explain_prose,
+                   needs=("candidates",), priority=2,
+                   desc="제품/추천을 LLM 자연어 문장으로 설명(§8~11). off면 결정적 explain."),
         # 행동형 — 플래너 자동선택 제외. 명시 order 의도 또는 CTA 회신으로만 진입. 초안만 산출.
         Capability("order", "action", "tool", ("order",), _cap_order,
                    needs=("required_parts",), priority=4,
@@ -287,12 +407,15 @@ class CapabilityOrchestrator:
 
     def __init__(self, container: Optional[Container] = None,
                  classifier: Optional[IntentClassifier] = None,
-                 llm_planner=None) -> None:
+                 llm_planner=None, prose_client=None) -> None:
         self.c = container or build_container()
         self.classifier = classifier or RuleBasedClassifier()
         self.registry = build_registry()
         self._sessions: dict[str, dict] = {}   # session_id → 지속 슬롯
         self.llm_planner = llm_planner          # 단일 라우터(없으면 규칙 폴백)
+        # §8~11 prose 클라이언트(주입형) — complete(system, user)->str. 없으면 prose capability는
+        # 결정적 폴백(explain)으로 동작한다. 기본 None → 테스트·오프라인 결정성 유지.
+        self.prose_client = prose_client
         self._plan_cache: dict[str, list[str]] = {}   # message → LLM 조언형 plan(홉 생략)
 
     def _ordered_intents(self, message: str) -> list[str]:
@@ -386,6 +509,13 @@ class CapabilityOrchestrator:
         if not sections:   # 빈 턴 방지(R7) — 무엇을 원하는지 되묻기
             sections = handlers.handle_clarify(ctx.c, ctx.user, message)
 
+        # F4(R7) — 메시지에 범위 밖 요청이 섞여 있으면 침묵 대신 명시적 미처리 안내를 덧붙인다.
+        # 결정적 잔여 검사: clarify로만 응답한 경우(전부 미해석)는 이미 되묻기이므로 중복 안내하지 않는다.
+        oos = detect_out_of_scope(message)
+        already_only_clarify = all(s.intent == "clarify" for s in sections)
+        if oos and not already_only_clarify:
+            sections.append(out_of_scope_section(oos))
+
         # 세션 carry 갱신 — 다음 턴 주문이 이어받을 슬롯 보존(요구사항 5)
         for slot in ("required_parts", "candidates"):
             if slot in ctx.turn:
@@ -402,6 +532,7 @@ class CapabilityOrchestrator:
                    screen_context: Optional[dict] = None, user=None) -> AssistantTurn:
         session = self._session(session_id)
         ctx = TurnCtx(self.c, session, user)   # user=Principal 사용자(None이면 기본, 멀티테넌트)
+        ctx.turn["_prose_client"] = self.prose_client   # §8~11 prose capability용(없으면 결정적 폴백)
         plan = self.route(message)
 
         sections = self._run_capabilities(plan, ctx, message, session)
@@ -438,6 +569,7 @@ class CapabilityOrchestrator:
         try:
             session = self._session(session_id)
             ctx = TurnCtx(self.c, session, user)   # user=Principal 사용자(멀티테넌트)
+            ctx.turn["_prose_client"] = self.prose_client   # §8~11 prose capability용
             plan = await self.aroute(message)
             sections = self._run_capabilities(plan, ctx, message, session)
             active_flow = "troubleshoot" if any(

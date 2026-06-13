@@ -244,6 +244,101 @@ def test_empty_plan_falls_back_to_clarify(container):
     assert secs and secs[0].intent == "clarify"           # 빈 턴 금지 — 되묻기
 
 
+# ── F4: 범위 밖/미충족 의도 명시(R7) ────────────────────────────────────────
+def test_out_of_scope_ack_appended_with_in_scope(container):
+    # 진단(in-scope) + 날씨(out-of-scope) 혼합 → 처리 섹션 AND out_of_scope 안내
+    turn = _orch(container).build_turn("세탁기 물이 안 빠져요 해결법 알려주고 주말 날씨도 알려줘")
+    intents = [s.intent for s in turn.sections]
+    assert "troubleshoot" in intents                      # in-scope 처리됨
+    oos = [s for s in turn.sections if s.intent == "out_of_scope"]
+    assert oos and oos[0].handled is False                # 범위 밖 명시(미처리)
+    assert "날씨" in oos[0].template.data["message"]
+    assert "날씨" in oos[0].template.data["topics"]
+
+
+def test_no_out_of_scope_ack_when_all_in_scope(container):
+    turn = _orch(container).build_turn("세탁기 물이 안 빠져요")
+    assert not any(s.intent == "out_of_scope" for s in turn.sections)
+
+
+def test_out_of_scope_not_duplicated_when_only_clarify(container):
+    # 전부 미해석 → clarify 되묻기뿐일 때는 별도 out_of_scope 안내를 덧붙이지 않음(중복 금지)
+    orch = _orch(container)
+    secs = orch._run_capabilities(Plan([]), _ctx(container), "주말 날씨 어때", {})
+    assert secs and secs[0].intent == "clarify"
+    assert not any(s.intent == "out_of_scope" for s in secs)
+
+
+def test_out_of_scope_detection_labels():
+    from app.orchestrator.capability import detect_out_of_scope
+    assert detect_out_of_scope("주말 날씨랑 환율 알려줘") == ["날씨", "환율"]
+    assert detect_out_of_scope("세탁기 물이 안 빠져요") == []
+
+
+# ── §8~11: LLM prose agent capability(stub로 결정적 검증) ────────────────────
+class _StubProseClient:
+    def __init__(self, text="비스포크 큐브는 저소음이고 필터 관리가 편해요."):
+        self.text = text
+        self.calls = 0
+
+    def complete(self, system, user):
+        self.calls += 1
+        return self.text
+
+
+def test_prose_capability_emits_text_when_llm_on(container, monkeypatch):
+    monkeypatch.setenv("LLM_BACKED", "1")
+    stub = _StubProseClient()
+    orch = CapabilityOrchestrator(container=container, classifier=RuleBasedClassifier(),
+                                  prose_client=stub)
+    ctx = _ctx(container)
+    ctx.write("_prose_client", stub)
+    ctx.write("candidates", ["prod_purifier_cube"])
+    sec = orch.registry["explain_prose"].run(ctx, "비스포크 큐브 더 알려줘")[0]
+    assert stub.calls == 1
+    assert sec.intent == "explain" and sec.template.kind == "text"
+    assert sec.template.data.get("prose") is True
+    assert "비스포크" in sec.template.data["message"]
+
+
+def test_prose_capability_deterministic_fallback_when_off(container, monkeypatch):
+    monkeypatch.setenv("LLM_BACKED", "")
+    stub = _StubProseClient()
+    orch = CapabilityOrchestrator(container=container, classifier=RuleBasedClassifier(),
+                                  prose_client=stub)
+    ctx = _ctx(container)
+    ctx.write("_prose_client", stub)
+    ctx.write("candidates", ["prod_purifier_cube"])
+    sec = orch.registry["explain_prose"].run(ctx, "비스포크 큐브 더 알려줘")[0]
+    assert stub.calls == 0                                 # LLM 미호출
+    assert sec.intent == "explain"
+    assert sec.template.kind == "recommendation_list"      # 결정적 explain 폴백
+
+
+def test_prose_capability_fallback_without_client(container, monkeypatch):
+    # LLM on이어도 prose 클라이언트 미주입 → 결정적 폴백(기본 결정성)
+    monkeypatch.setenv("LLM_BACKED", "1")
+    orch = _orch(container)
+    ctx = _ctx(container)
+    ctx.write("candidates", ["prod_purifier_cube"])
+    sec = orch.registry["explain_prose"].run(ctx, "비스포크 큐브 더 알려줘")[0]
+    assert sec.template.kind == "recommendation_list"
+
+
+def test_prose_capability_is_agent_kind():
+    reg = build_registry()
+    assert reg["explain_prose"].kind == "agent"
+    assert reg["explain_prose"] in advisory_catalog(reg)   # 플래너 후보
+
+
+def test_planner_can_route_to_prose(container):
+    stub = _StubPlanner(["explain_prose"])
+    orch = CapabilityOrchestrator(container=container, classifier=RuleBasedClassifier(),
+                                  llm_planner=stub)
+    plan = orch.route("비스포크 큐브 더 자세히 설명해줘")
+    assert "explain_prose" in plan.capabilities
+
+
 # ── 봉투 패리티(요구사항 13) ────────────────────────────────────────────────
 def test_stream_emits_section_flow_done(container):
     chunks = list(_orch(container).stream_turn("세탁기 물이 안 빠져요"))

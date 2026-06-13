@@ -1,5 +1,4 @@
 """BE 내부 API — 결정적 엔드포인트·커밋 게이트·surface·WS 스트림(api-contract §2.4)."""
-import pytest
 from fastapi.testclient import TestClient
 
 from app.api.internal import app

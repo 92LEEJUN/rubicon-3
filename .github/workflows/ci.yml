@@ -49,13 +49,10 @@ jobs:
       - name: Vite build
         run: cd frontend && npx vite build
 
-  # Lint job is informative (non-blocking) for this first pass: the ruff/eslint/
-  # prettier configs land in parallel from other agents. Once the codebase is
-  # clean and configs are in place, remove `continue-on-error` to make it blocking.
+  # Blocking gate: ruff(backend/bff)·eslint(0 errors)·prettier(src) 모두 현재 코드에서 통과.
   lint:
     name: lint (ruff + eslint + prettier)
     runs-on: ubuntu-latest
-    continue-on-error: true
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5

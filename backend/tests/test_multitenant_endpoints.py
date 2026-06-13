@@ -5,7 +5,6 @@ on이면 헤더 `X-User-Id`/`X-Guest-Token`로 신원을 해석한다(요구사�
 
 소유 규칙: 이 파일과 `app/api/internal.py`만 수정. 컨테이너/서비스/principal은 재사용한다.
 """
-import pytest
 from fastapi.testclient import TestClient
 
 from app.api.internal import app, _container

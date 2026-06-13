@@ -54,8 +54,8 @@ class ReEngagementService:
         last = self._last_sent.get(user.id)
         if last and (now - last).total_seconds() < self.cooldown_sec:        # ② 빈도(R26)
             return None
-        fresh = [l for l in self.companion.open_loops(user.id)
-                 if not self.engagement.has_seen(user.id, self._dedup_ref(l.ref))]  # ③ 중복/가치
+        fresh = [loop for loop in self.companion.open_loops(user.id)
+                 if not self.engagement.has_seen(user.id, self._dedup_ref(loop.ref))]  # ③ 중복/가치
         if not fresh:
             return None
         top = fresh[0]                                                       # ④ 묶음(R27): 우선순위 top + 카운트

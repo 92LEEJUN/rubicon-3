@@ -8,10 +8,3 @@ target-version = "py311"
 [tool.ruff.lint]
 # 보수적 기본값(ruff defaults): pycodestyle(E4/E7/E9) + pyflakes(F).
 select = ["E4", "E7", "E9", "F"]
-# 기존 코드를 수정하지 않고 green 상태를 유지하기 위해 무시하는 규칙.
-# (소스 수정 없이 통과시키기 위한 targeted ignore. 추후 코드 정리 시 해제 가능.)
-#   F401 — unused-import (미사용 import; 11건, 주로 tests/__init__ 재노출)
-#   E741 — ambiguous-variable-name (l/I/O 등 모호한 변수명; 10건)
-#   E702 — multiple-statements-on-one-line-semicolon (세미콜론 다중 구문; verify 스크립트)
-#   F541 — f-string-without-placeholders (placeholder 없는 f-string; 구분선 출력)
-ignore = ["F401", "E741", "E702", "F541"]

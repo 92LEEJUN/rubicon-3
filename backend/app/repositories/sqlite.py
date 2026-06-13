@@ -103,9 +103,9 @@ class SqliteOpenLoopRepository:
             "SELECT data FROM open_loops WHERE user_id = ?", (user_id,)
         ).fetchall()
         loops = [OpenLoop.model_validate_json(r["data"]) for r in rows]
-        loops = [l for l in loops if l.status == "open"]
+        loops = [loop for loop in loops if loop.status == "open"]
         # 우선순위·최근순(인메모리 구현과 동일 정렬).
-        return sorted(loops, key=lambda l: (l.priority, l.last_touch), reverse=True)
+        return sorted(loops, key=lambda loop: (loop.priority, loop.last_touch), reverse=True)
 
     def set_status(self, user_id: str, ref: str, status: str) -> OpenLoop | None:
         loop = self.get(user_id, ref)

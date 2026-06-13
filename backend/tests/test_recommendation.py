@@ -98,5 +98,5 @@ def test_enqueue_preemptive_creates_open_loops():
     user = _user()
     n = _svc().enqueue_preemptive(user, companion)
     assert n >= 1
-    refs = {l.ref for l in companion.open_loops(user.id)}
+    refs = {loop.ref for loop in companion.open_loops(user.id)}
     assert any(r.startswith("rec:") for r in refs)    # 추천이 open-loop로 등록(요구 7)

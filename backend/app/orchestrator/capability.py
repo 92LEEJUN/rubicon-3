@@ -39,10 +39,11 @@ class TurnCtx:
     required_parts를 다음 턴 order가 이어받는다(크로스턴 carry).
     """
 
-    def __init__(self, container: Container, session: dict) -> None:
+    def __init__(self, container: Container, session: dict, user=None) -> None:
         self.c = container
         self.session = session
         self.turn: dict = {}
+        self.user = user if user is not None else container.user   # 이 턴의 Principal 사용자(멀티테넌트)
 
     def write(self, key: str, value) -> None:
         self.turn[key] = value
@@ -144,7 +145,7 @@ def gate_repair_ctas(section: MessageSection, ctx: TurnCtx, message_danger: bool
 
 # ── capability 구현(기존 handlers 재사용) ──────────────────────────────────
 def _cap_device_status(ctx: TurnCtx, message: str) -> list[MessageSection]:
-    sections = handlers.handle_device_status(ctx.c, ctx.c.user, message)
+    sections = handlers.handle_device_status(ctx.c, ctx.user, message)
     for s in sections:
         if s.handled:
             ctx.write("device_status", s.template.data.get("device"))
@@ -152,7 +153,7 @@ def _cap_device_status(ctx: TurnCtx, message: str) -> list[MessageSection]:
 
 
 def _cap_diagnose(ctx: TurnCtx, message: str) -> list[MessageSection]:
-    sections = handlers.handle_troubleshoot(ctx.c, ctx.c.user, message)
+    sections = handlers.handle_troubleshoot(ctx.c, ctx.user, message)
     danger = detect_danger(message)
     for s in sections:
         if s.template.kind == "guide_steps":
@@ -169,7 +170,7 @@ def _cap_diagnose(ctx: TurnCtx, message: str) -> list[MessageSection]:
 
 
 def _cap_recommend(ctx: TurnCtx, message: str) -> list[MessageSection]:
-    sections = handlers.handle_recommend(ctx.c, ctx.c.user, message)
+    sections = handlers.handle_recommend(ctx.c, ctx.user, message)
     for s in sections:
         prods = s.template.data.get("products") if s.handled else None
         if prods:
@@ -180,31 +181,31 @@ def _cap_recommend(ctx: TurnCtx, message: str) -> list[MessageSection]:
 def _cap_order(ctx: TurnCtx, message: str) -> list[MessageSection]:
     # 명시 부품이 없으면 블랙보드(이전 턴 진단의 required_parts)를 이어받음(요구사항 5-3)
     ids = handlers.resolve_part_ids(message) or ctx.read("required_parts") or []
-    return handlers.handle_order(ctx.c, ctx.c.user, message, part_ids=ids)
+    return handlers.handle_order(ctx.c, ctx.user, message, part_ids=ids)
 
 
 def _cap_general(ctx: TurnCtx, message: str) -> list[MessageSection]:
-    return handlers.handle_general(ctx.c, ctx.c.user, message)
+    return handlers.handle_general(ctx.c, ctx.user, message)
 
 
 def _cap_warranty(ctx: TurnCtx, message: str) -> list[MessageSection]:
-    sections = handlers.handle_warranty(ctx.c, ctx.c.user, message)
+    sections = handlers.handle_warranty(ctx.c, ctx.user, message)
     for s in sections:
         ctx.write("warranty_status", s.template.data.get("coverage"))
     return sections
 
 
 def _cap_booking(ctx: TurnCtx, message: str) -> list[MessageSection]:
-    return handlers.handle_booking(ctx.c, ctx.c.user, message)
+    return handlers.handle_booking(ctx.c, ctx.user, message)
 
 
 def _cap_explain(ctx: TurnCtx, message: str) -> list[MessageSection]:
     # 직전 추천 후보(blackboard)를 이어받아 상세/비교 설명(요구사항 5)
-    return handlers.handle_explain(ctx.c, ctx.c.user, message, candidates=ctx.read("candidates"))
+    return handlers.handle_explain(ctx.c, ctx.user, message, candidates=ctx.read("candidates"))
 
 
 def _cap_clarify(ctx: TurnCtx, message: str) -> list[MessageSection]:
-    return handlers.handle_clarify(ctx.c, ctx.c.user, message)
+    return handlers.handle_clarify(ctx.c, ctx.user, message)
 
 
 def build_registry() -> dict[str, Capability]:
@@ -383,7 +384,7 @@ class CapabilityOrchestrator:
                         "detail": str(exc)})))
 
         if not sections:   # 빈 턴 방지(R7) — 무엇을 원하는지 되묻기
-            sections = handlers.handle_clarify(self.c, self.c.user, message)
+            sections = handlers.handle_clarify(ctx.c, ctx.user, message)
 
         # 세션 carry 갱신 — 다음 턴 주문이 이어받을 슬롯 보존(요구사항 5)
         for slot in ("required_parts", "candidates"):
@@ -398,9 +399,9 @@ class CapabilityOrchestrator:
         return self._sessions.setdefault(session_id, {})
 
     def build_turn(self, message: str, session_id: str = "s1",
-                   screen_context: Optional[dict] = None) -> AssistantTurn:
+                   screen_context: Optional[dict] = None, user=None) -> AssistantTurn:
         session = self._session(session_id)
-        ctx = TurnCtx(self.c, session)
+        ctx = TurnCtx(self.c, session, user)   # user=Principal 사용자(None이면 기본, 멀티테넌트)
         plan = self.route(message)
 
         sections = self._run_capabilities(plan, ctx, message, session)
@@ -410,10 +411,10 @@ class CapabilityOrchestrator:
                              message_id=f"msg_{uuid.uuid4().hex[:8]}")
 
     def stream_turn(self, message: str, session_id: str = "s1",
-                    screen_context: Optional[dict] = None) -> Iterator[dict]:
+                    screen_context: Optional[dict] = None, user=None) -> Iterator[dict]:
         """§2.1 봉투 — section* → flow → done(실패 시 error). core.stream_turn과 동등."""
         try:
-            turn = self.build_turn(message, session_id, screen_context)
+            turn = self.build_turn(message, session_id, screen_context, user=user)
         except Exception as exc:   # 전체 폴백(R13)
             yield {"type": "error", "code": "orchestrator_error",
                    "fallback": {"kind": "text",
@@ -426,7 +427,7 @@ class CapabilityOrchestrator:
         yield {"type": "done", "message_id": turn.message_id}
 
     async def astream(self, message: str, session_id: str = "s1",
-                      screen_context: Optional[dict] = None) -> AsyncIterator[dict]:
+                      screen_context: Optional[dict] = None, user=None) -> AsyncIterator[dict]:
         """stream_turn의 비동기 버전 — aroute(LLM-planner)로 플래닝 후 §2.1 봉투를 방출한다.
 
         section* → flow → done(실패 시 error). sync stream_turn과 동일 봉투·세션 carry.
@@ -436,7 +437,7 @@ class CapabilityOrchestrator:
         capability handler는 동기(결정적)이므로 await 없이 그대로 호출한다."""
         try:
             session = self._session(session_id)
-            ctx = TurnCtx(self.c, session)
+            ctx = TurnCtx(self.c, session, user)   # user=Principal 사용자(멀티테넌트)
             plan = await self.aroute(message)
             sections = self._run_capabilities(plan, ctx, message, session)
             active_flow = "troubleshoot" if any(

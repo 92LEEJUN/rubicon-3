@@ -22,7 +22,7 @@ try:  # backend/.env 자동 로드(있으면) — OPENAI_API_KEY·LLM_BACKED 등
 except ModuleNotFoundError:
     pass
 
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, Header, WebSocket, WebSocketDisconnect
 from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel
 
@@ -37,14 +37,42 @@ from ..errors import (
     QuoteNotConvertible,
 )
 from ..orchestrator.capability import CapabilityOrchestrator
+from ..principal import (
+    Principal,
+    UserDirectory,
+    multitenant_enabled,
+    resolve_principal,
+)
 
 app = FastAPI(title="MVP 컨시어지 — BE 내부 API")
 
-# MVP: 단일 컨테이너(인메모리 상태). 실 전환 시 세션/사용자별로 분리.
+# 공유 컨테이너 — 인메모리 상태 리포는 **이미 user_id 키잉**(멀티테넌트 준비됨, specs/multi-tenant-state).
+# 단일 지점이던 `_container.user`(프로필)는 Principal/UserDirectory로 분리한다.
 _container = build_container()
+_users = UserDirectory()
 # 결정적 경로(LLM off) = capability 오케스트레이터(플래너 없음). 옛 core.Orchestrator를
 # 여기로 수렴(스트랭글러 §12.3) — 봉투 동일 + ADR-0046 수리 CTA 게이팅 포함.
 _orch = CapabilityOrchestrator(container=_container, llm_planner=None)
+
+
+def _principal(user_id: str | None = None, guest_token: str | None = None) -> Principal:
+    """요청 신원 → Principal(토글 off거나 신원 없으면 폴백, specs/multi-tenant-state)."""
+    return resolve_principal(user_id, guest_token)
+
+
+def _guest_commit_gate(x_user_id: str | None, x_guest_token: str | None):
+    """게스트(비로그인) 커밋 차단(요구사항 2-3). 토글 off면 게이트 없음(회귀)."""
+    if not multitenant_enabled():
+        return None
+    if _principal(x_user_id, x_guest_token).is_guest:
+        return JSONResponse(status_code=401, content={
+            "code": "LoginRequired",
+            "message": "주문·예약은 로그인 후 확정할 수 있어요.",
+            "template": Template(kind="text", data={
+                "message": "로그인하면 진행할 수 있어요. 지금까지 담은 내용은 로그인 후 이어집니다."}).model_dump(mode="json"),
+            "cta": {"label": "로그인", "action": "navigate", "kind": "login"},
+        })
+    return None
 
 
 def _llm_backed() -> bool:
@@ -76,7 +104,8 @@ def _build_cap_orch():
 _cap_orch = None   # 첫 CAPABILITY_ORCH 요청 시 lazy 구성(LLM_BACKED 토글 반영)
 
 
-async def _stream_turn(text: str, screen_context: dict | None) -> AsyncIterator[dict]:
+async def _stream_turn(text: str, screen_context: dict | None,
+                       principal: Principal | None = None) -> AsyncIterator[dict]:
     """턴 스트림 디스패치(비동기):
     ⓪ CAPABILITY_ORCH on → CapabilityOrchestrator.astream(LLM-planner 라우팅, §9.2)
     ① LLM_BACKED off → 결정적 섹션(CapabilityOrchestrator, 플래너 없음 — core 수렴 §12.3)
@@ -84,14 +113,16 @@ async def _stream_turn(text: str, screen_context: dict | None) -> AsyncIterator[
     ③ LLM_BACKED on, MULTIAGENT on → 슈퍼바이저-워커(runtime, LLM 자연어 prose).
 
     ②③(LLM prose)는 capability에 LLM agent capability(§8~11)가 생기기 전까지 유지한다."""
+    principal = principal or _principal()
+    user = _users.get(principal)
     if _capability_orch():
         global _cap_orch
         if _cap_orch is None:
             _cap_orch = _build_cap_orch()
-        async for chunk in _cap_orch.astream(text, screen_context=screen_context):
+        async for chunk in _cap_orch.astream(text, screen_context=screen_context, user=user):
             yield chunk
     elif _llm_backed():
-        memory = _container.companion.context(_container.user.id)  # 이어가기 주입(§0.4)
+        memory = _container.companion.context(principal.id)  # 이어가기 주입(§0.4·사용자별)
         if _multiagent():
             from ..orchestrator.runtime import astream_multiagent
             async for chunk in astream_multiagent(text, screen_context, memory=memory):
@@ -101,7 +132,7 @@ async def _stream_turn(text: str, screen_context: dict | None) -> AsyncIterator[
             async for chunk in _llm_astream(text, screen_context, memory=memory):
                 yield chunk
     else:
-        for chunk in _orch.stream_turn(text, screen_context=screen_context):
+        for chunk in _orch.stream_turn(text, screen_context=screen_context, user=user):
             yield chunk
 
 
@@ -116,14 +147,16 @@ def _collect_assistant(chunk: dict, parts: list[str]) -> None:
             parts.append(f"[{label}]")  # 상세 추출은 컴패니언 §0.3
 
 
-async def _stream_and_record(text: str, screen_context: dict | None) -> AsyncIterator[dict]:
+async def _stream_and_record(text: str, screen_context: dict | None,
+                             principal: Principal | None = None) -> AsyncIterator[dict]:
     """턴 스트림 + 종료 후 컴팩션 기록(turn 루프 배선, tasks §0.4). 기록 실패는 무시(비차단)."""
+    principal = principal or _principal()
     parts: list[str] = []
-    async for chunk in _stream_turn(text, screen_context):
+    async for chunk in _stream_turn(text, screen_context, principal):
         _collect_assistant(chunk, parts)
         yield chunk
     try:
-        _container.companion.record_turn(_container.user.id, text, " ".join(p for p in parts if p))
+        _container.companion.record_turn(principal.id, text, " ".join(p for p in parts if p))
     except Exception:
         pass
 
@@ -134,6 +167,8 @@ class TurnRequest(BaseModel):
     text: str
     media: list = []
     screen_context: dict | None = None
+    user_id: str | None = None       # 신원(멀티테넌트) — 없으면 게스트/기본 폴백
+    guest_token: str | None = None
 
 
 class OrderRequest(BaseModel):
@@ -177,9 +212,10 @@ async def turn_ws(ws: WebSocket) -> None:
     await ws.accept()
     try:
         while True:
-            msg = await ws.receive_json()
+            msg = await ws.receive_json()   # 핸드셰이크/메시지가 신원 운반(user_id·guest_token)
             text = msg.get("text", "")
-            async for chunk in _stream_and_record(text, msg.get("screen_context")):
+            principal = _principal(msg.get("user_id"), msg.get("guest_token"))
+            async for chunk in _stream_and_record(text, msg.get("screen_context"), principal):
                 await ws.send_json(chunk)
     except WebSocketDisconnect:
         return
@@ -189,8 +225,9 @@ async def turn_ws(ws: WebSocket) -> None:
 def turn_http(req: TurnRequest) -> StreamingResponse:
     """BFF 중계용 HTTP 스트림(NDJSON) — 한 줄당 청크 1개(§2.1 봉투). 비동기 제너레이터로
     스트리밍(이벤트 루프 비차단 — 스레드-당-턴 점유 제거)."""
+    principal = _principal(req.user_id, req.guest_token)
     async def gen():
-        async for chunk in _stream_and_record(req.text, req.screen_context):
+        async for chunk in _stream_and_record(req.text, req.screen_context, principal):
             yield json.dumps(chunk, ensure_ascii=False) + "\n"
     return StreamingResponse(gen(), media_type="application/x-ndjson")
 
@@ -328,7 +365,11 @@ def _out_of_stock_409(err: OutOfStock) -> JSONResponse:
 
 # ── 커밋(HTTP) — 주문 게이트(R17) ───────────────────────────────────────────
 @app.post("/internal/orders")
-def place_order(req: OrderRequest):
+def place_order(req: OrderRequest, x_user_id: str | None = Header(None),
+                x_guest_token: str | None = Header(None)):
+    gate = _guest_commit_gate(x_user_id, x_guest_token)   # 게스트 커밋 차단(요구사항 2-3)
+    if gate is not None:
+        return gate
     try:
         if req.fulfillment == "pickup":
             order = _container.order.checkout_pickup(
@@ -446,9 +487,13 @@ def _booking_confirmation_409(req: BookingRequest) -> JSONResponse:
 
 
 @app.post("/internal/bookings")
-def create_booking(req: BookingRequest):
-    """방문 예약 — 미확인이면 409 ConfirmationRequired(R17). 확인 시 센터 방문(O7-4)은
-    visit_type/store_id 동반, 맥락 전달(context_ref, O7-5)."""
+def create_booking(req: BookingRequest, x_user_id: str | None = Header(None),
+                   x_guest_token: str | None = Header(None)):
+    """방문 예약 — 게스트 차단(요구사항 2-3) → 미확인이면 409 ConfirmationRequired(R17).
+    확인 시 센터 방문(O7-4)은 visit_type/store_id 동반, 맥락 전달(context_ref, O7-5)."""
+    gate = _guest_commit_gate(x_user_id, x_guest_token)
+    if gate is not None:
+        return gate
     if not req.confirmed:
         return _booking_confirmation_409(req)
     return _container.handoff.book(

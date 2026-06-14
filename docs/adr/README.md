@@ -50,6 +50,9 @@
 | [0060](0060-api-maturity.md) | **API 성숙(API-first)** — 날짜 기반 버저닝·`X-API-Version`·Deprecation/Sunset 절차·OpenAPI export·스키마→타입 생성·계약 테스트. 하위호환 | 채택 |
 | [0061](0061-privacy-dsr.md) | **개인정보·DSR** — 동의 scope 부여/철회·DSR 접근/삭제/정정·보존 정책·감사 훅(`/internal/privacy/*` 라우터). `MULTITENANT` off=회귀 불변 | 채택 |
 | [0062](0062-cost-caching.md) | **비용·캐싱(S6)** — LLM 비용 회계(stdlib 근사 토큰·메트릭)·결정적 모델 라우팅·예산 가드(강등/차단)·응답 캐싱(S3 `CachePort` 재사용). `COST_TRACKING`·`MODEL_ROUTING`·`RESPONSE_CACHE` off=회귀 불변 | 채택 |
+| [0063](0063-security-hardening.md) | **보안 심화(S7)** — BFF 레이트리밋(토큰버킷·429)·보안 헤더·입력 검증 유틸·감사 강화(S5 audit 재사용)·의존성 스캔(`security.yml`). `RATE_LIMIT`·`SECURITY_HEADERS` off=회귀 불변 | 채택 |
+| [0064](0064-experiments-ab.md) | **실험·롤아웃(Runtime A/B, S8)** — 결정적 sticky 할당·실험 레지스트리·canary/홀드아웃 게이트·노출 로깅(analytics append)·FE 훅/BE 헬퍼(`/internal/experiments/*`). `EXPERIMENTS` off=회귀 불변 | 채택 |
+| [0065](0065-delivery-dora.md) | **딜리버리·DORA(S9)** — 빌드↔릴리스↔런 분리·버전 스탬프·DORA 4지표 수집·환경별 배포 파이프라인(`release.yml`)·멀티스테이지 컨테이너. 추가형(기존 CI 잡 불변) | 채택 |
 
 ### Phase A — 스트리밍 / 동시성 실행 (operations.md §6·§9·§14)
 | # | 결정 | 상태 |

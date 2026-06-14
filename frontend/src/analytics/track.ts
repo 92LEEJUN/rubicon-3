@@ -24,7 +24,9 @@ export type AnalyticsEventName =
   | 'notification_dismissed'
   // order_confirmed의 owner는 BE이나, FE 데모/오프라인(BE 미연결) 경로의 커밋 확정도
   // 가시화하기 위해 클라 사이드에서 같은 이름으로 발행한다(실 연동 시 BE가 진실의 출처).
-  | 'order_confirmed';
+  | 'order_confirmed'
+  // 실험 A/B 노출(S8, ADR-0064) — useVariant 훅이 1회 발행(append-only).
+  | 'experiment_exposed';
 
 export type AnalyticsProps = Record<string, unknown>;
 

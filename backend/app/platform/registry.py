@@ -9,6 +9,7 @@
 """
 from .. import openapi as _api_maturity  # noqa: F401  (S4: X-API-Version 헤더 등록)
 from .. import resilience as _resilience  # noqa: F401  (S2 회복력 — RESILIENCE_ENABLED 시 shutdown 훅)
+from ..cost import router as _cost_router  # noqa: F401  (S6 비용·캐싱: /metrics/llm 라우터)
+from ..experiments import router as _experiments_router  # noqa: F401  (S8 실험 A/B 라우터)
 from ..observability import middleware_obs as _obs_mw  # noqa: F401  (S1 관측성: 미들웨어 등록)
-from ..privacy import router as _privacy_router  # noqa: F401  (S5 DSR 라우터 등록)
-from ..cost import router as _cost_router  # noqa: F401  (S6 비용·캐싱: /metrics/llm 라우터 등록)
+from ..privacy import router as _privacy_router  # noqa: F401  (S5 DSR 라우터)

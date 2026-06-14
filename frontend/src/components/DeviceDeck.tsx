@@ -25,22 +25,61 @@ export type DeckItem = {
   deviceType?: string;
 };
 
-// 톤별 오버레이 그라데이션(사진 위에 깔아 가독성·통일감 확보).
-const OVERLAY: Record<string, string> = {
-  danger: 'linear-gradient(155deg, rgba(240,68,82,0.82) 0%, rgba(189,33,48,0.94) 100%)',
-  warning: 'linear-gradient(155deg, rgba(255,138,0,0.82) 0%, rgba(214,104,0,0.94) 100%)',
-  primary: 'linear-gradient(155deg, rgba(49,130,246,0.82) 0%, rgba(20,86,196,0.95) 100%)',
+// 톤별 비주얼 — 사진을 살리되(위) 아래로 갈수록 스크림으로 가독성 확보. solid=글로우/CTA 텍스트색.
+const TONE: Record<string, { tint: string; scrim: string; solid: string; text: string }> = {
+  danger: {
+    tint: 'rgba(240,68,82,0.28)',
+    scrim:
+      'linear-gradient(180deg, rgba(120,16,26,0) 0%, rgba(120,16,26,0.12) 34%, rgba(150,22,33,0.95) 100%)',
+    solid: '#F04452',
+    text: '#E5384A',
+  },
+  warning: {
+    tint: 'rgba(255,138,0,0.26)',
+    scrim:
+      'linear-gradient(180deg, rgba(120,64,0,0) 0%, rgba(120,64,0,0.12) 34%, rgba(150,80,0,0.95) 100%)',
+    solid: '#FF8A00',
+    text: '#D87400',
+  },
+  primary: {
+    tint: 'rgba(49,130,246,0.26)',
+    scrim:
+      'linear-gradient(180deg, rgba(12,48,120,0) 0%, rgba(12,48,120,0.12) 34%, rgba(14,54,140,0.96) 100%)',
+    solid: '#3182F6',
+    text: '#1B64DA',
+  },
+};
+
+const DECK_EMOJI: Record<string, string> = {
+  washer: '🧺',
+  refrigerator: '❄️',
+  air_purifier: '🌀',
 };
 
 function CardFace({ item }: { item: DeckItem }) {
   const img = item.deviceType ? DEVICE_IMAGE[item.deviceType] : undefined;
+  const emoji = item.deviceType ? DECK_EMOJI[item.deviceType] : undefined;
+  const t = TONE[item.tone];
   return (
     <>
-      {img ? <Image source={{ uri: img }} style={styles.photo} resizeMode="cover" /> : null}
-      <View style={[styles.overlay, { backgroundImage: OVERLAY[item.tone] } as any]} />
+      {img ? (
+        <Image source={{ uri: img }} style={styles.photo} resizeMode="cover" />
+      ) : (
+        <View style={[styles.photo, { backgroundColor: t.solid }]} />
+      )}
+      {/* 톤 워시(브랜드색) + 하단 스크림(가독성) — 사진은 위쪽에서 살아 보인다 */}
+      <View style={[styles.fill, { backgroundColor: t.tint }]} pointerEvents="none" />
+      <View style={[styles.fill, { backgroundImage: t.scrim } as any]} pointerEvents="none" />
       <View style={styles.faceContent}>
-        <View style={styles.tag}>
-          <Text style={styles.tagText}>{item.tag}</Text>
+        <View style={styles.topRow}>
+          <View style={styles.tag}>
+            <Text style={styles.tagText}>{item.tag}</Text>
+          </View>
+          {emoji ? (
+            <View style={styles.glassBadge}>
+              <Text style={styles.glassEmoji}>{emoji}</Text>
+            </View>
+          ) : null}
         </View>
         <View style={{ flex: 1 }} />
         <Text style={styles.title} numberOfLines={2}>
@@ -49,9 +88,9 @@ function CardFace({ item }: { item: DeckItem }) {
         <Text style={styles.desc} numberOfLines={2}>
           {item.desc}
         </Text>
-        <View style={styles.ctaRow}>
-          <Text style={styles.cta}>{item.cta}</Text>
-          <Text style={styles.chev}>›</Text>
+        <View style={styles.ctaPill}>
+          <Text style={[styles.ctaPillText, { color: t.text }]}>{item.cta}</Text>
+          <Text style={[styles.ctaPillChev, { color: t.text }]}>›</Text>
         </View>
       </View>
     </>
@@ -120,6 +159,11 @@ export function DeviceDeck({
             {
               ...StyleSheet.flatten(styles.card),
               height,
+              // 톤 컬러 글로우 — 카드가 떠 보이게
+              shadowColor: TONE[front.tone].solid,
+              shadowOpacity: 0.4,
+              shadowRadius: 30,
+              shadowOffset: { width: 0, height: 16 },
               x,
               scale: sc,
               rotateY,
@@ -162,7 +206,7 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     top: 0,
-    borderRadius: radius.xl,
+    borderRadius: 24,
     overflow: 'hidden',
     backgroundColor: color.primaryDark,
     ...(shadow.elevated as any),
@@ -171,26 +215,50 @@ const styles = StyleSheet.create({
   behind1: { transform: [{ scale: 0.95 }, { translateY: -14 }] as any, opacity: 0.92 },
   behind2: { transform: [{ scale: 0.9 }, { translateY: -28 }] as any, opacity: 0.78 },
   photo: { ...StyleSheet.absoluteFillObject, width: '100%', height: '100%' },
-  overlay: { ...StyleSheet.absoluteFillObject },
+  fill: { ...StyleSheet.absoluteFillObject },
   faceContent: { flex: 1, padding: space.xl },
+  topRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   tag: {
-    alignSelf: 'flex-start',
-    backgroundColor: 'rgba(255,255,255,0.24)',
-    paddingHorizontal: 11,
-    paddingVertical: 5,
+    backgroundColor: 'rgba(255,255,255,0.22)',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
     borderRadius: radius.pill,
+    // @ts-expect-error web-only: 글래스 블러
+    backdropFilter: 'blur(8px)',
   },
   tagText: { color: '#fff', fontSize: font.size.xs, fontWeight: font.weight.bold as any },
+  glassBadge: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255,255,255,0.22)',
+    // @ts-expect-error web-only: 글래스 블러
+    backdropFilter: 'blur(8px)',
+  },
+  glassEmoji: { fontSize: 20 },
   title: {
     color: '#fff',
     fontSize: font.size.xxl,
     fontWeight: font.weight.bold as any,
     lineHeight: 32,
+    // @ts-expect-error web-only: 텍스트 가독성 그림자
+    textShadow: '0 1px 12px rgba(0,0,0,0.25)',
   },
-  desc: { color: 'rgba(255,255,255,0.92)', fontSize: font.size.md, lineHeight: 22, marginTop: 6 },
-  ctaRow: { flexDirection: 'row', alignItems: 'center', marginTop: space.md },
-  cta: { color: '#fff', fontSize: font.size.md, fontWeight: font.weight.bold as any },
-  chev: { color: '#fff', fontSize: 20, fontWeight: font.weight.bold as any, marginLeft: 2 },
+  desc: { color: 'rgba(255,255,255,0.95)', fontSize: font.size.md, lineHeight: 22, marginTop: 6 },
+  ctaPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    backgroundColor: '#fff',
+    borderRadius: radius.pill,
+    paddingHorizontal: space.lg,
+    paddingVertical: 9,
+    marginTop: space.lg,
+  },
+  ctaPillText: { fontSize: font.size.sm, fontWeight: font.weight.bold as any },
+  ctaPillChev: { fontSize: 17, fontWeight: font.weight.bold as any, marginLeft: 3 },
   dots: { flexDirection: 'row', gap: 6, justifyContent: 'center', marginTop: space.md },
   dot: { width: 7, height: 7, borderRadius: 4, backgroundColor: color.border },
   dotOn: { width: 20, backgroundColor: color.primary },

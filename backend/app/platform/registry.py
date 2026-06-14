@@ -9,3 +9,4 @@
 """
 # 스트림 모듈 import를 여기에 append한다(부수효과=등록). 미사용 import 경고는 줄 끝 noqa로 억제.
 # 예) from ..observability import middleware as _obs   # F401 억제 주석을 함께 붙일 것
+from ..observability import middleware_obs as _obs_mw  # noqa: F401  (S1 관측성: 미들웨어 등록)

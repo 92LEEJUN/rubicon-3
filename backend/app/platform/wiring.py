@@ -12,6 +12,7 @@ from typing import Callable
 _MIDDLEWARES: list[tuple[int, Callable]] = []
 _STARTUP: list[tuple[int, Callable]] = []
 _SHUTDOWN: list[tuple[int, Callable]] = []
+_ROUTERS: list[tuple[int, object]] = []   # (priority, APIRouter) — app.include_router로 부착
 
 
 def register_middleware(fn: Callable | None = None, *, priority: int = 100):
@@ -36,10 +37,18 @@ def register_shutdown(fn: Callable | None = None, *, priority: int = 100):
     return _wrap(fn) if fn is not None else _wrap
 
 
+def register_router(router: object, *, priority: int = 100) -> object:
+    """APIRouter 등록 — `apply`가 `app.include_router(router)`로 부착(스트림 엔드포인트용)."""
+    _ROUTERS.append((priority, router))
+    return router
+
+
 def apply(app) -> None:
-    """등록된 미들웨어·라이프사이클 훅을 앱에 적용(priority 순)."""
+    """등록된 미들웨어·라우터·라이프사이클 훅을 앱에 적용(priority 순)."""
     for _, fn in sorted(_MIDDLEWARES, key=lambda x: x[0]):
         fn(app)
+    for _, router in sorted(_ROUTERS, key=lambda x: x[0]):
+        app.include_router(router)
     for _, fn in sorted(_STARTUP, key=lambda x: x[0]):
         app.add_event_handler("startup", fn)
     for _, fn in sorted(_SHUTDOWN, key=lambda x: x[0]):
@@ -51,3 +60,4 @@ def _reset() -> None:
     _MIDDLEWARES.clear()
     _STARTUP.clear()
     _SHUTDOWN.clear()
+    _ROUTERS.clear()

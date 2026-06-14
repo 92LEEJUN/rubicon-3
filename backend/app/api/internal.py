@@ -52,7 +52,8 @@ app = FastAPI(title="MVP 컨시어지 — BE 내부 API")
 # 관측성(gap 8) — /health·/metrics + 요청/에러 카운트 미들웨어(stdlib only, 응답 불변).
 _metrics = install_observability(app, service="backend")
 
-# 플랫폼 배선(ADR-0056) — 스트림이 등록한 미들웨어·라이프사이클 훅을 일괄 적용(현재 비어 있음=무동작).
+# 플랫폼 배선(ADR-0056) — registry가 스트림 모듈을 로드(등록), wiring이 일괄 적용(현재 비어=무동작).
+from ..platform import registry as _registry  # noqa: E402,F401  (스트림 등록 부수효과)
 from ..platform import wiring  # noqa: E402
 
 wiring.apply(app)

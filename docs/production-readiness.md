@@ -12,12 +12,12 @@
 ## 작업 스트림 & 웨이브
 | 스트림 | 대상 | 소유 파일(배타) | 의존 | 웨이브 | 상태 |
 |---|---|---|---|:--:|:--:|
-| **S0 환경·구성** | 12F#5·#9 | `app/config.py`·`app/platform/*`·`bff/gateway/config.py`·`frontend/src/config/*` | — | **P0** | 🟡 진행 |
-| S1 관측성 | 12F#14·WA운영 | `app/observability/*`·`*_middleware_obs` | S0 | W1 | ⬜ |
-| S2 회복력 | WA신뢰성·12F#7 | `app/resilience.py`·lifecycle | S0 | W1 | ⬜ |
-| S3 백킹서비스 | 12F#8·#12 | `app/repositories/*`·`adapters/*`·`migrations/` | S0 | W1 | ⬜ |
-| S4 API 성숙 | 12F#2 | `docs/api-contract`·`scripts/gen_types`·openapi | — | W1 | ⬜ |
-| S5 개인정보 | GDPR | `app/privacy/*`·consent·DSR | S0 | W1 | ⬜ |
+| **S0 환경·구성** | 12F#5·#9 | `app/config.py`·`app/platform/*`·`bff/gateway/config.py`·`frontend/src/config/*` | — | **P0** | ✅ (ADR-0056) |
+| S1 관측성 | 12F#14·WA운영 | `app/observability/*`·`middleware_obs` | S0 | W1 | ✅ (ADR-0057) |
+| S2 회복력 | WA신뢰성·12F#7 | `app/resilience.py`·lifecycle | S0 | W1 | ✅ (ADR-0058) |
+| S3 백킹서비스 | 12F#8·#12 | `app/repositories/*`·`adapters/*`·`migrations/` | S0 | W1 | ✅ (ADR-0059) |
+| S4 API 성숙 | 12F#2 | `docs/api-contract`·`scripts/gen_types`·openapi | — | W1 | ✅ (ADR-0060) |
+| S5 개인정보 | GDPR | `app/privacy/*`·consent·DSR | S0 | W1 | ✅ (ADR-0061) |
 | S6 비용·캐싱 | WA비용 | `app/llm.py`(비용)·`app/cache/*` | S1 | W2 | ⬜ |
 | S7 보안 심화 | WA보안·OWASP | `bff/gateway/ratelimit`·`app/audit/*` | S0·S5 | W2 | ⬜ |
 | S8 실험 A/B | ⑭ | `app/experiments/*`·`frontend/src/experiments/*` | S0·S1 | W2 | ⬜ |
@@ -30,27 +30,27 @@
 | # | 항목 | 상태 | 근거 / 갭 | 스트림 |
 |---|---|:--:|---|:--:|
 | 1 | Codebase/app | ✅ | monorepo 3계층(ADR-0019) | — |
-| 2 | API first | 🟡 | 계약 문서·contract.ts. 버저닝·OpenAPI·Pact 없음 | S4 |
+| 2 | API first | ✅ | 버저닝·`X-API-Version`·OpenAPI export·타입생성·계약테스트(ADR-0060) | S4 |
 | 3 | Dependency mgmt | ✅ | 핀 고정·pyproject·pre-commit | — |
 | 4 | Build/release/run | 🟡 | CI·Docker·gh-pages. release 분리·아티팩트 약함 | S9 |
-| 5 | Config/credentials | 🟡→ | **APP_ENV·Settings 토대(ADR-0056)**. 시크릿 매니저 후속 | **S0** |
-| 6 | Logs | 🟡 | JSON 로깅. 집계·보존 표준 미정 | S1 |
-| 7 | Disposability | ⬜ | graceful shutdown 없음 | S2 |
-| 8 | Backing services | 🟡 | Port/DI. 실 DB·캐시·큐 미배선 | S3 |
-| 9 | Env parity | 🟡→ | **APP_ENV 동형(BE/BFF/FE)**. 환경별 테스트·시드 확장 | **S0** |
-| 10 | Admin processes | ⬜ | 마이그레이션·admin 콘솔 없음 | S3(부분) |
+| 5 | Config/credentials | ✅ | APP_ENV·Settings·명시 우선(ADR-0056). 실 시크릿 매니저는 후속 | S0 |
+| 6 | Logs | ✅ | settings 기반 구조화 로깅(JSON/평문, ADR-0057) | S1 |
+| 7 | Disposability | ✅ | graceful shutdown 훅(ADR-0058) | S2 |
+| 8 | Backing services | ✅ | DB·캐시·큐·세션 Port + Mock(ADR-0059). 실 어댑터는 후속 | S3 |
+| 9 | Env parity | ✅ | APP_ENV 동형(BE/BFF/FE, ADR-0056) | S0 |
+| 10 | Admin processes | 🟡 | 마이그레이션 러너(ADR-0059). admin 콘솔은 범위 외 | S3 |
 | 11 | Port binding | ✅ | FastAPI/uvicorn 자기완결 | — |
-| 12 | Stateless | 🟡 | 세션 인메모리. 외부화 부분 | S3 |
+| 12 | Stateless | ✅ | 세션 외부화 Port + Mock(ADR-0059). 실 Redis는 후속 | S3 |
 | 13 | Concurrency | 🟡 | async·세마포어·KeyedLock. 분산 보류 | — |
-| 14 | Telemetry | 🟡 | /metrics·/health. 추적·SLO 없음 | S1 |
-| 15 | Auth & authz | 🟡 | Principal·커밋게이트. 실 SSO·RBAC 미정 | S7 |
+| 14 | Telemetry | ✅ | request_id·지연 히스토그램·추적(ADR-0057) | S1 |
+| 15 | Auth & authz | 🟡 | Principal·커밋게이트·DSR(0061). 실 SSO·RBAC 미정 | S7 |
 
 ## 매트릭스 — Well-Architected
 | 기둥 | 상태 | 갭 | 스트림 |
 |---|:--:|---|:--:|
 | 운영 우수성 | 🟡 | 배포 자동화·런북·온콜 | S9·S1 |
 | 보안 | 🟡 | 암호화·OWASP·시크릿 | S7 |
-| 신뢰성 | 🟡 | DR·백업·서킷브레이커 | S2 |
+| 신뢰성 | ✅ | 서킷브레이커·단계 타임아웃·graceful shutdown(ADR-0058). DR·백업은 후속 | S2 |
 | 성능 효율 | 🟡 | 부하·용량 계획 | S6 |
 | 비용 최적화 | ⬜ | LLM 비용 관측·쿼터 | S6 |
 | 지속가능성 | ⬜ | (범위 외) | — |
@@ -60,7 +60,7 @@
 |---|---|:--:|:--:|
 | 보안 심화 | OWASP | 🟡 | S7 |
 | 딜리버리 | DORA | 🟡 | S9 |
-| 개인정보 | GDPR/개인정보보호법 | 🟡 | S5 |
+| 개인정보 | GDPR/개인정보보호법 | ✅ | S5 |
 | 실험·롤아웃 | (런타임 A/B) | ⬜ | S8 |
 
 ## 범위 외(의도적 ⬜, deferred)

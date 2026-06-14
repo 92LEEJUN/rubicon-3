@@ -44,6 +44,11 @@
 | [0051](0051-fe-mock-mode.md) | FE 단독 동작 Mock 모드 — 클라이언트 전용·문서 미러·시나리오+키워드 라우터·localStorage·회귀 불변(`!apiBase`) | 채택 |
 | [0052](0052-guardrail-agent.md) | **신뢰·안전 = 별도 가드레일 에이전트** — 인라인/에지 전담 기각, 입력(pre)/출력(post) 2-단계 + Review 게이트 통합·감사 소유·결정적·토글 회귀 | 채택 |
 | [0056](0056-environment-config-baseline.md) | **환경 계층(dev/stg/prd) & 구성 토대 + 배선 시임** — APP_ENV 단일 소스·명시 env 우선·3계층 동형·append-only wiring(병렬 충돌 회피)·추가형 회귀 불변. (프로덕션 준비도 프로그램 토대, `docs/production-readiness.md`) | 채택 |
+| [0057](0057-observability.md) | **관측성** — 요청 상관관계(request_id)·settings 기반 구조화 로깅·/metrics 지연 히스토그램·OTel 스타일 추적(`TRACING` 토글)·SLO. 계약 무변(헤더·시리즈 부가) | 채택 |
+| [0058](0058-resilience.md) | **신뢰성·회복력** — 서킷브레이커·단계별 타임아웃(0018 되살림)·graceful shutdown·degraded·retry 공용 유틸. stdlib·토글 회귀 | 채택 |
+| [0059](0059-backing-services.md) | **백킹서비스 = Port + Mock + 환경 토글** — DB(Postgres 지향)·캐시(Redis)·큐·세션 외부화 Port + Mock·마이그레이션 러너. 추가형 회귀 불변 | 채택 |
+| [0060](0060-api-maturity.md) | **API 성숙(API-first)** — 날짜 기반 버저닝·`X-API-Version`·Deprecation/Sunset 절차·OpenAPI export·스키마→타입 생성·계약 테스트. 하위호환 | 채택 |
+| [0061](0061-privacy-dsr.md) | **개인정보·DSR** — 동의 scope 부여/철회·DSR 접근/삭제/정정·보존 정책·감사 훅(`/internal/privacy/*` 라우터). `MULTITENANT` off=회귀 불변 | 채택 |
 
 ### Phase A — 스트리밍 / 동시성 실행 (operations.md §6·§9·§14)
 | # | 결정 | 상태 |

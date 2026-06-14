@@ -43,6 +43,8 @@
 | [0050](0050-bff-be-identity-and-commit-contract.md) | BFF↔BE 신원 계약 + 게스트(비로그인) + 커밋 왕복 — 헤더/WS 신원 전달·게스트 허용·401/409 중계·FE 신규 kind | 채택 |
 | [0051](0051-fe-mock-mode.md) | FE 단독 동작 Mock 모드 — 클라이언트 전용·문서 미러·시나리오+키워드 라우터·localStorage·회귀 불변(`!apiBase`) | 채택 |
 | [0052](0052-guardrail-agent.md) | **신뢰·안전 = 별도 가드레일 에이전트** — 인라인/에지 전담 기각, 입력(pre)/출력(post) 2-단계 + Review 게이트 통합·감사 소유·결정적·토글 회귀 | 채택 |
+| [0053](0053-supervisor-compose.md) | **LLM 플래너 → 슈퍼바이저(plan+compose 양끝)** — 복합 응답 종합(reduce) 추가·말만 생성/데이터 불변·선택적·폴백·`COMPOSE` 토글·text 재사용(계약 무추가) | 채택 |
+| [0054](0054-guardrail-parallel.md) | **가드레일 = 의도 추출과 병렬 + fail-closed** — pre는 라우팅과 gather(직렬 지연 0)·예외→차단·post 방출 직전(텍스트만)·`GUARDRAIL` 토글 회귀 | 채택 |
 
 ### Phase A — 스트리밍 / 동시성 실행 (operations.md §6·§9·§14)
 | # | 결정 | 상태 |

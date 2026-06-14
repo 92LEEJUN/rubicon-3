@@ -1,8 +1,10 @@
-"""LLM 플래너 — 에스컬레이션된 턴에서 조언형 capability를 동적 선택(ADR-0046·0047, 요구사항 4-1).
+"""LLM 플래너 = 슈퍼바이저 — 턴의 양끝(plan 분해 + compose 조립)을 담당(ADR-0048·0053).
 
-규칙 분류기가 부서지는 장문·모호 턴(test-findings F1·F2)에서만 호출된다(티어드, ADR-0047).
-구조화 출력(json_schema)으로 **후보(조언형) 이름만** 고르게 강제 — 행동(order·booking)은
-여기서 고르지 않는다(사용자가 CTA로 확정). 실패 시 호출측이 규칙 plan으로 폴백한다.
+- **plan(`propose`/`apropose`)**: 모든 질의를 LLM 라우팅 — 조언형 capability + 범위 밖(out_of_scope)을
+  구조화 출력(json_schema)으로 고른다. 행동(order)은 여기서 고르지 않는다(사용자가 CTA로 확정).
+  실패 시 호출측이 규칙 plan으로 폴백한다.
+- **compose(`compose`/`acompose`)**: 핸들러가 만든 섹션 facts를 받아 **자연어 내러티브만** 종합한다
+  (ADR-0053). 데이터(카드·CTA·가격·id)는 재생성하지 않고 참조만 한다. 같은 모델·클라이언트 재사용.
 """
 from __future__ import annotations
 
@@ -11,6 +13,7 @@ from typing import Optional
 
 from ..llm import MODEL, achat_completion, get_client
 from .capability import Capability, Plan
+from .prompts import COMPOSER_PROMPT
 
 _SYSTEM = (
     "당신은 삼성 가전 AI 컨시어지의 '플래너'입니다. 사용자 메시지를 처리하려면 어떤 "
@@ -75,8 +78,20 @@ def _parse(content: str, names: list[str]) -> Plan:
     return Plan(capabilities=picked, out_of_scope=oos)
 
 
+def _compose_prompt(message: str, plan: Plan, facts: list[dict]) -> str:
+    """compose 사용자 프롬프트 — 섹션 facts 요약 + 원 메시지(데이터 재생성 금지, ADR-0053)."""
+    lines = []
+    for f in facts:
+        brief = f.get("brief") or ""
+        lines.append(f"- [{f.get('label', '')}] ({f.get('intent', '')}) {brief}".rstrip())
+    block = "\n".join(lines) or "(처리 결과 없음)"
+    oos = list(getattr(plan, "out_of_scope", []) or [])
+    extra = f"\n\n범위 밖으로 처리하지 못한 요청: {', '.join(oos)}" if oos else ""
+    return f"사용자 메시지:\n{message}\n\n처리 결과(facts):\n{block}{extra}"
+
+
 class LLMPlanner:
-    """조언형 capability 선택을 LLM 구조화 출력으로 제안(주입형). 동기/비동기 모두 제공."""
+    """슈퍼바이저(주입형) — plan(propose/apropose) + compose(compose/acompose). 동기/비동기 제공."""
 
     def __init__(self, model: Optional[str] = None) -> None:
         self.model = model or MODEL
@@ -104,3 +119,24 @@ class LLMPlanner:
             response_format=_schema(names),
         )
         return _parse(resp.choices[0].message.content, names)
+
+    # ── compose(조립) — 섹션 facts → 자연어 내러티브(ADR-0053) ──────────────
+    def compose(self, message: str, plan: Plan, facts: list[dict]) -> str:
+        resp = get_client().chat.completions.create(
+            model=self.model,
+            messages=[
+                {"role": "system", "content": COMPOSER_PROMPT},
+                {"role": "user", "content": _compose_prompt(message, plan, facts)},
+            ],
+        )
+        return (resp.choices[0].message.content or "").strip()
+
+    async def acompose(self, message: str, plan: Plan, facts: list[dict]) -> str:
+        resp = await achat_completion(
+            model=self.model,
+            messages=[
+                {"role": "system", "content": COMPOSER_PROMPT},
+                {"role": "user", "content": _compose_prompt(message, plan, facts)},
+            ],
+        )
+        return (resp.choices[0].message.content or "").strip()

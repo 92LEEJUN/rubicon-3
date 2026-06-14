@@ -14,6 +14,7 @@ core.Orchestrator(결정적 백본)를 capability 레지스트리로 감싼 1차
 """
 from __future__ import annotations
 
+import asyncio
 import os
 import uuid
 from dataclasses import dataclass, field
@@ -23,6 +24,7 @@ from ..container import Container, build_container
 from ..domain import AssistantTurn, Cta, MessageSection, Template
 from . import handlers
 from .classify import IntentClassifier, RuleBasedClassifier
+from .guardrail import Verdict
 
 # 우선순위(core._PRIORITY와 동일) — 안전/CS 먼저, 주문은 뒤
 _PRIORITY = {"device_status": 0, "troubleshoot": 1, "general": 2, "recommend": 3, "order": 4}
@@ -237,6 +239,16 @@ def llm_backed() -> bool:
     return _env_on("LLM_BACKED")
 
 
+def compose_on() -> bool:
+    """COMPOSE 토글(매 호출 평가, 기본 off) — 슈퍼바이저 응답 종합 게이트(ADR-0053)."""
+    return _env_on("COMPOSE")
+
+
+def guardrail_on() -> bool:
+    """GUARDRAIL 토글(매 호출 평가, 기본 off) — 가드레일 pre/post 게이트(ADR-0054)."""
+    return _env_on("GUARDRAIL")
+
+
 _PROSE_SYSTEM = (
     "당신은 삼성 가전 AI 컨시어지입니다. 사용자에게 친절하고 간결한 한국어로, "
     "추천 제품의 특징(소음·필터·관리 편의 등)을 자연스러운 문장으로 설명하세요. "
@@ -382,12 +394,14 @@ class CapabilityOrchestrator:
 
     def __init__(self, container: Optional[Container] = None,
                  classifier: Optional[IntentClassifier] = None,
-                 llm_planner=None, prose_client=None) -> None:
+                 llm_planner=None, prose_client=None, guardrail=None) -> None:
         self.c = container or build_container()
         self.classifier = classifier or RuleBasedClassifier()
         self.registry = build_registry()
         self._sessions: dict[str, dict] = {}   # session_id → 지속 슬롯
-        self.llm_planner = llm_planner          # 단일 라우터(없으면 규칙 폴백)
+        self.llm_planner = llm_planner          # 단일 라우터 + 슈퍼바이저(없으면 규칙 폴백)
+        # 가드레일(주입형, 결정적) — GUARDRAIL on일 때 pre/post 발동(ADR-0054). 기본 없음=미발동.
+        self.guardrail = guardrail
         # §8~11 prose 클라이언트(주입형) — complete(system, user)->str. 없으면 prose capability는
         # 결정적 폴백(explain)으로 동작한다. 기본 None → 테스트·오프라인 결정성 유지.
         self.prose_client = prose_client
@@ -512,6 +526,78 @@ class CapabilityOrchestrator:
             self._sessions.pop(next(iter(self._sessions)))
         return self._sessions.setdefault(session_id, {})
 
+    # ── 슈퍼바이저 종합(compose) + 가드레일(ADR-0053·0054) ───────────────────
+    def _can_compose(self) -> bool:
+        """compose 가능 = 슈퍼바이저(플래너)가 acompose를 보유(LLM_BACKED 경로에서만 주입)."""
+        return self.llm_planner is not None and hasattr(self.llm_planner, "acompose")
+
+    @staticmethod
+    def _section_facts(sections: list[MessageSection]) -> list[dict]:
+        """섹션 → compose 입력 facts 요약({label,intent,kind,brief}). 데이터는 압축만(재생성 아님)."""
+        facts: list[dict] = []
+        for s in sections:
+            data = s.template.data if s.template else {}
+            brief = ""
+            if isinstance(data, dict):
+                if isinstance(data.get("message"), str):
+                    brief = data["message"]
+                elif s.template.kind == "guide_steps":
+                    steps = data.get("steps") or []
+                    n = len(steps)
+                    cov = data.get("coverage")
+                    brief = f"{n}단계 해결 가이드" + (f"(보증 {cov})" if cov else "")
+                    if data.get("cta_notice"):
+                        brief += f" — {data['cta_notice']}"
+                elif s.template.kind in ("recommendation_list",):
+                    prods = data.get("products") or []
+                    names = ", ".join(p.get("name", "") for p in prods[:3] if isinstance(p, dict))
+                    brief = f"추천 {len(prods)}건: {names}"
+                elif s.template.kind == "product_card":
+                    brief = f"부품 카드: {data.get('name', '')}"
+                elif s.template.kind == "booking":
+                    brief = f"방문 예약 슬롯 {len(data.get('slots') or [])}개"
+                elif s.template.kind == "device_status":
+                    dev = data.get("device") or {}
+                    brief = f"기기 상태: {dev.get('name', '') if isinstance(dev, dict) else ''}"
+            facts.append({"label": s.label, "intent": s.intent,
+                          "kind": s.template.kind if s.template else "text",
+                          "handled": s.handled, "brief": brief})
+        return facts
+
+    @staticmethod
+    def _narration_section(text: str) -> MessageSection:
+        """종합 내러티브 섹션 — 기존 text kind 재사용(계약 무추가, ADR-0053·요구사항 4-1)."""
+        return MessageSection(
+            label="정리", intent="narration", handled=True,
+            template=Template(kind="text", data={
+                "message": text, "prose": True, "composed": True}))
+
+    async def _screen_and_route(self, message: str) -> tuple[Verdict, Plan]:
+        """가드레일 pre-screen과 라우팅을 **병렬**(gather)로 — screen 예외는 fail-closed(차단, ADR-0054)."""
+        async def _screen() -> Verdict:
+            try:
+                return await self.guardrail.ascreen(message)
+            except Exception:
+                return Verdict(allowed=False, reason="guardrail_error")   # fail-closed
+        verdict, plan = await asyncio.gather(_screen(), self.aroute(message))
+        return verdict, plan
+
+    async def _compose_sections(self, message: str, plan: Plan,
+                                sections: list[MessageSection]) -> list[MessageSection]:
+        """처리 섹션이 2개 이상이면 내러티브를 선두에 둔다. 실패·미충족이면 원본 그대로(폴백)."""
+        if not (compose_on() and self._can_compose()):
+            return sections
+        handled = [s for s in sections if s.handled]
+        if len(handled) < 2:                          # 종합할 게 없음 → 스킵(요구사항 1-5)
+            return sections
+        try:
+            text = await self.llm_planner.acompose(message, plan, self._section_facts(sections))
+        except Exception:
+            return sections                           # compose 실패 → 원본 폴백(요구사항 1-4)
+        if not text:
+            return sections
+        return [self._narration_section(text)] + sections
+
     def build_turn(self, message: str, session_id: str = "s1",
                    screen_context: Optional[dict] = None, user=None) -> AssistantTurn:
         session = self._session(session_id)
@@ -543,19 +629,45 @@ class CapabilityOrchestrator:
 
     async def astream(self, message: str, session_id: str = "s1",
                       screen_context: Optional[dict] = None, user=None) -> AsyncIterator[dict]:
-        """stream_turn의 비동기 버전 — aroute(LLM-planner)로 플래닝 후 §2.1 봉투를 방출한다.
+        """stream_turn의 비동기 버전 — 슈퍼바이저(plan→compose) + 가드레일 배선(ADR-0053·0054).
 
-        section* → flow → done(실패 시 error). sync stream_turn과 동일 봉투·세션 carry.
-
-        한계: 본 구현은 '결정적-섹션-우선 스트리밍'을 capability가 끝나는 즉시 섹션을
-        방출하는 수준으로만 한다. 완전한 speculative pre-paint(추정 선-렌더)는 범위 밖이다.
+        흐름(토글 켜졌을 때):
+          ① 가드레일 pre-screen ∥ 라우팅(gather, 병렬). 차단(block)이면 capability 스킵 →
+             안전 거부 1섹션(fail-closed, ADR-0054).
+          ② capability 실행(결정적). ③ COMPOSE on + 처리 섹션 ≥2면 슈퍼바이저 종합 내러티브를
+             선두에(배리어 후, ADR-0053). ④ 가드레일 post-check(PII 마스킹) → 방출.
+        봉투는 §2.1(section* → flow → done, 실패 시 error)로 동일하다. 토글 off면 기존과 동일.
         capability handler는 동기(결정적)이므로 await 없이 그대로 호출한다."""
         try:
             session = self._session(session_id)
             ctx = TurnCtx(self.c, session, user)   # user=Principal 사용자(멀티테넌트)
             ctx.turn["_prose_client"] = self.prose_client   # §8~11 prose capability용
-            plan = await self.aroute(message)
-            sections = self._run_capabilities(plan, ctx, message, session)
+
+            gon = guardrail_on() and self.guardrail is not None
+            if gon:
+                verdict, plan = await self._screen_and_route(message)   # ① 병렬 pre-screen
+                if not verdict.allowed:                                 # 차단 → fail-closed
+                    refusal = self.guardrail.refusal_section(verdict)
+                    yield {"type": "section", "section": refusal.model_dump(mode="json")}
+                    yield {"type": "flow", "active_flow": None}
+                    yield {"type": "done", "message_id": f"msg_{uuid.uuid4().hex[:8]}"}
+                    return
+            else:
+                plan = await self.aroute(message)
+
+            sections = self._run_capabilities(plan, ctx, message, session)   # ②
+            sections = await self._compose_sections(message, plan, sections)  # ③ 종합(스킵/폴백 내장)
+
+            if gon:   # ④ post-check — 텍스트 PII 마스킹(구조 필드 불변). 예외면 error 폴백(fail-closed)
+                try:
+                    sections = self.guardrail.check(sections)
+                except Exception as exc:
+                    yield {"type": "error", "code": "guardrail_error",
+                           "fallback": {"kind": "text", "data": {
+                               "message": "안전 점검 중 문제가 생겨 응답을 보류했어요. 잠시 후 다시 시도해 주세요."}},
+                           "detail": str(exc)}
+                    return
+
             active_flow = "troubleshoot" if any(
                 s.intent == "troubleshoot" for s in sections) else None
             message_id = f"msg_{uuid.uuid4().hex[:8]}"

@@ -29,6 +29,7 @@ jobs:
         working-directory: frontend
         env:
           DEPLOY_BASE: /rubicon-3/
+          VITE_APP_ENV: prd   # 환경 계층(ADR-0056) — 프로덕션 빌드 명시(미설정 시 MODE=production→prd 추론)
       - name: Publish to gh-pages
         uses: peaceiris/actions-gh-pages@v4
         with:

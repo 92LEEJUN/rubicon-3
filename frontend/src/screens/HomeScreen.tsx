@@ -5,9 +5,11 @@
  * 비주얼: 화이트 표면·토스 블루 단일 액센트·큰 볼드 타이포·아주 부드러운 섀도우·넉넉한 여백.
  */
 import React from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Image, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { TemplateView } from '../templates';
 import { FadeInView, PressableScale, Stagger, StaggerItem } from '../components/motion';
+import { DeviceDeck, type DeckItem } from '../components/DeviceDeck';
+import { DEVICE_IMAGE } from '../design/deviceImages';
 import { color, font, radius, shadow, space } from '../design/tokens';
 
 const DEVICE_KO: Record<string, string> = {
@@ -26,11 +28,10 @@ const CONS_KO: Record<string, string> = {
   hepa_filter: 'HEPA 필터',
 };
 
-type Briefing = { tone: 'warning' | 'danger' | 'primary'; tag: string; title: string; desc: string; cta: string; ask: string };
-type Tile = { icon: string; tint: string; title: string; sub: string; ok?: boolean; ask: string };
+type Tile = { icon: string; type: string; tint: string; title: string; sub: string; ok?: boolean; ask: string };
 
-function buildBriefings(data: any): Briefing[] {
-  const out: Briefing[] = [];
+function buildBriefings(data: any): DeckItem[] {
+  const out: DeckItem[] = [];
   for (const d of data.devices ?? []) {
     if (d.status !== 'ONLINE') {
       const c =
@@ -39,7 +40,7 @@ function buildBriefings(data: any): Briefing[] {
       const pct = c ? Math.round(c.life_remaining * 100) : null;
       out.push({
         tone: 'danger',
-        tag: '점검 필요',
+        tag: '⚠ 점검 필요',
         title: `${DEVICE_KO[d.type] ?? d.type} 배수 이상 · 5C`,
         desc:
           pct != null
@@ -47,6 +48,7 @@ function buildBriefings(data: any): Briefing[] {
             : '상태 확인이 필요해요.',
         cta: '해결 방법 보기',
         ask: `${DEVICE_KO[d.type] ?? d.type}에서 물이 안 빠져요. 5C 떠요. 해결하고 부품도 주문할래요.`,
+        deviceType: d.type,
       });
     }
   }
@@ -55,11 +57,12 @@ function buildBriefings(data: any): Briefing[] {
     const name = d ? (DEVICE_KO[d.type] ?? d.type) : '기기';
     out.push({
       tone: a.severity === 'warning' ? 'warning' : 'primary',
-      tag: a.severity === 'warning' ? '소모품 알림' : '안내',
+      tag: a.severity === 'warning' ? '🔧 소모품 알림' : 'ⓘ 안내',
       title: `${name} 소모품 교체 시기`,
       desc: a.detail,
       cta: '교체·주문 안내',
       ask: `${name} 소모품 교체 방법 알려주고 주문도 도와줘`,
+      deviceType: d?.type,
     });
   }
   return out;
@@ -71,6 +74,7 @@ function buildTiles(data: any): Tile[] {
     const ok = d.status === 'ONLINE';
     tiles.push({
       icon: DEVICE_ICON[d.type] ?? '📱',
+      type: d.type,
       tint: ok ? color.successTint : color.dangerTint,
       title: `${DEVICE_KO[d.type] ?? d.type}`,
       sub: d.model,
@@ -87,12 +91,6 @@ const QUICK = [
   { icon: '🏠', label: '방문예약', tint: '#EAF6FF', ask: '방문 수리 예약하고 싶어요' },
   { icon: '✨', label: '추천', tint: '#F1EEFF', ask: '맞춤 제품 추천해줘' },
 ];
-
-const TONE_BADGE: Record<string, { bg: string; fg: string }> = {
-  warning: { bg: color.warningTint, fg: color.warning },
-  danger: { bg: color.dangerTint, fg: color.danger },
-  primary: { bg: color.primaryTint, fg: color.primaryDark },
-};
 
 export function HomeScreen({
   data,
@@ -134,34 +132,11 @@ export function HomeScreen({
           ))}
         </Stagger>
 
-        {/* 오늘 챙길 것 — 클린 카드 리스트 */}
+        {/* 오늘 챙길 것 — 3D 스택 스와이프 덱(실사진 + 틸트) */}
         {briefings.length ? (
           <>
             <Text style={styles.section}>오늘 챙길 것</Text>
-            <Stagger style={styles.deck} stagger={0.07}>
-              {briefings.map((b, i) => {
-                const badge = TONE_BADGE[b.tone];
-                return (
-                  <StaggerItem key={i}>
-                    <PressableScale
-                      testID={`briefing-${i}`}
-                      onPress={() => onOpenChat?.(b.ask)}
-                      style={styles.briefCard}
-                    >
-                      <View style={[styles.tag, { backgroundColor: badge.bg }]}>
-                        <Text style={[styles.tagText, { color: badge.fg }]}>{b.tag}</Text>
-                      </View>
-                      <Text style={styles.briefTitle}>{b.title}</Text>
-                      <Text style={styles.briefDesc}>{b.desc}</Text>
-                      <View style={styles.briefCtaRow}>
-                        <Text style={styles.briefCta}>{b.cta}</Text>
-                        <Text style={styles.chevron}>›</Text>
-                      </View>
-                    </PressableScale>
-                  </StaggerItem>
-                );
-              })}
-            </Stagger>
+            <DeviceDeck items={briefings} onPick={(ask) => onOpenChat?.(ask)} />
           </>
         ) : null}
 
@@ -178,9 +153,13 @@ export function HomeScreen({
                   style={[styles.row, i < tiles.length - 1 && styles.rowDivider]}
                   lift={false}
                 >
-                  <View style={[styles.rowChip, { backgroundColor: t.tint }]}>
-                    <Text style={styles.rowIcon}>{t.icon}</Text>
-                  </View>
+                  {DEVICE_IMAGE[t.type] ? (
+                    <Image source={{ uri: DEVICE_IMAGE[t.type] }} style={styles.rowThumb} resizeMode="cover" />
+                  ) : (
+                    <View style={[styles.rowChip, { backgroundColor: t.tint }]}>
+                      <Text style={styles.rowIcon}>{t.icon}</Text>
+                    </View>
+                  )}
                   <View style={styles.rowBody}>
                     <Text style={styles.rowTitle}>{t.title}</Text>
                     <Text style={styles.rowSub}>{t.sub}</Text>
@@ -304,6 +283,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  rowThumb: { width: 44, height: 44, borderRadius: 14, backgroundColor: color.surfaceAlt },
   rowIcon: { fontSize: 20 },
   rowBody: { flex: 1 },
   rowTitle: { fontSize: font.size.md, fontWeight: font.weight.bold as any, color: color.text },

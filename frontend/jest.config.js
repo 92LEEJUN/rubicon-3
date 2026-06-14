@@ -5,6 +5,7 @@ module.exports = {
   moduleNameMapper: {
     '^react-native$': 'react-native-web',
     '\\.md\\?raw$': '<rootDir>/tests/rawMdStub.js', // vite ?raw 문서 import 스텁
+    '\\.(jpg|jpeg|png|webp|gif)$': '<rootDir>/tests/imageStub.js', // 이미지 import 스텁
     viteEnv$: '<rootDir>/tests/viteEnvStub.js', // import.meta 격리 스텁(ADR-0056)
   },
   transform: { '^.+\\.(t|j)sx?$': 'babel-jest' },

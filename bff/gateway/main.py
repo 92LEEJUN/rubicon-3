@@ -20,11 +20,21 @@ from .analytics import AnalyticsSink
 from .auth import Identity, identity_dep, resolve_identity
 from .backend_client import BackendClient
 from .observability import install_observability
+from .security import install_security
 from .transform import fallback_body, interaction_to_text, relay
 
 
 def _backend(request: Request) -> BackendClient:
     return request.app.state.backend
+
+
+def _make_security_audit():
+    """S5 AuditLog 인스턴스를 만든다(보안 감사 재사용). backend가 path에 없으면 None."""
+    try:
+        from app.privacy.audit import AuditLog  # S5 재사용(중복 구현 금지)
+    except Exception:
+        return None
+    return AuditLog()
 
 
 def create_app(backend: Optional[BackendClient] = None) -> FastAPI:
@@ -37,6 +47,12 @@ def create_app(backend: Optional[BackendClient] = None) -> FastAPI:
 
     # 분석 싱크(gap: FE emit만 있고 수신 없음) — 인프로세스 수집기(stdlib only).
     app.state.analytics = AnalyticsSink()
+
+    # 보안 심화(S7, ADR-0063) — 레이트리밋·보안 헤더 미들웨어(토글 RATE_LIMIT·SECURITY_HEADERS).
+    # 토글 off(기본)면 미들웨어가 등록되지 않아 오늘과 동일하게 동작한다(회귀 불변).
+    # 감사는 S5 AuditLog를 재사용(있으면). backend가 path에 없으면 audit 없이 동작.
+    app.state.security_audit = _make_security_audit()
+    install_security(app, audit=app.state.security_audit)
 
     @app.get("/health")
     def health():

@@ -5,8 +5,7 @@
 `wiring.apply(app)`를 호출하므로, 스트림은 **이 파일에 한 줄 append**만 하면 앱 팩토리를 직접 편집하지
 않는다(병렬 충돌 회피).
 
-규칙: 한 스트림 = 한 import 줄. 알파벳/추가 순. 부수효과(등록) 목적의 import이므로 noqa.
+규칙: 한 스트림 = 한 import 줄. 추가 순. 부수효과(등록) 목적의 import이므로 noqa.
 """
-# 스트림 모듈 import를 여기에 append한다(부수효과=등록). 미사용 import 경고는 줄 끝 noqa로 억제.
-# 예) from ..observability import middleware as _obs   # F401 억제 주석을 함께 붙일 것
+from .. import resilience as _resilience  # noqa: F401  (S2 회복력 — RESILIENCE_ENABLED 시 shutdown 훅)
 from ..observability import middleware_obs as _obs_mw  # noqa: F401  (S1 관측성: 미들웨어 등록)

@@ -86,8 +86,13 @@ HttpStreamTransport  # 후보 (필요 시)
 
 ## 6. 디자인 시스템 / 토큰
 
-- **토큰**(색·간격·타이포·radius) 과 **테마**(라이트/다크)를 정의하고, 컴포넌트는 토큰만 참조(하드코딩 금지).
+- **토큰**(색·간격·타이포·radius·shadow) 과 **테마**(라이트/다크)를 정의하고, 컴포넌트는 토큰만 참조(하드코딩 금지).
 - 디자이너 애셋 도착 시 **토큰 값 교체**로 반영. 그 전까지는 중립 플레이스홀더 스타일.
+- **모션 레이어(ADR-0068)** — 색처럼 모션도 토큰화한다. `design/motion.ts`(duration·easing·spring·distance·
+  variants) + 프리미티브 `components/motion.tsx`(`FadeInView`·`Stagger`/`StaggerItem`·`PressableScale`·
+  `MotionView`)·`Skeleton`. 엔진은 **framer-motion × react-native-web**(`motion.create(View)`, 웹 타깃).
+  **표현 계층** — 계약·데이터 흐름 불변, **reduced-motion 존중**(비활성 시 콘텐츠 동일), jest(jsdom)·build green.
+  톤=One UI 정제(깊이·여백·위계·절제된 미세 모션).
 
 ## 7. 멀티모달 입력 (R10)
 

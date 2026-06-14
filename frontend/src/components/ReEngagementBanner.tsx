@@ -6,6 +6,9 @@
  */
 import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { useReducedMotion } from 'framer-motion';
+import { MotionView } from './motion';
+import { slideInDown } from '../design/motion';
 import { color, font, radius, space } from '../design/tokens';
 import type { ReEngagement } from '../types/contract';
 
@@ -19,8 +22,15 @@ export function ReEngagementBanner({
   onDismiss?: () => void;
 }) {
   const also = banner.also_count ?? 0;
+  const reduce = useReducedMotion();
   return (
-    <View style={styles.banner} testID="reengagement-banner">
+    <MotionView
+      style={styles.banner as any}
+      testID="reengagement-banner"
+      initial={reduce ? false : slideInDown.hidden}
+      animate={reduce ? undefined : slideInDown.show}
+      exit={reduce ? undefined : slideInDown.exit}
+    >
       <Pressable
         testID="reengagement-open"
         accessibilityRole="button"
@@ -54,7 +64,7 @@ export function ReEngagementBanner({
       >
         <Text style={styles.closeIcon}>×</Text>
       </Pressable>
-    </View>
+    </MotionView>
   );
 }
 

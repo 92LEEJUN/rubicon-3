@@ -1,0 +1,316 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>BE · 도메인 정리</title>
+<link rel="stylesheet" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css" />
+<link rel="stylesheet" href="./style.css" />
+</head>
+<body class="be">
+<nav class="nav"><div class="nav-in">
+  <span class="brand">📐 Rubicon 구성 문서</span>
+  <div class="links">
+    <a href="./index.html">허브</a>
+    <a class="fe" href="./fe.html">FE</a>
+    <a class="bff" href="./bff.html">BFF</a>
+    <a class="be on" href="./be.html">BE</a>
+    <a href="../">← 앱으로</a>
+  </div>
+</div></nav>
+
+<div class="wrap">
+  <div class="hero">
+    <div class="kicker">BE · 도메인 + LLM 오케스트레이터 (Python)</div>
+    <h1>백엔드 — 큰 도메인별 정리</h1>
+    <p>도메인 서비스(결정적) 위에 LLM 오케스트레이터가 얹힌 구조입니다. 모든 외부 노출은 <code>/internal/*</code>(BFF 전용).
+       신기능은 <b>런타임 토글 뒤</b>에 두어 off면 기존 동작과 동일합니다(스트랭글러). <span class="chip tog">TOGGLE</span> 표시를 참고하세요.</p>
+  </div>
+
+  <div class="flow">
+    <div class="node tag-be"><b>의도/라우팅</b><span>classify · LLM planner · guardrail</span></div>
+    <div class="arr">→</div>
+    <div class="node tag-be"><b>도메인 서비스</b><span>쇼핑·CS·O2O·컴패니언</span></div>
+    <div class="arr">→</div>
+    <div class="node tag-be"><b>응답 합성</b><span>섹션 봉투·compose·스트리밍</span></div>
+  </div>
+
+  <!-- 1 쇼핑 -->
+  <h2 class="sec"><span class="n">🛒</span> 쇼핑 · 커머스</h2>
+  <p class="sec-sub">추천 → 주문 커밋 → 픽업/배송. 견적 전환. 확인 게이트(R17).</p>
+  <div class="card tag-be">
+    <div class="chips" style="margin-bottom:12px">
+      <span class="chip be">CatalogService</span><span class="chip be">OrderService</span><span class="chip be">StoreService(견적)</span><span class="chip be">RecommendationService</span>
+    </div>
+    <table>
+      <tr><th>엔드포인트</th><th>역할</th></tr>
+      <tr><td><span class="method get">GET</span> <span class="pill">/internal/catalog/recommend</span> · <span class="pill">/internal/recommendations</span></td><td>개인화 추천(동의 차등)</td></tr>
+      <tr><td><span class="method post">POST</span> <span class="pill">/internal/orders</span> <span class="method get">GET</span> <span class="pill">/internal/orders/{id}</span></td><td>주문 커밋(미확인 409)·이력</td></tr>
+      <tr><td><span class="method post">POST</span> <span class="pill">/internal/orders/{id}/pickup</span></td><td>픽업 상태 전이(ready/picked/expired)</td></tr>
+      <tr><td><span class="method get">GET</span> <span class="pill">/internal/quotes/{ref}</span> <span class="method post">POST</span> <span class="pill">.../convert</span></td><td>견적 조회·주문 전환(O5·O6)</td></tr>
+    </table>
+  </div>
+
+  <!-- 2 CS -->
+  <details class="fold"><summary>코드 · OrderService.checkout — 미확인 시 409 게이트(R17)<span class="fp">services/services.py</span></summary>
+  <div class="code"><span class="k">def</span> checkout(self, user_id, part_ids, confirmed=False) -&gt; Order:
+    <span class="c"># 동시성: 같은 user_id 커밋 직렬화(oversell 방지)</span>
+    with _ORDER_LOCKS.acquire(user_id):
+        if not confirmed:
+            draft = self._port.place_order(user_id, part_ids, confirmed=False)
+            raise <span class="k">ConfirmationRequired</span>(draft)   <span class="c"># → 409</span>
+        return self._port.place_order(user_id, part_ids, confirmed=True)
+<span class="c"># checkout_pickup: 재고 게이트(OutOfStock) → 확인(R17) → RESERVED</span></div></details>
+
+  <h2 class="sec"><span class="n">🩺</span> CS · 진단</h2>
+  <p class="sec-sub">기기 상태·에러코드·셀프수리·워런티·서비스 트리아지.</p>
+  <div class="card tag-be">
+    <div class="chips" style="margin-bottom:12px">
+      <span class="chip be">DeviceService</span><span class="chip be">KnowledgeService(CS·워런티)</span><span class="chip be">TriageService</span><span class="chip">troubleshoot intent</span>
+    </div>
+    <table>
+      <tr><th>엔드포인트 / 능력</th><th>역할</th></tr>
+      <tr><td><span class="method get">GET</span> <span class="pill">/internal/devices</span> · <span class="pill">/internal/devices/{id}</span></td><td>기기 목록·상태·소모품 수명</td></tr>
+      <tr><td>지식/RAG(오류코드 매칭 + 벡터)</td><td>증상→원인·해결 가이드</td></tr>
+      <tr><td>워런티 조회 · 트리아지</td><td>보증 여부·셀프/방문 분기(O7)</td></tr>
+    </table>
+  </div>
+
+  <!-- 3 O2O -->
+  <details class="fold"><summary>코드 · DeviceService · KnowledgeService 시그니처<span class="fp">services/services.py</span></summary>
+  <div class="code">class <span class="k">DeviceService</span>:
+    def list_devices(self) -&gt; list[Device]: ...
+    def get_status(self, device_query: str) -&gt; DeviceStatusResult: ...
+    def consumable_alerts(self, device: Device) -&gt; list[Anomaly]: ...
+
+class <span class="k">KnowledgeService</span>:  <span class="c"># RAG: 오류코드 매칭 + 벡터</span>
+    def find_solutions(self, query, error_code=None) -&gt; SolutionSearchResult: ...
+    def best_solution(self, query, error_code=None) -&gt; Solution | None: ...</div></details>
+
+  <h2 class="sec"><span class="n">📍</span> O2O · 오프라인 연계</h2>
+  <p class="sec-sub">거점·재고·픽업(BOPIS)·방문 예약.</p>
+  <div class="card tag-be">
+    <div class="chips" style="margin-bottom:12px"><span class="chip be">StoreService</span><span class="chip be">HandoffService</span><span class="chip be">AlertPort(픽업 알림)</span></div>
+    <table>
+      <tr><th>엔드포인트</th><th>역할</th></tr>
+      <tr><td><span class="method get">GET</span> <span class="pill">/internal/stores</span> · <span class="pill">/internal/stores/{id}/stock/{part}</span></td><td>거점 찾기·매장 재고(O1·O2)</td></tr>
+      <tr><td><span class="method get">GET</span> <span class="pill">/internal/bookings/slots</span> <span class="method post">POST</span> <span class="pill">/internal/bookings</span></td><td>방문 슬롯·예약(확인 게이트, R18)</td></tr>
+    </table>
+  </div>
+
+  <!-- 4 컴패니언 -->
+  <h2 class="sec"><span class="n">🤝</span> 컴패니언 · 리텐션</h2>
+  <p class="sec-sub">1회성 해결을 지속 관계로. 이어가기·미해결·선제 재관여·만족도.</p>
+  <div class="card tag-be">
+    <div class="chips" style="margin-bottom:12px">
+      <span class="chip be">CompanionService</span><span class="chip be">ReEngagementService</span><span class="chip be">SatisfactionService</span>
+    </div>
+    <table>
+      <tr><th>엔드포인트</th><th>역할</th></tr>
+      <tr><td><span class="method get">GET</span> <span class="pill">/internal/resume</span></td><td>이어가기(요약·미해결·상대시간)</td></tr>
+      <tr><td><span class="method get">GET</span> <span class="pill">/internal/reengagement</span> <span class="method post">POST</span> <span class="pill">.../deliver</span></td><td>선제 재관여 — 엄격 게이트(동의·빈도·중복)</td></tr>
+      <tr><td><span class="method post">POST</span> <span class="pill">/internal/open-loops/{ref}/resolve|dismiss</span></td><td>미해결 스레드 해소/닫기</td></tr>
+      <tr><td><span class="method post">POST</span> <span class="pill">/internal/satisfaction</span></td><td>CSAT/NPS 수집 → 개선 엔진 신호로 emit</td></tr>
+    </table>
+  </div>
+
+  <!-- 5 오케스트레이션 -->
+  <h2 class="sec"><span class="n">🧠</span> AI 오케스트레이션</h2>
+  <p class="sec-sub">의도 분류 → 라우팅 → tool/도메인 → 응답 합성·스트리밍. 멀티에이전트(슈퍼바이저-워커) 조건부.</p>
+  <div class="grid g2">
+    <div class="card tag-be"><h3>경로 · 토글</h3>
+      <ul class="complist">
+        <li><span class="nm">결정적</span><span class="rl">CapabilityOrchestrator(플래너 없음) — 기본</span></li>
+        <li><span class="nm">LLM</span><span class="rl"><span class="chip tog">LLM_BACKED</span> 단일 tool-loop(legacy)</span></li>
+        <li><span class="nm">멀티에이전트</span><span class="rl"><span class="chip tog">MULTIAGENT</span> 슈퍼바이저-워커(runtime)</span></li>
+        <li><span class="nm">capability</span><span class="rl"><span class="chip tog">CAPABILITY_ORCH</span> LLM 플래너 라우팅</span></li>
+      </ul>
+    </div>
+    <div class="card tag-be"><h3>모듈 · 안전</h3>
+      <div class="chips" style="margin-bottom:10px">
+        <span class="chip">classify</span><span class="chip">planner</span><span class="chip">handlers</span><span class="chip">multiagent</span><span class="chip">prompts(단일 출처)</span>
+      </div>
+      <ul class="complist">
+        <li><span class="nm">Guardrail</span><span class="rl">입력/출력 2단계 안전(<span class="chip tog">GUARDRAIL</span>)</span></li>
+        <li><span class="nm">Compose</span><span class="rl">복합 응답 종합(<span class="chip tog">COMPOSE</span>) · 2-track 스트리밍</span></li>
+        <li><span class="nm">엔드포인트</span><span class="rl"><span class="method ws">WS</span>/<span class="method post">POST</span> <span class="pill">/internal/turn</span> · <span class="method post">POST</span> <span class="pill">/internal/surface</span></span></li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- 6 신뢰·안전·운영 -->
+  <details class="fold"><summary>코드 · RuleBasedClassifier — 키워드 규칙 + 복합 감지<span class="fp">orchestrator/classify.py</span></summary>
+  <div class="code"><span class="c"># 플래너(LLM) 미연결/실패 시 규칙 폴백</span>
+def <span class="k">classify</span>(self, message) -&gt; IntentResult:
+    intents = []
+    if _has(t, _TROUBLE):   intents.append(<span class="s">"troubleshoot"</span>)
+    if _has(t, _RECOMMEND): intents.append(<span class="s">"recommend"</span>)
+    if _has(t, _ORDER):     intents.append(<span class="s">"order"</span>)
+    if _has(t, _STATUS) and <span class="s">"troubleshoot"</span> not in intents:
+        intents.append(<span class="s">"device_status"</span>)
+    if not intents: intents.append(<span class="s">"general"</span>)
+    is_compound = len(intents) &gt; 1 or (_has(t, _CONJ) and intents)
+    return IntentResult(intents=uniq, is_compound=…)</div></details>
+
+  <h2 class="sec"><span class="n">🛡</span> 신뢰 · 안전 · 운영 (플랫폼)</h2>
+  <p class="sec-sub">횡단 관심사 — 전부 토글 뒤(off=회귀 불변). append-only 배선(wiring).</p>
+  <div class="grid g3">
+    <div class="card tag-be"><h3>개인정보·DSR</h3><p class="desc">consent·dsr·retention·audit</p>
+      <div class="chips"><span class="pill">/consent/grant|revoke</span><span class="pill">/dsr/export|delete|rectify</span><span class="pill">/retention</span></div></div>
+    <div class="card tag-be"><h3>비용·캐싱</h3><p class="desc"><span class="pill">/metrics/llm</span></p>
+      <div class="chips"><span class="chip tog">COST_TRACKING</span><span class="chip tog">MODEL_ROUTING</span><span class="chip tog">RESPONSE_CACHE</span></div></div>
+    <div class="card tag-be"><h3>실험 A/B (S8)</h3><p class="desc"><span class="pill">/internal/experiments/assign</span></p>
+      <div class="chips"><span class="chip">sticky 할당·canary</span><span class="chip tog">EXPERIMENTS</span></div></div>
+    <div class="card tag-be"><h3>자기개선(propose-only)</h3><p class="desc"><span class="pill">/internal/improve/*</span> · propose-only</p>
+      <div class="chips"><span class="chip">신호→제안→리뷰→S8</span><span class="chip tog">SELF_IMPROVE</span></div></div>
+    <div class="card tag-be"><h3>관측·회복력</h3><p class="desc"><span class="pill">/metrics</span> · tracing · 서킷브레이커</p>
+      <div class="chips"><span class="chip tog">TRACING</span><span class="chip tog">RESILIENCE</span></div></div>
+    <div class="card tag-be"><h3>백킹서비스·구성</h3><p class="desc">Port+Mock · 마이그레이션 · 환경 계층</p>
+      <div class="chips"><span class="chip tog">PERSISTENCE=db</span><span class="chip">APP_ENV</span></div></div>
+  </div>
+
+  <!-- 7 신원 -->
+  <h2 class="sec"><span class="n">🧑</span> 신원 · 멀티테넌트</h2>
+  <p class="sec-sub">Principal 해석·게스트·머지. off면 기본 사용자(회귀 불변).</p>
+  <div class="card tag-be">
+    <div class="chips" style="margin-bottom:12px"><span class="chip be">principal</span><span class="chip be">UserDirectory</span><span class="chip tog">MULTITENANT</span></div>
+    <table>
+      <tr><th>엔드포인트 / 능력</th><th>역할</th></tr>
+      <tr><td>Principal 해석</td><td>헤더(X-User-Id/X-Guest-Token)→신원, 상태 user_id 키잉</td></tr>
+      <tr><td><span class="method post">POST</span> <span class="pill">/internal/principal/merge</span></td><td>게스트→로그인 상태 이관(주문·대화·미해결·engagement)</td></tr>
+    </table>
+  </div>
+
+  <h2 class="sec"><span class="n">▦</span> 데이터 모델 · 구조 개요</h2>
+  <p class="sec-sub">도메인 서비스가 다루는 핵심 구조.</p>
+  <div class="grid g2">
+    <div class="card tag-be"><h3>데이터 모델 4계층</h3>
+      <p class="desc">도메인 · 표현(Template) · 전송(섹션 봉투) · 영속(Repository/Port)을 분리. Mock↔실은 Port/DI 경계로 교체.</p>
+      <div class="chips"><span class="chip be">domain/models.py</span><span class="chip be">Repository/Port</span><span class="chip be">Template/Section</span></div>
+    </div>
+    <div class="card tag-be"><h3>멀티에이전트 구조</h3>
+      <p class="desc">슈퍼바이저-워커 · 중간 그래뉼래리티(진단·커머스·추천 agent) · 조건부 리뷰 · 단일 패스. 프롬프트는 단일 출처.</p>
+      <div class="chips"><span class="chip be">prompts 단일 출처</span><span class="chip be">capability 통합</span></div>
+    </div>
+  </div>
+
+  <!-- 엔티티 -->
+  <h2 class="sec"><span class="n">▦</span> 도메인 엔티티 (핵심 필드)</h2>
+  <p class="sec-sub"><code>domain/models.py</code> 등 — 주요 엔티티와 필드.</p>
+  <div class="er">
+    <div class="ent"><h4>User</h4><ul>
+      <li><b>id</b> · display_name</li><li>linked_device_ids[]</li>
+      <li>preferences { notify_opt_in, interest_categories[] }</li>
+      <li>consent { scopes[] }</li><li>addresses[]</li></ul></div>
+    <div class="ent"><h4>Device</h4><ul>
+      <li><b>id</b> · type · model</li><li>status (ONLINE…)</li>
+      <li>consumables[ { name, life_remaining, threshold } ]</li><li>metrics{}</li></ul></div>
+    <div class="ent"><h4>Order</h4><ul>
+      <li><b>id</b> · user_id</li><li>items[ {part_id,name,unit_price,qty} ]</li>
+      <li>status (DRAFT…) · summary{ subtotal,tax,discount,total }</li>
+      <li>fulfillment (delivery|pickup) · store_id · pickup_status</li></ul></div>
+    <div class="ent"><h4>Quote</h4><ul>
+      <li><b>id</b> · user_id · source</li><li>items[] · total</li><li>status (ACTIVE…)</li></ul></div>
+    <div class="ent"><h4>Booking</h4><ul>
+      <li><b>id</b> · slot_id</li><li>status (REQUESTED…)</li>
+      <li>visit_type · store_id · context_ref</li></ul></div>
+    <div class="ent"><h4>OpenLoop</h4><ul>
+      <li><b>id</b> · kind · ref(유일키)</li><li>label · status (open…)</li><li>priority</li></ul></div>
+    <div class="ent"><h4>EngagementRecord</h4><ul>
+      <li><b>user_id</b> · ref</li><li>state (viewed/acknowledged/dismissed/interested)</li></ul></div>
+    <div class="ent"><h4>Satisfaction · Signal · Proposal</h4><ul>
+      <li>Satisfaction { topic, score, kind, resolved }</li>
+      <li>Signal { kind, ref, value, consent_ok }</li>
+      <li>Proposal { kind, target, evidence[], impact, status }</li></ul></div>
+  </div>
+
+  <!-- 오케스트레이션 시퀀스 -->
+  <details class="fold"><summary>코드 · 도메인 모델 원본(Device · Order)<span class="fp">domain/models.py</span></summary>
+  <div class="code">class <span class="k">Device</span>(_Base):
+    id: Id; type: str; model: str
+    status: DeviceHealth = <span class="s">"ONLINE"</span>
+    consumables: list[Consumable] = []   <span class="c"># {name, life_remaining, threshold}</span>
+    metrics: dict[str, float] = {}
+
+class <span class="k">Order</span>(_Base):
+    id: Id; user_id: Id
+    items: list[OrderItem] = []          <span class="c"># {part_id, name, unit_price, qty}</span>
+    status: OrderStatus = <span class="s">"DRAFT"</span>
+    summary: OrderSummary                 <span class="c"># subtotal·shipping·tax·discount·total</span>
+    fulfillment: Fulfillment = <span class="s">"delivery"</span>; store_id; pickup_status</div></details>
+
+  <h2 class="sec"><span class="n">🧭</span> 오케스트레이션 시퀀스</h2>
+  <p class="sec-sub">한 턴(<code>/internal/turn</code>)의 처리 단계.</p>
+  <div class="seq be">
+    <div class="step"><b>입력 수신</b><span>text + screen_context + 신원(메모리 주입)</span></div>
+    <div class="step"><b>가드레일 pre (병렬)</b><span>입력 검사 — 의도 추출과 gather, fail-closed</span></div>
+    <div class="step"><b>의도 분류</b><span>classify — LLM 구조화 + 규칙(device_status·troubleshoot·order·recommend·general)</span></div>
+    <div class="step"><b>라우팅</b><span>LLM 플래너 또는 규칙 폴백 → capability/도메인 선택</span></div>
+    <div class="step"><b>도메인 실행</b><span>tool/Service 호출(결정적) · 멀티에이전트면 슈퍼바이저-워커</span></div>
+    <div class="step"><b>합성(compose)</b><span>복합 응답 종합 → 섹션 봉투(말만 생성·데이터 불변)</span></div>
+    <div class="step"><b>가드레일 post → 스트림</b><span>방출 직전 검사 · 2-track 스트리밍(카드 선방출 + delta)</span></div>
+  </div>
+
+  <!-- 토글 매트릭스 -->
+  <h2 class="sec"><span class="n">⚙</span> 토글 매트릭스</h2>
+  <p class="sec-sub">신기능은 토글 뒤(기본 off = 회귀 불변, 스트랭글러).</p>
+  <div class="tbl-card"><table>
+    <tr><th>env</th><th>효과</th><th>기본</th></tr>
+    <tr><td><span class="pill">LLM_BACKED</span></td><td>LLM 자연어 경로(off=결정적 섹션)</td><td class="no">off</td></tr>
+    <tr><td><span class="pill">MULTIAGENT</span></td><td>슈퍼바이저-워커 멀티에이전트</td><td class="no">off</td></tr>
+    <tr><td><span class="pill">CAPABILITY_ORCH</span></td><td>capability 오케스트레이터 라우팅</td><td class="no">off</td></tr>
+    <tr><td><span class="pill">GUARDRAIL</span></td><td>가드레일 발동(pre/post)</td><td class="no">off</td></tr>
+    <tr><td><span class="pill">COMPOSE</span></td><td>복합 응답 종합(reduce)</td><td class="no">off</td></tr>
+    <tr><td><span class="pill">MULTITENANT</span></td><td>Principal/게스트 신원(off=기본 사용자)</td><td class="no">off</td></tr>
+    <tr><td><span class="pill">PERSISTENCE</span></td><td>상태 영속 <span class="mono">memory|db</span>(+SQLITE_PATH)</td><td>memory</td></tr>
+    <tr><td><span class="pill">EXPERIMENTS</span></td><td>A/B 할당(off=control)</td><td class="no">off</td></tr>
+    <tr><td><span class="pill">SELF_IMPROVE</span></td><td>개선 제안 엔진(신호·제안)</td><td class="no">off</td></tr>
+    <tr><td><span class="pill">COST_TRACKING</span> · <span class="pill">MODEL_ROUTING</span> · <span class="pill">RESPONSE_CACHE</span></td><td>비용 회계·모델 라우팅·응답 캐싱</td><td class="no">off</td></tr>
+    <tr><td><span class="pill">TRACING</span> · <span class="pill">RESILIENCE</span></td><td>추적·서킷브레이커/회복력</td><td class="no">off</td></tr>
+    <tr><td><span class="pill">OPENAI_API_KEY</span></td><td>실 LLM(backend/.env) — CI엔 없음(수동 검증)</td><td>—</td></tr>
+  </table></div>
+
+  <!-- 에러코드 + 의도 -->
+  <details class="fold"><summary>코드 · 커밋 게이트 응답(상태코드·code)<span class="fp">api/internal.py</span></summary>
+  <div class="code"><span class="c"># 게스트 커밋</span>
+return JSONResponse(401, {<span class="s">"code"</span>: <span class="s">"LoginRequired"</span>,
+    <span class="s">"message"</span>: <span class="s">"주문·예약은 로그인 후 확정할 수 있어요."</span>, …})
+<span class="c"># 미확인 커밋</span>
+return JSONResponse(409, {<span class="s">"code"</span>: <span class="s">"ConfirmationRequired"</span>, <span class="s">"message"</span>: gate.message, …})
+<span class="c"># 재고 없음 / 견적 만료 / 픽업 전이</span>
+JSONResponse(409, {<span class="s">"code"</span>: <span class="s">"OutOfStock"</span>, …})  ·  JSONResponse(410, {<span class="s">"code"</span>: <span class="s">"QuoteExpired"</span>, …})</div></details>
+
+  <div class="grid g2" style="margin-top:8px">
+    <div>
+      <h2 class="sec"><span class="n">⚠</span> 에러 코드</h2>
+      <div class="tbl-card"><table>
+        <tr><th>코드</th><th>HTTP</th><th>의미</th></tr>
+        <tr><td>ConfirmationRequired</td><td>409</td><td>커밋 전 확인(R17)</td></tr>
+        <tr><td>LoginRequired</td><td>401</td><td>게스트 커밋 차단</td></tr>
+        <tr><td>OutOfStock</td><td>409</td><td>재고 없음 + 대체 매장</td></tr>
+        <tr><td>QuoteExpired</td><td>410</td><td>견적 만료</td></tr>
+        <tr><td>QuoteForbidden</td><td>403</td><td>본인 견적 아님</td></tr>
+        <tr><td>QuoteNotConvertible</td><td>409</td><td>전환 불가 상태</td></tr>
+        <tr><td>PickupTransitionError</td><td>409</td><td>잘못된 픽업 전이</td></tr>
+        <tr><td>not_found</td><td>404</td><td>미발견</td></tr>
+      </table></div>
+    </div>
+    <div>
+      <h2 class="sec"><span class="n">⤳</span> 의도 → 핸들러</h2>
+      <div class="tbl-card"><table>
+        <tr><th>intent</th><th>핸들러 / 서비스</th></tr>
+        <tr><td><span class="pill">device_status</span></td><td>DeviceService — 상태·소모품</td></tr>
+        <tr><td><span class="pill">troubleshoot</span></td><td>KnowledgeService(RAG) — 진단·가이드</td></tr>
+        <tr><td><span class="pill">order</span></td><td>OrderService/StoreService — 부품·커밋</td></tr>
+        <tr><td><span class="pill">recommend</span></td><td>RecommendationService — 추천 agent</td></tr>
+        <tr><td><span class="pill">general</span></td><td>일반 응답 / clarify(모호 시)</td></tr>
+      </table></div>
+      <p class="desc" style="margin-top:10px">복합 질의는 여러 intent로 분해(is_compound) → 섹션 N개로 합성.</p>
+    </div>
+  </div>
+
+  <div class="note be">검증: <code>cd backend &amp;&amp; python -m pytest</code>. 실 LLM은 CI에 없어 수동(<code>backend/verify_*.py</code>).</div>
+</div>
+<footer>BE · 도메인 정리 · 현재 코드 구현 기준</footer>
+</body>
+</html>

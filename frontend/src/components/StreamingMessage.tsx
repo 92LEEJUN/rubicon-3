@@ -9,6 +9,7 @@
 import React, { useEffect, useRef } from 'react';
 import { Animated, StyleSheet, Text, View } from 'react-native';
 import { SectionView } from './message';
+import { FadeInView } from './motion';
 import { color, font, radius, space } from '../design/tokens';
 import type { Cta, MessageSection } from '../types/contract';
 
@@ -43,7 +44,9 @@ export function StreamingMessage({
           </View>
         ) : null}
         {sections.map((s, i) => (
-          <SectionView key={i} section={s} onCta={onCta} />
+          <FadeInView key={i}>
+            <SectionView section={s} onCta={onCta} />
+          </FadeInView>
         ))}
       </View>
     </View>

@@ -1,19 +1,41 @@
 /** 기본 UI 프리미티브 — 토큰만 참조(One UI 스타일). RN 컴포넌트(웹=react-native-web). */
 import React from 'react';
-import { Pressable, StyleSheet, Text, View, ViewStyle } from 'react-native';
-import { color, font, radius, space } from '../design/tokens';
+import { StyleSheet, Text, View, ViewStyle } from 'react-native';
+import { color, font, radius, shadow, space } from '../design/tokens';
+import { spring, pressTap, hoverLift } from '../design/motion';
+import { MotionPressable } from './motion';
 
 export function Card({
   children,
   style,
   testID,
+  onPress,
+  elevated,
 }: {
   children: React.ReactNode;
   style?: ViewStyle;
   testID?: string;
+  onPress?: () => void;       // 주면 누름 가능한 카드(스프링 피드백)
+  elevated?: boolean;         // 깊이 강조 그림자
 }) {
+  const cardStyle = [styles.card, elevated && (shadow.elevated as any), style];
+  if (onPress) {
+    return (
+      <MotionPressable
+        testID={testID}
+        accessibilityRole="button"
+        onPress={onPress}
+        style={StyleSheet.flatten(cardStyle) as any}
+        whileTap={pressTap}
+        whileHover={hoverLift}
+        transition={spring.press as any}
+      >
+        {children}
+      </MotionPressable>
+    );
+  }
   return (
-    <View testID={testID} style={[styles.card, style]}>
+    <View testID={testID} style={cardStyle}>
       {children}
     </View>
   );
@@ -63,49 +85,54 @@ export function Button({
 }) {
   const primary = variant === 'primary';
   return (
-    <Pressable
+    <MotionPressable
       testID={testID}
       accessibilityRole="button"
       onPress={onPress}
-      style={({ pressed }) => [
-        styles.btn,
-        primary ? styles.btnPrimary : styles.btnSecondary,
-        pressed && { opacity: 0.85 },
-      ]}
+      style={StyleSheet.flatten([styles.btn, primary ? styles.btnPrimary : styles.btnSecondary]) as any}
+      whileTap={pressTap}
+      whileHover={hoverLift}
+      transition={spring.press as any}
     >
       <Text style={[styles.btnText, primary ? { color: '#fff' } : { color: color.primaryDark }]}>
         {label}
       </Text>
-    </Pressable>
+    </MotionPressable>
   );
 }
 
 const styles = StyleSheet.create({
+  // 토스st 카드 — 보더 없이 아주 부드러운 섀도우로 분리, 큰 라운드.
   card: {
     backgroundColor: color.surface,
-    borderRadius: radius.lg,
-    padding: space.lg,
-    borderWidth: 1,
-    borderColor: color.border,
+    borderRadius: radius.xl,
+    padding: space.xl,
+    ...(shadow.card as any),
   },
-  heading: { fontSize: font.size.xxl, fontWeight: font.weight.bold as any, color: color.text },
-  title: { fontSize: font.size.lg, fontWeight: font.weight.semibold as any, color: color.text },
-  body: { fontSize: font.size.md, color: color.text, lineHeight: 22 },
-  caption: { fontSize: font.size.xs, color: color.textMuted },
+  heading: {
+    fontSize: font.size.display,
+    fontWeight: font.weight.bold as any,
+    color: color.text,
+    lineHeight: 40,
+  },
+  title: { fontSize: font.size.lg, fontWeight: font.weight.bold as any, color: color.text },
+  body: { fontSize: font.size.md, color: color.textSub, lineHeight: 23 },
+  caption: { fontSize: font.size.xs, color: color.textMuted, fontWeight: font.weight.medium as any },
   badge: {
     alignSelf: 'flex-start',
-    paddingHorizontal: space.sm,
-    paddingVertical: 2,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
     borderRadius: radius.pill,
   },
-  badgeText: { fontSize: font.size.xs, fontWeight: font.weight.semibold as any },
+  badgeText: { fontSize: font.size.xs, fontWeight: font.weight.bold as any },
+  // 토스st 버튼 — 큰 라운드(14)·넉넉한 높이·볼드.
   btn: {
-    borderRadius: radius.pill,
-    paddingVertical: space.md,
+    borderRadius: 14,
+    paddingVertical: 15,
     paddingHorizontal: space.xl,
     alignItems: 'center',
   },
   btnPrimary: { backgroundColor: color.primary },
   btnSecondary: { backgroundColor: color.primaryTint },
-  btnText: { fontSize: font.size.md, fontWeight: font.weight.semibold as any },
+  btnText: { fontSize: font.size.lg, fontWeight: font.weight.bold as any },
 });

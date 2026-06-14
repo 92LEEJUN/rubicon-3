@@ -83,6 +83,7 @@
 | [0022](0022-streaming-transport-websocket.md) | 스트리밍 트랜스포트 = **WebSocket**(vs SSE/fetch) | 채택 |
 | [0023](0023-fe-state-management.md) | FE 상태관리 = **React Query + Zustand** | 채택 |
 | [0027](0027-card-tap-surface.md) | 카드 탭 = **BE 동적 bridge/panel** | 채택 |
+| [0068](0068-fe-motion-polish.md) | **FE 모션·디자인 폴리시** — 모션 토큰(`design/motion.ts`)+프리미티브(`FadeInView`·`Stagger`·`PressableScale`·`Skeleton`)·framer-motion×RNW(`motion.create(View)`)·reduced-motion·One UI 정제. 표현 계층(계약·데이터 무변)·jest/build green | 채택 |
 
 ### 이전 기반 설계 — 응답 표현 / 도메인 / 데이터 (response-templates·data-model·orchestration)
 | # | 결정 | 상태 |

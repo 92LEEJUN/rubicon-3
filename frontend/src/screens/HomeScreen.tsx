@@ -1,21 +1,16 @@
-/** S1 홈 (변형 B, wireframes §2) — 브리핑 카드 스택(스와이프) + 2열 작은 카드 + 추천.
+/** S1 홈 — 토스(Toss)st 재설계: 큰 인사 + 퀵액션 + 클린 리스트 카드(ADR-0068).
  *
  * home_summary(devices·alerts·recommendations)에서 콘텐츠를 파생한다(실데이터/fixture 폴백).
- * 하단 채팅바는 MainShell이 고정으로 렌더(홈·CS 공통). 카드/타일 탭 → 맥락 질문으로 채팅 진입.
+ * 하단 채팅바는 MainShell이 고정 렌더. 카드/행 탭 → 맥락 질문으로 채팅 진입.
+ * 비주얼: 화이트 표면·토스 블루 단일 액센트·큰 볼드 타이포·아주 부드러운 섀도우·넉넉한 여백.
  */
-import React, { useState } from 'react';
-import {
-  NativeScrollEvent,
-  NativeSyntheticEvent,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-  useWindowDimensions,
-} from 'react-native';
+import React from 'react';
+import { Image, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { TemplateView } from '../templates';
-import { color, font, gradient, radius, shadow, space } from '../design/tokens';
+import { FadeInView, PressableScale, Stagger, StaggerItem } from '../components/motion';
+import { DeviceDeck, type DeckItem } from '../components/DeviceDeck';
+import { DEVICE_IMAGE } from '../design/deviceImages';
+import { color, font, radius, shadow, space } from '../design/tokens';
 
 const DEVICE_KO: Record<string, string> = {
   washer: '세탁기',
@@ -32,13 +27,54 @@ const CONS_KO: Record<string, string> = {
   water_filter: '정수필터',
   hepa_filter: 'HEPA 필터',
 };
-const won = (n: number) => `₩${Number(n).toLocaleString('ko-KR')}`;
 
-type Briefing = { badge: string; title: string; desc: string; cta: string; ask: string };
-type Tile = { icon: string; tint: string; title: string; sub: string; ok?: boolean; ask: string };
+type Tile = { icon: string; type: string; tint: string; title: string; sub: string; ok?: boolean; ask: string };
 
-function buildBriefings(data: any): Briefing[] {
-  const out: Briefing[] = [];
+// 데모 다양성을 위한 큐레이션 카드(데이터 카드 뒤에 붙어 ~7장 구성). 색·주제 다양화.
+const CURATED: DeckItem[] = [
+  {
+    palette: 'teal',
+    tag: '에너지',
+    title: '이번 달 절약 리포트',
+    desc: 'ECO 코스로 전기·물 12% 아꼈어요. 다음 절약 팁도 받아보세요.',
+    cta: '리포트 보기',
+    ask: '우리집 에너지 절약 리포트랑 다음 팁 알려줘',
+    img: 'energy',
+  },
+  {
+    palette: 'violet',
+    tag: '정기 점검',
+    title: '점검 시즌이 돌아왔어요',
+    desc: '3개월마다 자가 점검을 추천해요. 5분이면 끝나요.',
+    cta: '점검 시작',
+    ask: '우리집 가전 정기 점검 도와줘',
+    img: 'checkup',
+  },
+  {
+    palette: 'magenta',
+    tag: '맞춤 추천',
+    title: '세제·필터 번들 추천',
+    desc: '내 세탁기에 딱 맞는 세제와 필터를 묶어 최대 15% 할인.',
+    cta: '번들 보기',
+    ask: '세탁기에 맞는 세제랑 필터 번들 추천해줘',
+    img: 'bundle',
+  },
+  {
+    palette: 'forest',
+    tag: '보증',
+    title: '냉장고 워런티 만료 임박',
+    desc: '30일 뒤 보증이 끝나요. 연장 옵션을 미리 확인하세요.',
+    cta: '보증 확인',
+    ask: '냉장고 워런티 연장 옵션 알려줘',
+    deviceType: 'refrigerator',
+  },
+];
+
+// 기기 사진이 없는 타입 → 주제 사진 대체(덱 카드용). 모든 카드가 사진을 갖게 한다.
+const DEVICE_CARD_IMG: Record<string, string> = { air_purifier: 'cleanair' };
+
+function buildBriefings(data: any): DeckItem[] {
+  const out: DeckItem[] = [];
   for (const d of data.devices ?? []) {
     if (d.status !== 'ONLINE') {
       const c =
@@ -46,14 +82,16 @@ function buildBriefings(data: any): Briefing[] {
         (d.consumables ?? [])[0];
       const pct = c ? Math.round(c.life_remaining * 100) : null;
       out.push({
-        badge: '⚠ 점검 필요',
-        title: `${DEVICE_KO[d.type] ?? d.type} 배수 이상 (5C)`,
+        palette: 'sunset',
+        tag: '점검 필요',
+        title: `${DEVICE_KO[d.type] ?? d.type} 배수 이상 · 5C`,
         desc:
           pct != null
             ? `${CONS_KO[c.name] ?? '소모품'} 수명 ${pct}%. 지금 청소·교체하면 오류를 예방할 수 있어요.`
             : '상태 확인이 필요해요.',
-        cta: '해결 방법 보기 →',
+        cta: '해결 방법 보기',
         ask: `${DEVICE_KO[d.type] ?? d.type}에서 물이 안 빠져요. 5C 떠요. 해결하고 부품도 주문할래요.`,
+        deviceType: d.type,
       });
     }
   }
@@ -61,14 +99,20 @@ function buildBriefings(data: any): Briefing[] {
     const d = (data.devices ?? []).find((x: any) => x.id === a.device_id);
     const name = d ? (DEVICE_KO[d.type] ?? d.type) : '기기';
     out.push({
-      badge: a.severity === 'warning' ? '⚠ 소모품' : 'ⓘ 안내',
-      title: `${name} 소모품 알림`,
+      palette: 'amber',
+      tag: '소모품 알림',
+      title: `${name} 소모품 교체 시기`,
       desc: a.detail,
-      cta: '교체·주문 안내 →',
+      cta: '교체·주문 안내',
       ask: `${name} 소모품 교체 방법 알려주고 주문도 도와줘`,
+      deviceType: d?.type,
+      img: d?.type ? DEVICE_CARD_IMG[d.type] : undefined,
     });
   }
-  return out;
+  out.push(...CURATED);
+  // 7장에 7색을 위치별로 고유 배정(다크 엘레강트 액센트) — 인접 카드 색이 겹치지 않게.
+  const ORDER = ['blue', 'teal', 'violet', 'amber', 'rose', 'indigo', 'emerald'];
+  return out.slice(0, 7).map((c, i) => ({ ...c, palette: ORDER[i] }));
 }
 
 function buildTiles(data: any): Tile[] {
@@ -77,29 +121,23 @@ function buildTiles(data: any): Tile[] {
     const ok = d.status === 'ONLINE';
     tiles.push({
       icon: DEVICE_ICON[d.type] ?? '📱',
-      tint: ok ? color.successTint : color.warningTint,
-      title: `${DEVICE_KO[d.type] ?? d.type} ${ok ? '정상' : '점검'}`,
+      type: d.type,
+      tint: ok ? color.successTint : color.dangerTint,
+      title: `${DEVICE_KO[d.type] ?? d.type}`,
       sub: d.model,
       ok,
       ask: `${DEVICE_KO[d.type] ?? d.type} 상태 확인해줘`,
     });
   }
-  tiles.push({
-    icon: '📦',
-    tint: color.primaryTint,
-    title: '부품 주문',
-    sub: '배수 필터 ₩12,000',
-    ask: '세탁기 배수 필터 주문할래요',
-  });
-  tiles.push({
-    icon: '🏠',
-    tint: color.dangerTint,
-    title: '방문 예약',
-    sub: '출장 수리 가능',
-    ask: '방문 수리 예약하고 싶어요',
-  });
   return tiles;
 }
+
+const QUICK = [
+  { icon: '🩺', label: '진단', ask: '우리집 가전 상태 진단해줘' },
+  { icon: '📦', label: '부품주문', ask: '세탁기 배수 필터 주문할래요' },
+  { icon: '🏠', label: '방문예약', ask: '방문 수리 예약하고 싶어요' },
+  { icon: '✨', label: '추천', ask: '맞춤 제품 추천해줘' },
+];
 
 export function HomeScreen({
   data,
@@ -112,87 +150,103 @@ export function HomeScreen({
   const briefings = buildBriefings(data);
   const tiles = buildTiles(data);
   const recs: any[] = data.recommendations ?? [];
-  const { width } = useWindowDimensions();
-  const cardW = Math.min(width, 480) - space.lg * 2;
-  const [page, setPage] = useState(0);
-
-  function onScroll(e: NativeSyntheticEvent<NativeScrollEvent>) {
-    const i = Math.round(e.nativeEvent.contentOffset.x / (cardW + space.md));
-    if (i !== page) setPage(i);
-  }
 
   return (
     <View style={styles.root} testID="screen-home">
-      <ScrollView contentContainerStyle={styles.content}>
-        {/* 브리핑 카드 — 스택 스와이프 */}
-        <Text style={styles.label}>오늘의 브리핑</Text>
-        <View style={styles.deckWrap}>
-          <View style={[styles.behind, styles.behind2]} />
-          <View style={styles.behind} />
-          <ScrollView
-            horizontal
-            pagingEnabled
-            showsHorizontalScrollIndicator={false}
-            snapToInterval={cardW + space.md}
-            decelerationRate="fast"
-            onMomentumScrollEnd={onScroll}
-            testID="briefing-deck"
-            contentContainerStyle={{ gap: space.md }}
-          >
-            {briefings.map((b, i) => (
-              <Pressable
-                key={i}
-                testID={`briefing-${i}`}
-                onPress={() => onOpenChat?.(b.ask)}
-                style={[styles.briefCard, { width: cardW }]}
+      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+        {/* 큰 인사 */}
+        <FadeInView>
+          <Text style={styles.greeting}>안녕하세요, 준희님 👋</Text>
+          <Text style={styles.greetingSub}>오늘 챙기면 좋을 것들을 모았어요</Text>
+        </FadeInView>
+
+        {/* 퀵 액션 — 둥근 아이콘 4개 */}
+        <Stagger style={styles.quickRow} testID="quick-actions">
+          {QUICK.map((q, i) => (
+            <StaggerItem key={i} style={styles.quickItemWrap}>
+              <PressableScale
+                testID={`quick-${i}`}
+                onPress={() => onOpenChat?.(q.ask)}
+                style={styles.quickItem}
+                lift={false}
               >
-                <Text style={styles.briefBadge}>{b.badge}</Text>
-                <Text style={styles.briefTitle}>{b.title}</Text>
-                <Text style={styles.briefDesc}>{b.desc}</Text>
-                <View style={styles.briefCta}>
-                  <Text style={styles.briefCtaText}>{b.cta}</Text>
+                <View style={styles.quickChip}>
+                  <Text style={styles.quickIcon}>{q.icon}</Text>
                 </View>
-              </Pressable>
-            ))}
-          </ScrollView>
-        </View>
-        <View style={styles.dots}>
-          {briefings.map((_, i) => (
-            <View key={i} style={[styles.dot, i === page && styles.dotOn]} />
+                <Text style={styles.quickLabel}>{q.label}</Text>
+              </PressableScale>
+            </StaggerItem>
           ))}
-        </View>
+        </Stagger>
 
-        {/* 2열 작은 카드 */}
-        <Text style={styles.label}>한눈에 보기</Text>
-        <View style={styles.grid}>
-          {tiles.map((t, i) => (
-            <Pressable
-              key={i}
-              testID={`tile-${i}`}
-              onPress={() => onOpenChat?.(t.ask)}
-              style={({ pressed }) => [styles.tile, pressed && { opacity: 0.85 }]}
-            >
-              <View style={[styles.tileChip, { backgroundColor: t.tint }]}>
-                <Text style={styles.tileIcon}>{t.icon}</Text>
-              </View>
-              <Text style={styles.tileTitle}>{t.title}</Text>
-              <Text style={styles.tileSub}>{t.sub}</Text>
-            </Pressable>
-          ))}
-        </View>
+        {/* 오늘 챙길 것 — 3D 스택 스와이프 덱(실사진 + 틸트) */}
+        {briefings.length ? (
+          <>
+            <Text style={styles.section}>오늘 챙길 것</Text>
+            <DeviceDeck items={briefings} onPick={(ask) => onOpenChat?.(ask)} />
+          </>
+        ) : null}
 
-        {/* 개인화 추천 */}
+        {/* 내 기기 — 한 카드 안 행 리스트 */}
+        {tiles.length ? (
+          <FadeInView delay={0.05}>
+            <Text style={styles.section}>내 기기</Text>
+            <View style={styles.listCard}>
+              {tiles.map((t, i) => (
+                <PressableScale
+                  key={i}
+                  testID={`tile-${i}`}
+                  onPress={() => onOpenChat?.(t.ask)}
+                  style={[styles.row, i < tiles.length - 1 && styles.rowDivider]}
+                  lift={false}
+                >
+                  {DEVICE_IMAGE[t.type] ? (
+                    <Image source={{ uri: DEVICE_IMAGE[t.type] }} style={styles.rowThumb} resizeMode="cover" />
+                  ) : (
+                    <View style={[styles.rowChip, { backgroundColor: t.tint }]}>
+                      <Text style={styles.rowIcon}>{t.icon}</Text>
+                    </View>
+                  )}
+                  <View style={styles.rowBody}>
+                    <Text style={styles.rowTitle}>{t.title}</Text>
+                    <Text style={styles.rowSub}>{t.sub}</Text>
+                  </View>
+                  <View
+                    style={[
+                      styles.statusPill,
+                      { backgroundColor: t.ok ? color.successTint : color.dangerTint },
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.statusText,
+                        { color: t.ok ? color.success : color.danger },
+                      ]}
+                    >
+                      {t.ok ? '정상' : '점검'}
+                    </Text>
+                  </View>
+                  <Text style={styles.chevronMuted}>›</Text>
+                </PressableScale>
+              ))}
+            </View>
+          </FadeInView>
+        ) : null}
+
+        {/* 맞춤 추천 */}
         {recs.length ? (
-          <View testID="home-recommend">
-            <Text style={styles.label}>맞춤 추천</Text>
-            <Pressable
+          <FadeInView testID="home-recommend" delay={0.08}>
+            <Text style={styles.section}>맞춤 추천</Text>
+            <PressableScale
               onPress={() => onOpenChat?.('추천 제품 자세히 알려줘')}
               style={styles.recCard}
             >
               <TemplateView template={{ kind: 'recommendation_list', data: { products: recs } }} />
-            </Pressable>
-          </View>
+            </PressableScale>
+          </FadeInView>
         ) : null}
+
+        <View style={{ height: space.xl }} />
       </ScrollView>
     </View>
   );
@@ -201,109 +255,94 @@ export function HomeScreen({
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: color.bg },
   content: {
-    padding: space.lg,
+    paddingHorizontal: space.lg,
+    paddingTop: space.sm,
     paddingBottom: space.xl,
     maxWidth: 480,
     width: '100%',
     alignSelf: 'center',
   },
-  label: {
-    fontSize: font.size.xs,
-    color: color.textMuted,
-    fontWeight: font.weight.semibold as any,
-    marginTop: space.md,
-    marginBottom: space.sm,
-  },
 
-  deckWrap: { position: 'relative', paddingTop: 8 },
-  behind: {
-    position: 'absolute',
-    left: 8,
-    right: 8,
-    top: 0,
-    height: 168,
-    borderRadius: 22,
-    backgroundColor: '#7FB5FF',
-    opacity: 0.7,
-  },
-  behind2: { left: 16, right: 16, top: -8, backgroundColor: '#BBD9FF', opacity: 0.6 },
-  briefCard: {
-    minHeight: 176,
-    borderRadius: 22,
-    padding: space.lg,
-    justifyContent: 'flex-start',
-    backgroundColor: color.primary,
-    ...(shadow.card as any),
-    ...({ backgroundImage: gradient.brand } as any),
-  },
-  briefBadge: {
-    alignSelf: 'flex-start',
-    color: '#fff',
-    fontSize: font.size.xs,
+  greeting: {
+    fontSize: font.size.display,
     fontWeight: font.weight.bold as any,
-    backgroundColor: 'rgba(255,255,255,0.22)',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: radius.pill,
+    color: color.text,
+    lineHeight: 40,
   },
-  briefTitle: {
-    color: '#fff',
-    fontSize: font.size.xl,
-    fontWeight: font.weight.bold as any,
-    marginTop: space.md,
-  },
-  briefDesc: {
-    color: 'rgba(255,255,255,0.92)',
-    fontSize: font.size.md,
-    lineHeight: 22,
-    marginTop: space.sm,
-  },
-  briefCta: {
-    alignSelf: 'flex-start',
-    backgroundColor: '#fff',
-    borderRadius: radius.pill,
-    paddingHorizontal: space.lg,
-    paddingVertical: space.sm,
-    marginTop: space.md,
-  },
-  briefCtaText: {
-    color: color.primaryDark,
-    fontSize: font.size.sm,
-    fontWeight: font.weight.bold as any,
-  },
+  greetingSub: { fontSize: font.size.md, color: color.textSub, marginTop: 6 },
 
-  dots: { flexDirection: 'row', gap: 6, justifyContent: 'center', marginTop: space.md },
-  dot: { width: 7, height: 7, borderRadius: 4, backgroundColor: color.border },
-  dotOn: { width: 18, backgroundColor: color.primary },
-
-  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: space.md },
-  tile: {
-    width: '47%',
-    flexGrow: 1,
-    backgroundColor: color.surface,
+  // 퀵 액션
+  quickRow: { flexDirection: 'row', marginTop: space.xl, gap: space.sm },
+  quickItemWrap: { flex: 1 },
+  quickItem: { alignItems: 'center', gap: space.sm, paddingVertical: space.xs },
+  quickChip: {
+    width: 58,
+    height: 58,
     borderRadius: 18,
-    padding: space.lg,
-    ...(shadow.card as any),
-  },
-  tileChip: {
-    width: 38,
-    height: 38,
-    borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
+    backgroundColor: color.surfaceAlt,
   },
-  tileIcon: { fontSize: 18 },
-  tileTitle: {
-    fontSize: font.size.md,
+  quickIcon: { fontSize: 26 },
+  quickLabel: { fontSize: font.size.sm, color: color.textSub, fontWeight: font.weight.semibold as any },
+
+  section: {
+    fontSize: font.size.lg,
+    color: color.text,
+    fontWeight: font.weight.bold as any,
+    marginTop: space.xxl,
+    marginBottom: space.md,
+  },
+
+  // 챙길 것 카드
+  deck: { gap: space.md },
+  briefCard: {
+    backgroundColor: color.surface,
+    borderRadius: radius.xl,
+    padding: space.xl,
+    ...(shadow.card as any),
+  },
+  tag: { alignSelf: 'flex-start', paddingHorizontal: 10, paddingVertical: 4, borderRadius: radius.pill },
+  tagText: { fontSize: font.size.xs, fontWeight: font.weight.bold as any },
+  briefTitle: {
+    fontSize: font.size.xl,
     fontWeight: font.weight.bold as any,
     color: color.text,
     marginTop: space.md,
   },
-  tileSub: { fontSize: font.size.xs, color: color.textMuted, marginTop: 3 },
+  briefDesc: { fontSize: font.size.md, color: color.textSub, lineHeight: 23, marginTop: 6 },
+  briefCtaRow: { flexDirection: 'row', alignItems: 'center', marginTop: space.lg },
+  briefCta: { fontSize: font.size.md, color: color.primary, fontWeight: font.weight.bold as any },
+  chevron: { fontSize: 20, color: color.primary, fontWeight: font.weight.bold as any, marginLeft: 2 },
+
+  // 기기 리스트 카드
+  listCard: {
+    backgroundColor: color.surface,
+    borderRadius: radius.xl,
+    paddingHorizontal: space.lg,
+    ...(shadow.card as any),
+  },
+  row: { flexDirection: 'row', alignItems: 'center', paddingVertical: space.lg, gap: space.md },
+  rowDivider: { borderBottomWidth: 1, borderBottomColor: color.surfaceAlt },
+  rowChip: {
+    width: 44,
+    height: 44,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  rowThumb: { width: 44, height: 44, borderRadius: 14, backgroundColor: color.surfaceAlt },
+  rowIcon: { fontSize: 20 },
+  rowBody: { flex: 1 },
+  rowTitle: { fontSize: font.size.md, fontWeight: font.weight.bold as any, color: color.text },
+  rowSub: { fontSize: font.size.xs, color: color.textMuted, marginTop: 2 },
+  statusPill: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: radius.pill },
+  statusText: { fontSize: font.size.xs, fontWeight: font.weight.bold as any },
+  chevronMuted: { fontSize: 18, color: color.textMuted, marginLeft: 2 },
 
   recCard: {
     backgroundColor: color.surface,
-    borderRadius: 18,
+    borderRadius: radius.xl,
     padding: space.lg,
     ...(shadow.card as any),
   },

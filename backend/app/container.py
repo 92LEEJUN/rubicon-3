@@ -14,6 +14,7 @@ from .compaction import CompactionService, RuleBasedCompactor
 from .domain import User
 from .recommendation import RecommendationService
 from .reengagement import ReEngagementService
+from .satisfaction import SatisfactionService
 from .repositories import (
     InMemoryConversationMemoryRepository,
     InMemoryConversationStore,
@@ -47,6 +48,7 @@ class Container:
     compaction: CompactionService
     companion: CompanionService
     reengagement: ReEngagementService
+    satisfaction: SatisfactionService
     recommendation: RecommendationService
     device: DeviceService
     knowledge: KnowledgeService
@@ -78,6 +80,9 @@ def build_container() -> Container:
     compaction = CompactionService(RuleBasedCompactor())
     companion = CompanionService(conversation_memory, conversation_store, compaction, open_loops)
     reengagement = ReEngagementService(companion, engagement)
+    # 만족도 수집(ADR-0066) — 신호는 개선 엔진 sink로 emit(토글 off면 no-op = 회귀 불변).
+    from .improve.signals import COLLECTOR as _improve_sink
+    satisfaction = SatisfactionService(engagement, signal_sink=_improve_sink.collect)
     device = DeviceService(mock.MockDeviceAdapter())
     warranty_adapter = mock.MockWarrantyAdapter()
     knowledge = KnowledgeService(mock.MockCSKnowledgeAdapter(), warranty_adapter)
@@ -99,6 +104,7 @@ def build_container() -> Container:
         compaction=compaction,
         companion=companion,
         reengagement=reengagement,
+        satisfaction=satisfaction,
         recommendation=recommendation,
         device=device,
         knowledge=knowledge,

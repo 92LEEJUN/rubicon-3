@@ -8,17 +8,22 @@
 에서 채운다. 토글 `COMPANION` 기본 off. 외부 푸시 채널은 비범위(인앱 제안까지). 모든 신호는 Engagement에
 기록해 개인화·중복 방지·자기개선(ADR-0067)에 재사용한다.
 
+## 구현 현황(재사용 vs 신규)
+요구사항 1·2의 토대는 **이미 `specs/always-present-companion/`에 구현**돼 있다 — 본 라운드는 이를
+**재사용**하고 **만족도 수집(요구사항 3)** 과 **자기개선 신호 연결(ADR-0067)** 만 신규로 더한다.
+
 ## 주요 컴포넌트 / 인터페이스
-- **`OpenLoopStore`** — 미해결 스레드 기록/조회/만료/닫기 _(요구사항 1)_. 키: user_id(+thread). 인메모리/
-  Mock(영속은 백킹서비스 Port, ADR-0059 재사용 가능). `record(loop)`·`pending(user)`·`close(id)`·`expire()`.
-- **`ReengagementProposer`** — 트리거 평가 → 제안 생성 _(요구사항 2-1)_. 트리거: 소모품 임박·미해결·점검
-  주기·재주문 주기. 출력은 **제안 후보**(노출 아님).
-- **`ReengagementGate`** — ADR-0042 게이트 _(요구사항 2-2·2-3)_: 빈도 상한·중요도 임계·동의 scope(R30)
-  검사 → 통과분만 표면화. 결정적·단위 검증.
-- **`SatisfactionCollector`** — 해결 확인(R25)에 CSAT/NPS 인라인 수집 _(요구사항 3)_. 미해결→재진단/핸드오프.
-  수집 결과를 `ImprovementSignals`(ADR-0067)로 emit.
-- **Engagement 연계** — 위 결과를 Engagement 도메인(R29)에 기록(중복 제시 방지·개인화 재사용) _(요구사항 4-2)_.
-- **배선** — capability/companion 경로(기존 companion 0042 위) 또는 라우터로. 토글 off면 미등록(회귀 불변).
+- **`CompanionService` / `InMemoryOpenLoopRepository`** _(요구사항 1, 기구현)_ — open-loop 멱등 기록·
+  `resolve_loop`·`dismiss_loop`·`last_touch`(`app/companion.py`·`app/repositories/open_loop.py`).
+- **`ReEngagementService`** _(요구사항 2, 기구현)_ — ADR-0042 게이트 순서(① 동의/opt-in → ② cooldown(R26)
+  → ③ Engagement 중복 → ④ 묶음(R27))로 후보 1건만(`candidate`/`mark_sent`, `app/reengagement.py`).
+- **`SatisfactionService`** _(요구사항 3, **신규** `app/satisfaction.py`)_ — `collect(user, topic, score,
+  kind, resolved)`. 미해결이면 `next_action="rediagnose"`. Engagement에 `sat:<topic>` 기록. 동의 scope
+  인지로 `Signal(kind="satisfaction"|"handoff")`를 주입된 `signal_sink`(개선 엔진 COLLECTOR)로 emit.
+- **엔드포인트** _(신규)_ — `POST /internal/satisfaction`(기존 companion 엔드포인트와 동거, `api/internal.py`).
+- **Engagement 연계** — Engagement 도메인(R29)에 기록(중복·개인화 재사용) _(요구사항 4-2)_.
+- **토글** — 기존 companion/재관여는 **consent-gated**(글로벌 토글 아님). 만족도는 **추가형**(신규 경로,
+  기존 동작 불변). 신호 emit만 `SELF_IMPROVE` 게이트(ADR-0067) _(요구사항 4-1)_.
 
 ## 데이터 모델
 - `OpenLoop{ id, user_id, topic, opened_at, expires_at, status: open|resolved|expired }`

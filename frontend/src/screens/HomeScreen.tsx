@@ -7,7 +7,6 @@ import React, { useState } from 'react';
 import {
   NativeScrollEvent,
   NativeSyntheticEvent,
-  Pressable,
   ScrollView,
   StyleSheet,
   Text,
@@ -15,6 +14,7 @@ import {
   useWindowDimensions,
 } from 'react-native';
 import { TemplateView } from '../templates';
+import { FadeInView, PressableScale, Stagger, StaggerItem } from '../components/motion';
 import { color, font, gradient, radius, shadow, space } from '../design/tokens';
 
 const DEVICE_KO: Record<string, string> = {
@@ -140,11 +140,12 @@ export function HomeScreen({
             contentContainerStyle={{ gap: space.md }}
           >
             {briefings.map((b, i) => (
-              <Pressable
+              <PressableScale
                 key={i}
                 testID={`briefing-${i}`}
                 onPress={() => onOpenChat?.(b.ask)}
                 style={[styles.briefCard, { width: cardW }]}
+                lift={false}
               >
                 <Text style={styles.briefBadge}>{b.badge}</Text>
                 <Text style={styles.briefTitle}>{b.title}</Text>
@@ -152,7 +153,7 @@ export function HomeScreen({
                 <View style={styles.briefCta}>
                   <Text style={styles.briefCtaText}>{b.cta}</Text>
                 </View>
-              </Pressable>
+              </PressableScale>
             ))}
           </ScrollView>
         </View>
@@ -162,36 +163,33 @@ export function HomeScreen({
           ))}
         </View>
 
-        {/* 2열 작은 카드 */}
+        {/* 2열 작은 카드 — stagger 등장 + 스프링 누름 */}
         <Text style={styles.label}>한눈에 보기</Text>
-        <View style={styles.grid}>
+        <Stagger style={styles.grid} testID="tile-grid">
           {tiles.map((t, i) => (
-            <Pressable
-              key={i}
-              testID={`tile-${i}`}
-              onPress={() => onOpenChat?.(t.ask)}
-              style={({ pressed }) => [styles.tile, pressed && { opacity: 0.85 }]}
-            >
-              <View style={[styles.tileChip, { backgroundColor: t.tint }]}>
-                <Text style={styles.tileIcon}>{t.icon}</Text>
-              </View>
-              <Text style={styles.tileTitle}>{t.title}</Text>
-              <Text style={styles.tileSub}>{t.sub}</Text>
-            </Pressable>
+            <StaggerItem key={i} style={styles.tileWrap}>
+              <PressableScale testID={`tile-${i}`} onPress={() => onOpenChat?.(t.ask)} style={styles.tile}>
+                <View style={[styles.tileChip, { backgroundColor: t.tint }]}>
+                  <Text style={styles.tileIcon}>{t.icon}</Text>
+                </View>
+                <Text style={styles.tileTitle}>{t.title}</Text>
+                <Text style={styles.tileSub}>{t.sub}</Text>
+              </PressableScale>
+            </StaggerItem>
           ))}
-        </View>
+        </Stagger>
 
         {/* 개인화 추천 */}
         {recs.length ? (
-          <View testID="home-recommend">
+          <FadeInView testID="home-recommend" delay={0.08}>
             <Text style={styles.label}>맞춤 추천</Text>
-            <Pressable
+            <PressableScale
               onPress={() => onOpenChat?.('추천 제품 자세히 알려줘')}
               style={styles.recCard}
             >
               <TemplateView template={{ kind: 'recommendation_list', data: { products: recs } }} />
-            </Pressable>
-          </View>
+            </PressableScale>
+          </FadeInView>
         ) : null}
       </ScrollView>
     </View>
@@ -277,9 +275,9 @@ const styles = StyleSheet.create({
   dotOn: { width: 18, backgroundColor: color.primary },
 
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: space.md },
+  tileWrap: { width: '47%', flexGrow: 1 },
   tile: {
-    width: '47%',
-    flexGrow: 1,
+    flex: 1,
     backgroundColor: color.surface,
     borderRadius: 18,
     padding: space.lg,

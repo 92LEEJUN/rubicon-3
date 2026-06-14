@@ -1,19 +1,41 @@
 /** 기본 UI 프리미티브 — 토큰만 참조(One UI 스타일). RN 컴포넌트(웹=react-native-web). */
 import React from 'react';
-import { Pressable, StyleSheet, Text, View, ViewStyle } from 'react-native';
-import { color, font, radius, space } from '../design/tokens';
+import { StyleSheet, Text, View, ViewStyle } from 'react-native';
+import { color, font, radius, shadow, space } from '../design/tokens';
+import { spring, pressTap, hoverLift } from '../design/motion';
+import { MotionPressable } from './motion';
 
 export function Card({
   children,
   style,
   testID,
+  onPress,
+  elevated,
 }: {
   children: React.ReactNode;
   style?: ViewStyle;
   testID?: string;
+  onPress?: () => void;       // 주면 누름 가능한 카드(스프링 피드백)
+  elevated?: boolean;         // 깊이 강조 그림자
 }) {
+  const cardStyle = [styles.card, elevated && (shadow.elevated as any), style];
+  if (onPress) {
+    return (
+      <MotionPressable
+        testID={testID}
+        accessibilityRole="button"
+        onPress={onPress}
+        style={cardStyle as any}
+        whileTap={pressTap}
+        whileHover={hoverLift}
+        transition={spring.press as any}
+      >
+        {children}
+      </MotionPressable>
+    );
+  }
   return (
-    <View testID={testID} style={[styles.card, style]}>
+    <View testID={testID} style={cardStyle}>
       {children}
     </View>
   );
@@ -63,20 +85,19 @@ export function Button({
 }) {
   const primary = variant === 'primary';
   return (
-    <Pressable
+    <MotionPressable
       testID={testID}
       accessibilityRole="button"
       onPress={onPress}
-      style={({ pressed }) => [
-        styles.btn,
-        primary ? styles.btnPrimary : styles.btnSecondary,
-        pressed && { opacity: 0.85 },
-      ]}
+      style={[styles.btn, primary ? styles.btnPrimary : styles.btnSecondary] as any}
+      whileTap={pressTap}
+      whileHover={hoverLift}
+      transition={spring.press as any}
     >
       <Text style={[styles.btnText, primary ? { color: '#fff' } : { color: color.primaryDark }]}>
         {label}
       </Text>
-    </Pressable>
+    </MotionPressable>
   );
 }
 

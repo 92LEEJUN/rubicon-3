@@ -46,4 +46,12 @@ export const shadow = {
     shadowOffset: { width: 0, height: 4 },
     elevation: 2,
   },
+  // 깊이 강조(주요 카드·호버) — One UI 정제 톤의 한 단계 더한 elevation.
+  elevated: {
+    shadowColor: '#0A2540',
+    shadowOpacity: 0.1,
+    shadowRadius: 20,
+    shadowOffset: { width: 0, height: 8 },
+    elevation: 6,
+  },
 } as const;

@@ -7,6 +7,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Animated, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SectionView } from '../components/message';
+import { AnimatePresence } from '../components/motion';
 import { ResumeCard } from '../components/ResumeCard';
 import { ReEngagementBanner } from '../components/ReEngagementBanner';
 import { StreamingMessage } from '../components/StreamingMessage';
@@ -240,10 +241,12 @@ export function ChatPanel({
         contentContainerStyle={styles.content}
         testID="chat-scroll"
       >
-        {/* 선제 재관여 배너(동의·deliver 게이트는 훅에서, 요구 3·6) */}
-        {reeng.banner ? (
-          <ReEngagementBanner banner={reeng.banner} onOpen={reenter} onDismiss={reeng.dismiss} />
-        ) : null}
+        {/* 선제 재관여 배너(동의·deliver 게이트는 훅에서, 요구 3·6) — enter/exit 트랜지션 */}
+        <AnimatePresence>
+          {reeng.banner ? (
+            <ReEngagementBanner banner={reeng.banner} onOpen={reenter} onDismiss={reeng.dismiss} />
+          ) : null}
+        </AnimatePresence>
 
         {/* 이어가기 카드 — 패널 상단(요구 1). has_context=false면 미표시(빈 상태). */}
         {hasContext && resume ? (

@@ -139,9 +139,11 @@ def _capability_orch() -> bool:
 # 모듈 로드 시 1회 구성(_orch와 동일 패턴). LLM_BACKED 평가는 _stream_turn에서 매 호출.
 def _build_cap_orch():
     from ..orchestrator.capability import CapabilityOrchestrator
+    from ..orchestrator.guardrail import Guardrail
     from ..orchestrator.planner import LLMPlanner
-    planner = LLMPlanner() if _llm_backed() else None
-    return CapabilityOrchestrator(container=_container, llm_planner=planner)
+    planner = LLMPlanner() if _llm_backed() else None   # 슈퍼바이저(plan+compose, ADR-0053)
+    # 가드레일은 결정적(LLM 무관)이라 항상 주입. 발동은 GUARDRAIL 토글이 astream에서 게이트(ADR-0054).
+    return CapabilityOrchestrator(container=_container, llm_planner=planner, guardrail=Guardrail())
 
 
 _cap_orch = None   # 첫 CAPABILITY_ORCH 요청 시 lazy 구성(LLM_BACKED 토글 반영)

@@ -29,7 +29,7 @@
 |---|---|---|
 | [0008](0008-multiagent-latency.md) | 멀티에이전트 **지연 고려 반영**(SLA 재정의·N배) | 채택 |
 | [0009](0009-supervisor-worker.md) | 제어 패턴 = **슈퍼바이저-워커** | 채택 |
-| [0010](0010-agent-granularity.md) | 그래뉼래리티 = **중간**(진단·커머스만 에이전트) | 채택 |
+| [0010](0010-agent-granularity.md) | 그래뉼래리티 = **중간**(진단·커머스 에이전트, 추천은 0044로 agent 승격) | 채택(0044로 추천 추가) |
 | [0011](0011-conditional-review.md) | 리뷰/크리틱 = **조건부** | 채택 |
 | [0012](0012-single-pass.md) | 계획 = **단일 패스**(재계획 루프 없음) | 채택 |
 | [0013](0013-prompt-single-source.md) | 에이전트 프롬프트 **단일 출처 = prompts.py** | 구현됨 |
@@ -43,6 +43,9 @@
 | [0050](0050-bff-be-identity-and-commit-contract.md) | BFF↔BE 신원 계약 + 게스트(비로그인) + 커밋 왕복 — 헤더/WS 신원 전달·게스트 허용·401/409 중계·FE 신규 kind | 채택 |
 | [0051](0051-fe-mock-mode.md) | FE 단독 동작 Mock 모드 — 클라이언트 전용·문서 미러·시나리오+키워드 라우터·localStorage·회귀 불변(`!apiBase`) | 채택 |
 | [0052](0052-guardrail-agent.md) | **신뢰·안전 = 별도 가드레일 에이전트** — 인라인/에지 전담 기각, 입력(pre)/출력(post) 2-단계 + Review 게이트 통합·감사 소유·결정적·토글 회귀 | 채택 |
+| [0053](0053-supervisor-compose.md) | **LLM 플래너 → 슈퍼바이저(plan+compose 양끝)** — 복합 응답 종합(reduce) 추가·말만 생성/데이터 불변·선택적·폴백·`COMPOSE` 토글·text 재사용(계약 무추가) | 채택 |
+| [0054](0054-guardrail-parallel.md) | **가드레일 = 의도 추출과 병렬 + fail-closed** — pre는 라우팅과 gather(직렬 지연 0)·예외→차단·post 방출 직전(텍스트만)·`GUARDRAIL` 토글 회귀 | 채택 |
+| [0055](0055-compose-2track-streaming.md) | **compose 2-track 스트리밍 + 차단 시 라우팅 취소** — 카드 선-방출(first-token=라우팅 홉)·내러티브는 delta(off=토큰 스트리밍/on=버퍼+마스킹)·캐시 기각·ADR-0053 스트리밍 항목 정련 | 채택 |
 | [0056](0056-environment-config-baseline.md) | **환경 계층(dev/stg/prd) & 구성 토대 + 배선 시임** — APP_ENV 단일 소스·명시 env 우선·3계층 동형·append-only wiring(병렬 충돌 회피)·추가형 회귀 불변. (프로덕션 준비도 프로그램 토대, `docs/production-readiness.md`) | 채택 |
 | [0057](0057-observability.md) | **관측성** — 요청 상관관계(request_id)·settings 기반 구조화 로깅·/metrics 지연 히스토그램·OTel 스타일 추적(`TRACING` 토글)·SLO. 계약 무변(헤더·시리즈 부가) | 채택 |
 | [0058](0058-resilience.md) | **신뢰성·회복력** — 서킷브레이커·단계별 타임아웃(0018 되살림)·graceful shutdown·degraded·retry 공용 유틸. stdlib·토글 회귀 | 채택 |

@@ -121,3 +121,17 @@
 - **레지스트리** — `{name: Capability(kind=agent|tool, intents, tools, prompt?, deps_hint, priority, emits)}`, 추가=한 엔트리.
 
 > 구현(runtime/core 수렴)은 별도 스펙 후보. 근거·기각: ADR-0045.
+
+## 13. 슈퍼바이저 양끝(plan + compose) + 병렬 가드레일 (ADR-0053·0054)
+
+§1의 슈퍼바이저는 본래 "분해→위임→조립"을 모두 담당한다. capability 오케스트레이터(②)에서 이 중
+**조립(compose)** 을 LLM 슈퍼바이저(= 플래너와 동일 주입체)로 되살린다 — 같은 두뇌가 턴의 **양끝**
+(앞=plan 분해, 뒤=compose 조립)을 잡는다. compose는 핸들러 섹션의 facts를 받아 **자연어 내러티브만**
+만들고(데이터 재생성 금지), 처리 섹션이 2개 이상일 때만 선두에 둔다(스킵·폴백 내장, `COMPOSE` 토글).
+
+**가드레일(ADR-0052)은 §3 조건부 Review와 같은 경계**에 서되, 입력 검사(pre)는 **plan과 병렬**
+(`asyncio.gather`)로 직렬 지연을 없애고, 차단은 **fail-closed**(예외도 차단)다. 출력 검사(post)는
+방출 직전 텍스트 PII를 마스킹(구조 필드 불변). Review가 "근거·정책"을, 가드레일이 "안전·PII·인젝션"을
+보는 **같은 게이트의 두 관심사**다(`GUARDRAIL` 토글). 결정적 규칙(LLM 무관)이라 단위 검증 가능.
+
+> 레이턴시: compose는 배리어+LLM 1콜로 first-token·총 E2E 증가(품질 우선·의도된 비용). 근거: ADR-0053·0054.

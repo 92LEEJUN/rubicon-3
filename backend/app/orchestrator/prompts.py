@@ -4,8 +4,8 @@
 정책(해야/하지 말아야 할 말·어투·가드레일)은 docs/llm-policy.md 가 상위 단일 출처이며,
 본 모듈은 그 정책을 에이전트별로 구체화한 **운영용 프롬프트**다.
 
-주의: 멀티에이전트 런타임은 아직 미구현(현재 데모 경로는 단일 tool-loop = legacy.py).
-본 프롬프트는 멀티에이전트 구현 시 그대로 사용할 수 있도록 준비된 캐논 텍스트다.
+멀티에이전트 런타임은 `runtime.astream_multiagent`(MULTIAGENT 경로)에서 이 프롬프트를 쓰고,
+capability 오케스트레이터(②)는 `COMPOSER_PROMPT`로 슈퍼바이저 응답 종합을 수행한다(ADR-0053).
 """
 from __future__ import annotations
 
@@ -88,10 +88,26 @@ RECOMMEND_PROMPT = BASE_POLICY + """
 [출력] recommendation_list(제품별 근거 포함) 중심.
 """
 
+# ── Compose — 슈퍼바이저 응답 종합/조립 (ADR-0053, R7·§6.6) ──────────────────
+# 슈퍼바이저는 plan(분해)뿐 아니라 compose(조립)로 턴의 양끝을 잡는다. compose는 핸들러가 만든
+# 구조화 섹션의 facts를 받아 **자연어 내러티브만** 생성한다. 데이터(카드·CTA·가격·id)는 재생성하지
+# 않고 "참조"만 한다 — 환각·계약 훼손 방지(ADR-0053 불변식).
+COMPOSER_PROMPT = BASE_POLICY + """
+[역할] 슈퍼바이저(응답 조립).
+- 아래 '처리 결과(facts)'는 워커/핸들러가 이미 만든 섹션 요약이다. 이를 **하나의 자연스러운 한국어
+  응답**으로 매끄럽게 이어 정리한다(안전·진단 먼저, 행동·추천은 뒤).
+- 카드·버튼은 화면에 별도로 함께 표시된다. 너는 그것들을 "아래 카드/버튼으로 ~하실 수 있어요"처럼
+  **참조**만 하고, 가격·재고·사양·식별자 같은 수치/데이터를 **새로 만들지 않는다**.
+- 사용자가 무엇을 확인하면 되는지, 다음에 무엇을 하면 되는지 간결히 안내한다. 2~4문장 권장.
+[하지 말 것] facts에 없는 사실·수치 생성(환각), 카드 데이터 재기술·재계산, 과장·단정.
+[출력] 자연어 문장만(머리말·목록 기호·시스템 언급 없이).
+"""
+
 AGENT_PROMPTS = {
     "supervisor": SUPERVISOR_PROMPT,
     "diagnosis": DIAGNOSIS_PROMPT,
     "commerce": COMMERCE_PROMPT,
     "recommend": RECOMMEND_PROMPT,
     "review": REVIEW_PROMPT,
+    "compose": COMPOSER_PROMPT,
 }

@@ -30,6 +30,52 @@ const CONS_KO: Record<string, string> = {
 
 type Tile = { icon: string; type: string; tint: string; title: string; sub: string; ok?: boolean; ask: string };
 
+// 데모 다양성을 위한 큐레이션 카드(데이터 카드 뒤에 붙어 ~7장 구성). 색·주제 다양화.
+const CURATED: DeckItem[] = [
+  {
+    palette: 'teal',
+    tag: '🌱 에너지',
+    title: '이번 달 절약 리포트',
+    desc: 'ECO 코스로 전기·물 12% 아꼈어요. 다음 절약 팁도 받아보세요.',
+    cta: '리포트 보기',
+    ask: '우리집 에너지 절약 리포트랑 다음 팁 알려줘',
+  },
+  {
+    palette: 'violet',
+    tag: '🗓 정기 점검',
+    title: '점검 시즌이 돌아왔어요',
+    desc: '3개월마다 자가 점검을 추천해요. 5분이면 끝나요.',
+    cta: '점검 시작',
+    ask: '우리집 가전 정기 점검 도와줘',
+  },
+  {
+    palette: 'magenta',
+    tag: '✨ 맞춤 추천',
+    title: '세제·필터 번들 추천',
+    desc: '내 세탁기에 딱 맞는 세제와 필터를 묶어 최대 15% 할인.',
+    cta: '번들 보기',
+    ask: '세탁기에 맞는 세제랑 필터 번들 추천해줘',
+  },
+  {
+    palette: 'forest',
+    tag: '🛡 보증',
+    title: '냉장고 워런티 만료 임박',
+    desc: '30일 뒤 보증이 끝나요. 연장 옵션을 미리 확인하세요.',
+    cta: '보증 확인',
+    ask: '냉장고 워런티 연장 옵션 알려줘',
+    deviceType: 'refrigerator',
+  },
+  {
+    palette: 'ocean',
+    tag: '💧 소모품',
+    title: '공기청정기 필터 교체 시기',
+    desc: 'HEPA 필터 수명 20% 남았어요. 미리 주문해두면 편해요.',
+    cta: '필터 주문',
+    ask: '공기청정기 HEPA 필터 주문할래',
+    deviceType: 'air_purifier',
+  },
+];
+
 function buildBriefings(data: any): DeckItem[] {
   const out: DeckItem[] = [];
   for (const d of data.devices ?? []) {
@@ -39,7 +85,7 @@ function buildBriefings(data: any): DeckItem[] {
         (d.consumables ?? [])[0];
       const pct = c ? Math.round(c.life_remaining * 100) : null;
       out.push({
-        tone: 'danger',
+        palette: 'sunset',
         tag: '⚠ 점검 필요',
         title: `${DEVICE_KO[d.type] ?? d.type} 배수 이상 · 5C`,
         desc:
@@ -56,8 +102,8 @@ function buildBriefings(data: any): DeckItem[] {
     const d = (data.devices ?? []).find((x: any) => x.id === a.device_id);
     const name = d ? (DEVICE_KO[d.type] ?? d.type) : '기기';
     out.push({
-      tone: a.severity === 'warning' ? 'warning' : 'primary',
-      tag: a.severity === 'warning' ? '🔧 소모품 알림' : 'ⓘ 안내',
+      palette: 'amber',
+      tag: '🔧 소모품 알림',
       title: `${name} 소모품 교체 시기`,
       desc: a.detail,
       cta: '교체·주문 안내',
@@ -65,7 +111,10 @@ function buildBriefings(data: any): DeckItem[] {
       deviceType: d?.type,
     });
   }
-  return out;
+  out.push(...CURATED);
+  // 7장에 7색을 위치별로 고유 배정 — 데이터가 같은 종류를 만들어도 색이 겹치지 않게.
+  const ORDER = ['sunset', 'ocean', 'amber', 'violet', 'teal', 'magenta', 'forest'];
+  return out.slice(0, 7).map((c, i) => ({ ...c, palette: ORDER[i] }));
 }
 
 function buildTiles(data: any): Tile[] {

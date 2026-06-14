@@ -16,7 +16,7 @@ import { color, font, radius, shadow, space } from '../design/tokens';
 const MotionView = motion.create(View as any);
 
 export type DeckItem = {
-  tone: 'warning' | 'danger' | 'primary';
+  palette: string; // PALETTES 키
   tag: string;
   title: string;
   desc: string;
@@ -25,30 +25,63 @@ export type DeckItem = {
   deviceType?: string;
 };
 
-// 톤별 비주얼 — 사진을 살리되(위) 아래로 갈수록 스크림으로 가독성 확보. solid=글로우/CTA 텍스트색.
-const TONE: Record<string, { tint: string; scrim: string; solid: string; text: string }> = {
-  danger: {
-    tint: 'rgba(240,68,82,0.28)',
-    scrim:
-      'linear-gradient(180deg, rgba(120,16,26,0) 0%, rgba(120,16,26,0.12) 34%, rgba(150,22,33,0.95) 100%)',
-    solid: '#F04452',
-    text: '#E5384A',
+// 세련된 팔레트 7종 — 사진은 위에서 살리고(상단 투명) 아래로 갈수록 컬러 그라데이션(가독성).
+// base: 사진 없는 카드의 전체 그라데이션. overlay: 사진 위 하단 스크림. glow: 카드 글로우. text: 흰 CTA 글자색.
+type Palette = { base: string; overlay: string; glow: string; text: string };
+const PALETTES: Record<string, Palette> = {
+  sunset: {
+    base: 'linear-gradient(150deg, #FF8A8A 0%, #E0455F 100%)',
+    overlay:
+      'linear-gradient(180deg, rgba(0,0,0,0) 0%, rgba(224,69,95,0.66) 50%, rgba(190,38,66,0.96) 100%)',
+    glow: '#FF6B6B',
+    text: '#D6324B',
   },
-  warning: {
-    tint: 'rgba(255,138,0,0.26)',
-    scrim:
-      'linear-gradient(180deg, rgba(120,64,0,0) 0%, rgba(120,64,0,0.12) 34%, rgba(150,80,0,0.95) 100%)',
-    solid: '#FF8A00',
-    text: '#D87400',
-  },
-  primary: {
-    tint: 'rgba(49,130,246,0.26)',
-    scrim:
-      'linear-gradient(180deg, rgba(12,48,120,0) 0%, rgba(12,48,120,0.12) 34%, rgba(14,54,140,0.96) 100%)',
-    solid: '#3182F6',
+  ocean: {
+    base: 'linear-gradient(150deg, #5CA8FF 0%, #1456C4 100%)',
+    overlay:
+      'linear-gradient(180deg, rgba(0,0,0,0) 0%, rgba(34,108,214,0.66) 50%, rgba(16,70,170,0.96) 100%)',
+    glow: '#3182F6',
     text: '#1B64DA',
   },
+  amber: {
+    base: 'linear-gradient(150deg, #FFC061 0%, #E07A14 100%)',
+    overlay:
+      'linear-gradient(180deg, rgba(0,0,0,0) 0%, rgba(216,116,0,0.66) 50%, rgba(176,92,0,0.96) 100%)',
+    glow: '#FF9F43',
+    text: '#C76A00',
+  },
+  teal: {
+    base: 'linear-gradient(150deg, #3FD9C4 0%, #088C7C 100%)',
+    overlay:
+      'linear-gradient(180deg, rgba(0,0,0,0) 0%, rgba(8,150,134,0.66) 50%, rgba(6,110,98,0.96) 100%)',
+    glow: '#0BC4AC',
+    text: '#06997F',
+  },
+  violet: {
+    base: 'linear-gradient(150deg, #A488FF 0%, #5B3FD6 100%)',
+    overlay:
+      'linear-gradient(180deg, rgba(0,0,0,0) 0%, rgba(91,63,214,0.66) 50%, rgba(70,48,170,0.96) 100%)',
+    glow: '#7C5CFC',
+    text: '#5B3FD6',
+  },
+  magenta: {
+    base: 'linear-gradient(150deg, #FF8AC2 0%, #D6418A 100%)',
+    overlay:
+      'linear-gradient(180deg, rgba(0,0,0,0) 0%, rgba(214,65,138,0.66) 50%, rgba(176,40,110,0.96) 100%)',
+    glow: '#FF6EB4',
+    text: '#D6418A',
+  },
+  forest: {
+    base: 'linear-gradient(150deg, #5BD98A 0%, #149650 100%)',
+    overlay:
+      'linear-gradient(180deg, rgba(0,0,0,0) 0%, rgba(20,150,80,0.66) 50%, rgba(14,120,64,0.96) 100%)',
+    glow: '#2BC36B',
+    text: '#0AA15A',
+  },
 };
+
+// 상단 미세 다크 스크림(배지 가독성). 사진 카드에만 의미.
+const TOP_SCRIM = 'linear-gradient(180deg, rgba(0,0,0,0.26) 0%, rgba(0,0,0,0) 24%)';
 
 const DECK_EMOJI: Record<string, string> = {
   washer: '🧺',
@@ -59,17 +92,16 @@ const DECK_EMOJI: Record<string, string> = {
 function CardFace({ item }: { item: DeckItem }) {
   const img = item.deviceType ? DEVICE_IMAGE[item.deviceType] : undefined;
   const emoji = item.deviceType ? DECK_EMOJI[item.deviceType] : undefined;
-  const t = TONE[item.tone];
+  const p = PALETTES[item.palette] ?? PALETTES.ocean;
   return (
     <>
       {img ? (
         <Image source={{ uri: img }} style={styles.photo} resizeMode="cover" />
       ) : (
-        <View style={[styles.photo, { backgroundColor: t.solid }]} />
+        <View style={[styles.photo, { backgroundImage: p.base } as any]} />
       )}
-      {/* 톤 워시(브랜드색) + 하단 스크림(가독성) — 사진은 위쪽에서 살아 보인다 */}
-      <View style={[styles.fill, { backgroundColor: t.tint }]} pointerEvents="none" />
-      <View style={[styles.fill, { backgroundImage: t.scrim } as any]} pointerEvents="none" />
+      {img ? <View style={[styles.fill, { backgroundImage: TOP_SCRIM } as any]} pointerEvents="none" /> : null}
+      <View style={[styles.fill, { backgroundImage: p.overlay } as any]} pointerEvents="none" />
       <View style={styles.faceContent}>
         <View style={styles.topRow}>
           <View style={styles.tag}>
@@ -89,8 +121,8 @@ function CardFace({ item }: { item: DeckItem }) {
           {item.desc}
         </Text>
         <View style={styles.ctaPill}>
-          <Text style={[styles.ctaPillText, { color: t.text }]}>{item.cta}</Text>
-          <Text style={[styles.ctaPillChev, { color: t.text }]}>›</Text>
+          <Text style={[styles.ctaPillText, { color: p.text }]}>{item.cta}</Text>
+          <Text style={[styles.ctaPillChev, { color: p.text }]}>›</Text>
         </View>
       </View>
     </>
@@ -159,8 +191,8 @@ export function DeviceDeck({
             {
               ...StyleSheet.flatten(styles.card),
               height,
-              // 톤 컬러 글로우 — 카드가 떠 보이게
-              shadowColor: TONE[front.tone].solid,
+              // 팔레트 컬러 글로우 — 카드가 떠 보이게
+              shadowColor: (PALETTES[front.palette] ?? PALETTES.ocean).glow,
               shadowOpacity: 0.4,
               shadowRadius: 30,
               shadowOffset: { width: 0, height: 16 },

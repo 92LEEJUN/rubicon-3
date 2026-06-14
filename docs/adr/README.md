@@ -56,6 +56,8 @@
 | [0063](0063-security-hardening.md) | **보안 심화(S7)** — BFF 레이트리밋(토큰버킷·429)·보안 헤더·입력 검증 유틸·감사 강화(S5 audit 재사용)·의존성 스캔(`security.yml`). `RATE_LIMIT`·`SECURITY_HEADERS` off=회귀 불변 | 채택 |
 | [0064](0064-experiments-ab.md) | **실험·롤아웃(Runtime A/B, S8)** — 결정적 sticky 할당·실험 레지스트리·canary/홀드아웃 게이트·노출 로깅(analytics append)·FE 훅/BE 헬퍼(`/internal/experiments/*`). `EXPERIMENTS` off=회귀 불변 | 채택 |
 | [0065](0065-delivery-dora.md) | **딜리버리·DORA(S9)** — 빌드↔릴리스↔런 분리·버전 스탬프·DORA 4지표 수집·환경별 배포 파이프라인(`release.yml`)·멀티스테이지 컨테이너. 추가형(기존 CI 잡 불변) | 채택 |
+| [0066](0066-companion-retention.md) | **컴패니언·리텐션** — open-loop 후속·재관여 제안(ADR-0042 엄격 게이트=남발 금지)·만족도(CSAT/NPS) 수집·신호는 Engagement+자기개선 공급. `COMPANION` off=회귀 불변 | 채택(스펙) |
+| [0067](0067-improvement-proposals-human-gated.md) | **자기개선 = 개선 제안 엔진(propose-only·휴먼게이트)** — 자동 적용 경로 부재·신호→제안→리뷰 큐→S8 검증→사람 적용·감사. `SELF_IMPROVE` off=회귀 불변 | 채택(스펙) |
 
 ### Phase A — 스트리밍 / 동시성 실행 (operations.md §6·§9·§14)
 | # | 결정 | 상태 |

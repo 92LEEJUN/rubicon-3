@@ -260,6 +260,15 @@ class MergeRequest(BaseModel):
     user_id: str
 
 
+class SatisfactionRequest(BaseModel):
+    """만족도 수집(ADR-0066) — 해결 확인 시점 CSAT/NPS(선택 응답)."""
+    topic: str
+    score: float
+    kind: str = "csat"          # "csat"(1~5) | "nps"(0~10)
+    resolved: bool = True
+    comment: str | None = None
+
+
 # ── 대화(WS) — 섹션 스트림 ──────────────────────────────────────────────────
 @app.websocket("/internal/turn")
 async def turn_ws(ws: WebSocket) -> None:
@@ -333,6 +342,17 @@ def reengagement_deliver(x_user_id: str | None = Header(None),
         return {}
     _container.reengagement.mark_sent(user)
     return cand.model_dump(mode="json")
+
+
+@app.post("/internal/satisfaction")
+def collect_satisfaction(req: SatisfactionRequest, x_user_id: str | None = Header(None),
+                         x_guest_token: str | None = Header(None)):
+    """만족도 수집(컴패니언 §3, ADR-0066) — CSAT/NPS 인라인. 미해결이면 next_action='rediagnose'.
+    수집 신호는 개선 엔진(ADR-0067)으로 emit(SELF_IMPROVE off면 no-op)."""
+    user = _users.get(_principal(x_user_id, x_guest_token))
+    rec = _container.satisfaction.collect(
+        user, req.topic, req.score, kind=req.kind, resolved=req.resolved, comment=req.comment)
+    return rec.to_dict()
 
 
 @app.get("/internal/recommendations")

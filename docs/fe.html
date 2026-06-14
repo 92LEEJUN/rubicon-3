@@ -1,0 +1,288 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>FE · 화면 와이어프레임</title>
+<link rel="stylesheet" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css" />
+<link rel="stylesheet" href="./style.css" />
+</head>
+<body class="fe">
+<nav class="nav"><div class="nav-in">
+  <span class="brand">📐 Rubicon 구성 문서</span>
+  <div class="links">
+    <a href="./index.html">허브</a>
+    <a class="fe on" href="./fe.html">FE</a>
+    <a class="bff" href="./bff.html">BFF</a>
+    <a class="be" href="./be.html">BE</a>
+    <a href="../">← 앱으로</a>
+  </div>
+</div></nav>
+
+<div class="wrap">
+  <div class="hero">
+    <div class="kicker">Frontend · React Native Web</div>
+    <h1>화면 와이어프레임 &amp; 구성요소</h1>
+    <p>실제 구현된 화면을 <b>저충실도 박스</b>로 정리했습니다. 각 화면의 영역과 그 영역을 그리는 컴포넌트(파일·역할)를 함께 표기합니다.
+       전역 채팅 패널은 모든 화면 위에 오버레이로 뜹니다(별도 라우트 아님).</p>
+    <div class="chips" style="margin-top:14px">
+      <span class="chip">react-native-web</span><span class="chip">Vite</span><span class="chip">framer-motion</span>
+      <span class="chip">디자인 토큰 + Pretendard</span><span class="chip tog">Mock 모드(!apiBase)</span>
+    </div>
+  </div>
+
+  <!-- S1 홈 -->
+  <h2 class="sec"><span class="n">S1</span> 홈</h2>
+  <p class="sec-sub">MainShell + HomeScreen — 개인화 선제안·요약. 하단 채팅바는 전 탭 공통 고정.</p>
+  <div class="screen">
+    <div class="wire">
+      <div class="notch"></div>
+      <div class="wbox"><div class="l">Header · MainShell</div><div class="t">삼성 AI 컨시어지 · 문서↗</div></div>
+      <div class="wbar"><div class="on">홈</div><div>고객지원</div></div>
+      <div class="wbox"><div class="t" style="font-size:18px;font-weight:800">안녕하세요, 준희님 👋</div><div class="s">오늘 챙기면 좋을 것들</div></div>
+      <div class="wquick">
+        <div><div class="ic"></div><div class="cap">진단</div></div>
+        <div><div class="ic"></div><div class="cap">주문</div></div>
+        <div><div class="ic"></div><div class="cap">예약</div></div>
+        <div><div class="ic"></div><div class="cap">추천</div></div>
+      </div>
+      <div class="wbox dark"><div class="l">오늘 챙길 것 · DeviceDeck</div><div class="t">3D 스택 스와이프 (7장 · 실사진)</div><div class="s">● ○ ○ ○ ○ ○ ○</div></div>
+      <div class="wbox"><div class="l">내 기기 · 리스트 카드</div><div class="t">🧺 세탁기 · 점검</div><div class="t">❄️ 냉장고 · 정상</div></div>
+      <div class="wbox"><div class="l">맞춤 추천</div><div class="t">recommendation_list</div></div>
+      <div class="wbox fill"><div class="l">고정 채팅바 · MainShell</div><div class="t">[ 입력… ] ▶</div></div>
+    </div>
+    <div class="wnote">
+      <h4>구성요소</h4>
+      <ul class="complist">
+        <li><span class="nm">MainShell</span><span class="fp">screens/MainShell.tsx</span><span class="rl">헤더(브랜드·세그먼트 탭)·홈↔CS 전환·하단 고정 채팅바. 전송 시 채팅 오픈.</span></li>
+        <li><span class="nm">HomeScreen</span><span class="fp">screens/HomeScreen.tsx</span><span class="rl">인사 + 퀵액션 4 + 덱 + 기기 리스트 + 추천. home_summary에서 파생.</span></li>
+        <li><span class="nm">DeviceDeck</span><span class="fp">components/DeviceDeck.tsx</span><span class="rl">3D 스택 스와이프 카드(framer drag·틸트·실사진+다크 스크림·팔레트 7).</span></li>
+        <li><span class="nm">SegmentedTabs</span><span class="fp">components/SegmentedTabs.tsx</span><span class="rl">홈/고객지원 토글.</span></li>
+        <li><span class="nm">primitives</span><span class="fp">components/primitives.tsx</span><span class="rl">Card·Button·Badge·타이포 — 토큰만 참조.</span></li>
+        <li><span class="nm">useHomeData</span><span class="fp">state/useHomeData.ts</span><span class="rl">BFF <code>/home</code> 조회(실패 시 fixture 폴백).</span></li>
+      </ul>
+    </div>
+  </div>
+
+  <details class="fold"><summary>코드 · useHomeData — /home 조회 + fixture 폴백<span class="fp">state/useHomeData.ts</span></summary>
+  <div class="code"><span class="c">// 실패/미설정 시 fixture 폴백, 에러는 숨김</span>
+export function <span class="k">useHomeData</span>(cfg: ApiConfig) {
+  const [data, setData] = useState(homeSummary.data);
+  useEffect(() =&gt; {
+    let alive = true;
+    getHome(cfg).then((d) =&gt; { if (alive &amp;&amp; d) setData(d); });
+    return () =&gt; { alive = false; };
+  }, [cfg.base, cfg.token]);
+  return data;
+}</div></details>
+
+  <!-- S3 채팅 패널 -->
+  <h2 class="sec"><span class="n">S3</span> 채팅 패널 (전역 오버레이)</h2>
+  <p class="sec-sub">ChatPanel — 어디서든 대화. 이어가기·재관여·미해결·스트리밍 섹션·커밋 게이트.</p>
+  <div class="screen">
+    <div class="wire">
+      <div class="notch"></div>
+      <div class="wbox"><div class="l">‹ 뒤로 · AI</div><div class="t">데모 모드 · 예시 응답</div></div>
+      <div class="wbox fill"><div class="l">ReEngagementBanner</div><div class="t">지난번 세탁기 문제 이어서?</div></div>
+      <div class="wbox"><div class="l">ResumeCard · 이어가기</div><div class="s">요약 + 미해결 + 상대시간</div></div>
+      <div class="wbox"><div class="l">OpenLoopList</div><div class="s">주문 12345 · 오류 5C</div></div>
+      <div class="wrow"><div class="wbox" style="background:var(--soft)"><div class="t">사용자 말풍선 ›</div></div></div>
+      <div class="wbox dark"><div class="l">StreamingMessage</div><div class="t">진단 · 해결 단계 · 부품</div><div class="s">섹션 페이드 + 타이핑 인디케이터</div></div>
+      <div class="wbox"><div class="l">CommitGate</div><div class="t">주문 확인 / 로그인 월</div></div>
+      <div class="wbox fill"><div class="l">입력창</div><div class="t">[ 메시지… ] ▶</div></div>
+    </div>
+    <div class="wnote">
+      <h4>구성요소</h4>
+      <ul class="complist">
+        <li><span class="nm">ChatPanel</span><span class="fp">screens/ChatPanel.tsx</span><span class="rl">멀티턴 대화·WS 스트림/Mock 재생. 첫 질문 자동 전송, 칩·입력으로 이어감.</span></li>
+        <li><span class="nm">StreamingMessage</span><span class="fp">components/StreamingMessage.tsx</span><span class="rl">delta 누적 텍스트 + 섹션 스택(FadeIn) + 타이핑 인디케이터(R14).</span></li>
+        <li><span class="nm">SectionView / message</span><span class="fp">components/message.tsx</span><span class="rl">복합 응답 섹션(R7) → 템플릿 렌더 + CTA.</span></li>
+        <li><span class="nm">ResumeCard</span><span class="fp">components/ResumeCard.tsx</span><span class="rl">다시 열기 시 요약·미해결·상대시간 복원.</span></li>
+        <li><span class="nm">ReEngagementBanner</span><span class="fp">components/ReEngagementBanner.tsx</span><span class="rl">선제 재관여(AnimatePresence 슬라이드 enter/exit).</span></li>
+        <li><span class="nm">OpenLoopList</span><span class="fp">components/OpenLoopList.tsx</span><span class="rl">미해결 스레드 목록·해소/닫기.</span></li>
+        <li><span class="nm">CommitGate</span><span class="fp">components/CommitGate.tsx</span><span class="rl">주문/예약 확인 다이얼로그 + 게스트 로그인 월(R17).</span></li>
+        <li><span class="nm">useChat·useCommit·useResume·useReEngagement·useOpenLoops</span><span class="fp">state/*</span><span class="rl">대화·커밋·이어가기·재관여·미해결 상태 훅.</span></li>
+        <li><span class="nm">transport</span><span class="fp">transport/{api,commit,companion}.ts</span><span class="rl">WS <code>/chat</code> 스트림·커밋 왕복·컴패니언 조회. Mock/실 전환.</span></li>
+      </ul>
+    </div>
+  </div>
+
+  <details class="fold"><summary>코드 · useChat — 청크 reducer 누적<span class="fp">state/useChat.ts</span></summary>
+  <div class="code">export function <span class="k">useChat</span>(transport: ChatTransport) {
+  const [state, dispatch] = useReducer(chatReducer, initialChat);
+  useEffect(() =&gt; { transport.onChunk((c) =&gt; dispatch(c)); transport.connect();
+    return () =&gt; transport.close(); }, [transport]);
+  function <span class="k">send</span>(text, screenContext?) {
+    dispatch({ type: <span class="s">'send'</span> });
+    transport.send({ type: <span class="s">'user_message'</span>, text, screen_context: screenContext ?? null });
+  }
+  <span class="c">// replyInteraction(cta) · resumeFromRef(ref) — 후속/맥락 재진입</span>
+  return { state, send, replyInteraction, resumeFromRef };
+}</div></details>
+  <details class="fold"><summary>코드 · useCommit — 409(확인)·401(로그인) 게이트<span class="fp">state/useCommit.ts</span></summary>
+  <div class="code"><span class="c">// 커밋 결과로 게이트 상태 토글</span>
+function <span class="k">apply</span>(res: CommitResult, kind) {
+  if (res.status === <span class="s">'confirm'</span>) {        <span class="c">// 409</span>
+    pending.current = { kind, payload: res.payload };
+    setConfirmTemplate(res.template);  track(<span class="s">'checkout_shown'</span>, { kind });
+  } else if (res.status === <span class="s">'login'</span>) {     <span class="c">// 401</span>
+    setShowLogin(true);
+  } else if (res.status === <span class="s">'ok'</span>) {
+    track(<span class="s">'order_confirmed'</span>, { kind });  opts?.onCommitted?.(kind, res.data);
+  }
+}
+<span class="c">// start(cta)→confirmed:false · confirm()→confirmed:true 재제출 · login()→토큰 후 재시도</span></div></details>
+
+  <!-- S2 + S4 -->
+  <div class="grid g2" style="margin-top:8px">
+    <div>
+      <h2 class="sec"><span class="n">S2</span> 고객지원</h2>
+      <p class="sec-sub">SupportScreen — 문제 해결·상담·방문 진입.</p>
+      <div class="wire" style="width:100%;flex:1">
+        <div class="wbox"><div class="l">증상·에러코드 입력</div><div class="t">무엇을 도와드릴까요?</div></div>
+        <div class="wrow"><div class="wbox"><div class="t">자가진단</div></div><div class="wbox"><div class="t">방문예약</div></div></div>
+        <div class="wbox"><div class="l">진행 중</div><div class="s">주문·예약 상태 트래커</div></div>
+        <div class="wbox fill"><div class="l">고정 채팅바</div><div class="t">[ 입력… ] ▶</div></div>
+      </div>
+      <ul class="complist" style="margin-top:12px">
+        <li><span class="nm">SupportScreen</span><span class="fp">screens/SupportScreen.tsx</span><span class="rl">CS 진입·트리아지·방문 예약 흐름.</span></li>
+      </ul>
+    </div>
+    <div>
+      <h2 class="sec"><span class="n">S4</span> 브릿지 모달</h2>
+      <p class="sec-sub">카드 탭 시 간단 정보(대화 미진입). 복잡하면 S3 패널 — BE 동적 판단.</p>
+      <div class="wire" style="width:100%;flex:1">
+        <div class="wbox dark"><div class="l">Bridge · bottom sheet</div><div class="t">세탁기 상태 요약</div><div class="s">간단 정보 + [자세히 → 채팅]</div></div>
+        <div class="wbox"><div class="l">surface 결정</div><div class="s">simple→bridge · complex→panel</div></div>
+      </div>
+      <ul class="complist" style="margin-top:12px">
+        <li><span class="nm">Bridge / 템플릿</span><span class="fp">templates/index.tsx</span><span class="rl"><code>POST /surface</code> 결과로 bridge/panel 분기.</span></li>
+        <li><span class="nm">DemoBadge</span><span class="fp">components/DemoBadge.tsx</span><span class="rl">Mock 모드 표시(데모).</span></li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- 템플릿 -->
+  <h2 class="sec"><span class="n">▥</span> 메시지 템플릿 레지스트리</h2>
+  <p class="sec-sub">kind → 컴포넌트 매핑(response-templates.md). 채팅 섹션·홈·브릿지에서 재사용. 모르는 kind는 text 폴백.</p>
+  <div class="tbl-card"><table>
+    <tr><th>컴포넌트</th><th>kind / 용도</th><th>쓰임</th></tr>
+    <tr><td><b>TextTemplate</b></td><td><span class="pill">text</span></td><td>자연어 답변·폴백</td></tr>
+    <tr><td><b>DeviceStatus</b></td><td><span class="pill">device_status</span> + Gauge</td><td>기기 상태·소모품 게이지</td></tr>
+    <tr><td><b>GuideSteps</b></td><td><span class="pill">guide_steps</span></td><td>셀프수리 단계</td></tr>
+    <tr><td><b>ProductCard / RecommendationList</b></td><td><span class="pill">product_card</span> · <span class="pill">recommendation_list</span></td><td>부품·제품 추천</td></tr>
+    <tr><td><b>OrderSummary / AmountRow / QtyStepper</b></td><td><span class="pill">order_summary</span></td><td>주문 요약·금액 분해·수량</td></tr>
+    <tr><td><b>Confirmation</b></td><td><span class="pill">confirmation</span></td><td>커밋 전 확인(R17)</td></tr>
+    <tr><td><b>StatusTracker</b></td><td><span class="pill">status_tracker</span></td><td>주문·픽업·예약 진행</td></tr>
+    <tr><td><b>HandoffCard / Booking / RadioRow</b></td><td><span class="pill">handoff</span> · <span class="pill">booking</span></td><td>방문 예약·슬롯 선택(R18)</td></tr>
+    <tr><td><b>HomeSummary</b></td><td><span class="pill">home_summary</span></td><td>홈 종합(기기·알림·추천)</td></tr>
+    <tr><td><b>Bridge</b></td><td><span class="pill">bridge</span></td><td>카드 탭 간단 정보(S4)</td></tr>
+    <tr><td><b>MediaChips / Choices</b></td><td><span class="pill">choices</span></td><td>멀티모달 칩·선택지/CTA</td></tr>
+  </table></div>
+
+  <details class="fold"><summary>코드 · 공유 계약 타입(Cta · Template · MessageSection · Chunk)<span class="fp">types/contract.ts</span></summary>
+  <div class="code">type <span class="k">CtaAction</span> = <span class="s">'chat'</span> | <span class="s">'commit'</span> | <span class="s">'navigate'</span>;
+type <span class="k">CtaKind</span> = <span class="s">'order'|'booking'|'login'|'select_device'|'restock_alert'</span>
+            | <span class="s">'compare'|'explain'|'recommend'|'choices'|'handoff'</span>;
+interface <span class="k">Cta</span> { label: string; action: CtaAction; kind?: CtaKind | string; payload?: object; }
+
+type <span class="k">TemplateKind</span> = <span class="s">'text'|'device_status'|'guide_steps'|'product_card'|'order_summary'</span>
+  | <span class="s">'confirmation'|'recommendation_list'|'home_summary'|'status_tracker'</span>
+  | <span class="s">'bridge'|'handoff_card'|'booking'|'choices'</span>;  <span class="c">// 미등록 kind → text 폴백</span>
+interface <span class="k">Template</span>&lt;T&gt; { kind: TemplateKind | string; data: T; }
+interface <span class="k">MessageSection</span> { label; intent; template: Template; ctas: Cta[]; handled: boolean; }
+
+<span class="c">// WS /chat 서버→클라 청크</span>
+type <span class="k">Chunk</span> = { type:<span class="s">'delta'</span>; text } | { type:<span class="s">'section'</span>; section: MessageSection }
+  | { type:<span class="s">'flow'</span>; active_flow } | { type:<span class="s">'done'</span>; message_id? }
+  | { type:<span class="s">'error'</span>; code; fallback?: Template };</div></details>
+
+  <!-- 화면↔데이터 -->
+  <h2 class="sec"><span class="n">⇄</span> 화면 ↔ 데이터 매핑</h2>
+  <p class="sec-sub">각 화면이 호출하는 BFF 엔드포인트/WS와 받는 템플릿 kind.</p>
+  <div class="tbl-card"><table>
+    <tr><th>화면</th><th>호출</th><th>받는 데이터 / 템플릿</th></tr>
+    <tr><td>S1 홈</td><td><span class="method get">GET</span> <span class="pill">/home</span> · <span class="pill">/recommendations</span></td><td><span class="pill">home_summary</span>(devices·alerts·recommendations) · <span class="pill">recommendation_list</span></td></tr>
+    <tr><td>S3 채팅</td><td><span class="method ws">WS</span> <span class="pill">/chat</span></td><td>스트림 청크 <span class="pill">delta</span>/<span class="pill">section</span>/<span class="pill">done</span> → 섹션 봉투 + 템플릿</td></tr>
+    <tr><td>이어가기/재관여</td><td><span class="method get">GET</span> <span class="pill">/resume</span> · <span class="pill">/reengagement</span> <span class="method post">POST</span> <span class="pill">.../deliver</span></td><td>ResumePayload · ReEngagement(primary_label·message·also_count)</td></tr>
+    <tr><td>미해결</td><td><span class="method post">POST</span> <span class="pill">/open-loops/{ref}/{action}</span></td><td>OpenLoop(상태 갱신)</td></tr>
+    <tr><td>커밋</td><td><span class="method post">POST</span> <span class="pill">/orders</span> · <span class="pill">/bookings</span></td><td>성공 Order/Booking · 미확인 409 <span class="pill">confirmation</span> · 게스트 401 <span class="pill">LoginRequired</span></td></tr>
+    <tr><td>카드 탭(S4)</td><td><span class="method post">POST</span> <span class="pill">/surface</span></td><td><span class="pill">bridge</span>(간단) 또는 panel(복잡)</td></tr>
+  </table></div>
+
+  <!-- 인터랙션 흐름 -->
+  <h2 class="sec"><span class="n">↳</span> 인터랙션 흐름</h2>
+  <p class="sec-sub">탭·전송 시 일어나는 일.</p>
+  <div class="grid g3">
+    <div class="card tag-fe"><h3>카드 탭 → surface</h3>
+      <div class="seq fe">
+        <div class="step"><b>카드 탭</b><span>홈/CS 카드</span></div>
+        <div class="step"><b>POST /surface</b><span>BE 동적 판단</span></div>
+        <div class="step"><b>간단 → Bridge 모달</b><span>복잡 → 채팅 패널(S3)</span></div>
+      </div>
+    </div>
+    <div class="card tag-fe"><h3>CTA → 커밋 게이트</h3>
+      <div class="seq fe">
+        <div class="step"><b>주문/예약 CTA</b><span>isCommitCta</span></div>
+        <div class="step"><b>POST 커밋</b><span>confirmed=false</span></div>
+        <div class="step"><b>409 → ConfirmDialog</b><span>확인 후 confirmed=true 재요청</span></div>
+      </div>
+    </div>
+    <div class="card tag-fe"><h3>게스트 커밋</h3>
+      <div class="seq fe">
+        <div class="step"><b>게스트가 커밋</b><span>토큰 없음</span></div>
+        <div class="step"><b>401 LoginRequired</b><span>BE→BFF 중계</span></div>
+        <div class="step"><b>LoginWall 표시</b><span>로그인 후 머지·이어감</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 디자인 토큰 -->
+  <h2 class="sec"><span class="n">🎨</span> 디자인 토큰 레퍼런스</h2>
+  <p class="sec-sub"><code>design/tokens.ts</code> · <code>design/motion.ts</code> — 컴포넌트는 토큰만 참조(하드코딩 금지).</p>
+  <div class="swatches">
+    <span class="sw"><i style="background:#3182F6"></i>primary <code>#3182F6</code></span>
+    <span class="sw"><i style="background:#1B64DA"></i>primaryDark <code>#1B64DA</code></span>
+    <span class="sw"><i style="background:#191F28"></i>text <code>#191F28</code></span>
+    <span class="sw"><i style="background:#4E5968"></i>textSub <code>#4E5968</code></span>
+    <span class="sw"><i style="background:#8B95A1"></i>textMuted <code>#8B95A1</code></span>
+    <span class="sw"><i style="background:#F2F4F6;border-color:#ddd"></i>surfaceAlt <code>#F2F4F6</code></span>
+    <span class="sw"><i style="background:#0AB26B"></i>success <code>#0AB26B</code></span>
+    <span class="sw"><i style="background:#FF8A00"></i>warning <code>#FF8A00</code></span>
+    <span class="sw"><i style="background:#F04452"></i>danger <code>#F04452</code></span>
+  </div>
+  <div class="grid g3">
+    <div class="card"><h3>Spacing</h3><p class="desc mono">xs 4 · sm 8 · md 12 · lg 16 · xl 24 · xxl 32 · xxxl 44</p></div>
+    <div class="card"><h3>Radius / Type</h3><p class="desc mono">radius sm8·md12·lg16·xl20·pill999<br>font xs12·sm13·md15·lg17·xl20·xxl26·display32 · weight 400~800</p></div>
+    <div class="card"><h3>Motion</h3><p class="desc mono">duration fast .16·base .24·slow .36<br>spring press(420/28)·enter(260/24)</p></div>
+  </div>
+
+  <details class="fold"><summary>코드 · 디자인 토큰 원본(color · space · radius · font)<span class="fp">design/tokens.ts</span></summary>
+  <div class="code">export const <span class="k">color</span> = {
+  primary: <span class="s">'#3182F6'</span>, primaryDark: <span class="s">'#1B64DA'</span>, primaryTint: <span class="s">'#E8F2FE'</span>,
+  bg: <span class="s">'#FFFFFF'</span>, surface: <span class="s">'#FFFFFF'</span>, surfaceAlt: <span class="s">'#F2F4F6'</span>, border: <span class="s">'#E5E8EB'</span>,
+  text: <span class="s">'#191F28'</span>, textSub: <span class="s">'#4E5968'</span>, textMuted: <span class="s">'#8B95A1'</span>,
+  success: <span class="s">'#0AB26B'</span>, warning: <span class="s">'#FF8A00'</span>, danger: <span class="s">'#F04452'</span>,
+};
+export const <span class="k">space</span>  = { xs:4, sm:8, md:12, lg:16, xl:24, xxl:32, xxxl:44 };
+export const <span class="k">radius</span> = { sm:8, md:12, lg:16, xl:20, pill:999 };
+export const <span class="k">font</span>   = { size:{ xs:12, sm:13, md:15, lg:17, xl:20, xxl:26, display:32 },
+                 weight:{ regular:'400', medium:'500', semibold:'600', bold:'700', heavy:'800' } };</div></details>
+
+  <!-- 컴포넌트 상태 -->
+  <h2 class="sec"><span class="n">◷</span> 컴포넌트 상태 4종</h2>
+  <p class="sec-sub">전 화면·템플릿 공통(R14).</p>
+  <div class="grid g2">
+    <div class="wire" style="width:100%;flex:1"><div class="wbox"><div class="l">로딩</div><div class="t">Skeleton 시머(components/Skeleton.tsx)</div></div></div>
+    <div class="wire" style="width:100%;flex:1"><div class="wbox"><div class="l">빈 상태</div><div class="t">has_context=false → 안내·CTA</div></div></div>
+    <div class="wire" style="width:100%;flex:1"><div class="wbox"><div class="l">에러·재시도</div><div class="t">폴백 메시지(transform) → 재시도</div></div></div>
+    <div class="wire" style="width:100%;flex:1"><div class="wbox dark"><div class="l">스트리밍</div><div class="t">타이핑 인디케이터 → 섹션 페이드</div></div></div>
+  </div>
+
+  <div class="note fe">모션은 <code>design/motion.ts</code> 토큰 + framer-motion(<code>components/motion.tsx</code>), reduced-motion 존중.
+    Mock 모드(<code>!apiBase</code>)면 시나리오 라우터로 단독 구동(서버 불필요).</div>
+
+</div>
+<footer>FE · 화면 와이어프레임 · 현재 코드 구현 기준</footer>
+</body>
+</html>

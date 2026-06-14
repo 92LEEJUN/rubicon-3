@@ -1,0 +1,223 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Rubicon-3 · 진행 현황 & 설계 결정</title>
+<style>
+  :root{
+    --bg:#0f1420; --panel:#161d2c; --panel2:#1d2638; --line:#2a3550;
+    --fg:#e6ebf5; --muted:#9aa7c2; --accent:#3e7bfa; --accent2:#6ea8ff;
+    --done:#2ecc71; --partial:#f5a623; --todo:#6b7794; --hold:#b06bff; --impl:#26c6da;
+    --radius:14px;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:linear-gradient(180deg,#0c111b,#0f1420);color:var(--fg);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Noto Sans KR",sans-serif;line-height:1.55}
+  a{color:var(--accent2);text-decoration:none} a:hover{text-decoration:underline}
+  .wrap{max-width:1100px;margin:0 auto;padding:0 20px}
+  header.hero{padding:56px 0 28px;border-bottom:1px solid var(--line)}
+  .hero h1{margin:0 0 6px;font-size:30px;letter-spacing:-.5px}
+  .hero p{margin:0;color:var(--muted);font-size:15px}
+  .badges{display:flex;gap:10px;flex-wrap:wrap;margin-top:18px}
+  .pill{background:var(--panel2);border:1px solid var(--line);border-radius:999px;padding:6px 13px;font-size:13px}
+  .pill b{color:var(--done)}
+  nav.toc{position:sticky;top:0;background:rgba(15,20,32,.92);backdrop-filter:blur(8px);
+    border-bottom:1px solid var(--line);z-index:10;padding:10px 0}
+  nav.toc .wrap{display:flex;gap:16px;flex-wrap:wrap;font-size:13.5px}
+  nav.toc a{color:var(--muted)} nav.toc a:hover{color:var(--fg)}
+  section{padding:34px 0;border-bottom:1px solid var(--line)}
+  h2{font-size:21px;margin:0 0 4px} h2 .num{color:var(--accent);font-variant-numeric:tabular-nums;margin-right:8px}
+  .sub{color:var(--muted);font-size:14px;margin:0 0 18px}
+  .grid{display:grid;gap:14px}
+  .cards{grid-template-columns:repeat(auto-fill,minmax(250px,1fr))}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:16px}
+  .card h3{margin:0 0 6px;font-size:15px;display:flex;align-items:center;gap:8px}
+  .card p{margin:0;color:var(--muted);font-size:13px}
+  .tag{font-size:11.5px;font-weight:700;padding:3px 9px;border-radius:999px;white-space:nowrap}
+  .t-done{background:rgba(46,204,113,.15);color:var(--done);border:1px solid rgba(46,204,113,.35)}
+  .t-impl{background:rgba(38,198,218,.15);color:var(--impl);border:1px solid rgba(38,198,218,.35)}
+  .t-partial{background:rgba(245,166,35,.15);color:var(--partial);border:1px solid rgba(245,166,35,.35)}
+  .t-todo{background:rgba(107,119,148,.18);color:#aeb9d3;border:1px solid rgba(107,119,148,.4)}
+  .t-hold{background:rgba(176,107,255,.15);color:var(--hold);border:1px solid rgba(176,107,255,.35)}
+  .mermaid{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:18px;overflow:auto}
+  .adrgroup{margin-bottom:16px}
+  .adrgroup h4{margin:0 0 9px;font-size:14px;color:var(--accent2)}
+  .chips{display:flex;flex-wrap:wrap;gap:8px}
+  .chip{display:flex;align-items:center;gap:7px;background:var(--panel);border:1px solid var(--line);
+    border-radius:10px;padding:6px 10px;font-size:12.5px}
+  .chip .dot{width:8px;height:8px;border-radius:50%}
+  .d-adopted{background:var(--accent)} .d-impl{background:var(--impl)} .d-hold{background:var(--hold)}
+  .chip .n{color:var(--muted);font-variant-numeric:tabular-nums}
+  .legend{display:flex;gap:16px;flex-wrap:wrap;font-size:12.5px;color:var(--muted);margin:6px 0 16px}
+  .legend span{display:inline-flex;align-items:center;gap:6px}
+  .rem{grid-template-columns:repeat(auto-fill,minmax(280px,1fr))}
+  .rem .card{border-left:4px solid var(--line)}
+  .rem .a{border-left-color:var(--done)} .rem .b{border-left-color:var(--partial)}
+  .rem .c{border-left-color:var(--accent)} .rem .d{border-left-color:var(--todo)}
+  .rem ul{margin:8px 0 0;padding-left:18px;color:var(--muted);font-size:13px}
+  .rem li{margin:3px 0}
+  footer{padding:28px 0 60px;color:var(--muted);font-size:13px}
+  .kpi{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:12px;margin-top:6px}
+  .kpi .card{text-align:center} .kpi .big{font-size:26px;font-weight:800} .kpi .lbl{color:var(--muted);font-size:12.5px}
+</style>
+</head>
+<body>
+<header class="hero"><div class="wrap">
+  <h1>Rubicon-3 — 삼성 가전 AI 컨시어지 · 컴패니언</h1>
+  <p>이상 감지 → 해결 → 부품 주문, 그리고 <b>"언제든 곁에 있는"</b> 컴패니언. 이 페이지는 <b>진행 현황</b>과 <b>설계 결정</b>의 항해 지도입니다.</p>
+  <div class="badges">
+    <span class="pill">테스트 <b>BE 142 · BFF 37 · FE 56</b></span>
+    <span class="pill">ADR <b>42</b></span>
+    <span class="pill">스펙 <b>6</b></span>
+    <span class="pill">기반문서 <b>10+</b></span>
+  </div>
+</div></header>
+
+<nav class="toc"><div class="wrap">
+  <a href="#arch">아키텍처</a><a href="#flow">대화 흐름</a><a href="#companion">컴패니언</a>
+  <a href="#status">진행 현황</a><a href="#adr">설계 결정(ADR)</a><a href="#ops">운영·스케일</a><a href="#remaining">남은 작업</a>
+</div></nav>
+
+<main class="wrap">
+
+<section id="arch">
+  <h2><span class="num">1</span>아키텍처 — 3계층 · Port↔Mock 경계</h2>
+  <p class="sub">FE(RN Web)는 BFF만 본다. BFF는 표면·정형화·중계(비즈로직 없음), BE 도메인이 라우팅·오케스트레이션. 외부 연동은 Port 뒤 Mock↔실 교체.</p>
+  <pre class="mermaid">
+flowchart LR
+  FE["FE · React Native(Web)"] -->|WS /chat · HTTP| BFF["BFF · FastAPI<br/>aggregation·정형화·인증·중계"]
+  BFF -->|내부 API| BE["BE 도메인 · FastAPI<br/>오케스트레이터·서비스·Port"]
+  BE --> PORTS{{"Port (Mock↔실 경계)"}}
+  PORTS --> EXT["SmartThings · CS · Catalog · O2O · Alert ..."]
+  </pre>
+</section>
+
+<section id="flow">
+  <h2><span class="num">2</span>대화 흐름 — 디스패치 3경로 + 멀티에이전트</h2>
+  <p class="sub">한 진입(/turn)에서 토글로 3경로 공존: 결정적(기본·회귀0) / 단일 tool-loop / 슈퍼바이저-워커. 멀티에이전트는 순차·단일 패스, 다단계 스트리밍.</p>
+  <pre class="mermaid">
+flowchart TD
+  IN["/internal/turn"] --> D{디스패치}
+  D -->|LLM_BACKED off| DET["결정적 섹션<br/>core.Orchestrator"]
+  D -->|on · MULTIAGENT off| LEG["단일 tool-loop<br/>legacy"]
+  D -->|on · MULTIAGENT on| MA["슈퍼바이저-워커<br/>runtime"]
+  MA --> SUP[Supervisor 분해·우선순위] --> DIAG[진단] --> COMM[커머스] --> REV{조건부 리뷰} --> DONE["delta→done"]
+  </pre>
+</section>
+
+<section id="companion">
+  <h2><span class="num">3</span>컴패니언 — "언제든 곁에"</h2>
+  <p class="sub">턴마다 사실·요약을 user 메모리에 적재(컴팩션) → 다음 턴 주입 → 재방문 resume → 미해결 챙김(open-loop) → 엄격 게이트로 먼저 말 걺.</p>
+  <pre class="mermaid">
+flowchart LR
+  T[턴] --> REC[record_turn<br/>사실추출·컴팩션] --> MEM[(영속 메모리)]
+  MEM --> RES[resume<br/>요약·상대시간·open-loop]
+  T --> OL[OpenLoop<br/>오류·주문 자동추적]
+  OL --> GATE{선제 게이트<br/>동의·빈도·중복·묶음}
+  GATE -->|통과| PUSH[재관여 전달]
+  </pre>
+</section>
+
+<section id="status">
+  <h2><span class="num">4</span>진행 현황</h2>
+  <p class="sub">기능 영역별 구현 상태. 코어는 모두 구현·테스트됨(아래). 실 연동·표현·인프라가 남은 성격.</p>
+  <div class="legend">
+    <span><span class="tag t-done">구현</span> 코어 완료</span>
+    <span><span class="tag t-partial">부분</span> 코어+후속</span>
+    <span><span class="tag t-todo">미착수</span></span>
+    <span><span class="tag t-hold">보류</span></span>
+  </div>
+  <div class="kpi" id="kpi"></div>
+  <div class="grid cards" id="statusGrid" style="margin-top:14px"></div>
+</section>
+
+<section id="adr">
+  <h2><span class="num">5</span>설계 결정 — ADR 42</h2>
+  <p class="sub">결정의 <i>이유·후보안·기각</i>은 <a href="https://github.com/92LEEJUN/rubicon-3/tree/main/docs/adr">docs/adr</a>에. 여기선 카테고리별 한눈 맵.</p>
+  <div class="legend">
+    <span><span class="dot d-adopted" style="width:8px;height:8px;border-radius:50%;display:inline-block"></span> 채택</span>
+    <span><span class="dot d-impl" style="width:8px;height:8px;border-radius:50%;display:inline-block"></span> 구현됨</span>
+    <span><span class="dot d-hold" style="width:8px;height:8px;border-radius:50%;display:inline-block"></span> 보류</span>
+  </div>
+  <div id="adrGrid"></div>
+</section>
+
+<section id="ops">
+  <h2><span class="num">6</span>운영 · 스케일</h2>
+  <p class="sub">2-플레인(인터랙티브/비동기) · 동시성 Phase A→B · 멀티에이전트 지연 실측.</p>
+  <div class="grid cards">
+    <div class="card"><h3>동시성 <span class="tag t-done">Phase A</span></h3><p>async 전환·LLM 세마포어·백오프. 실측: 4턴 동시 ≈ 1턴 시간(스레드-당-턴 점유 제거).</p></div>
+    <div class="card"><h3>Phase B <span class="tag t-todo">미착수</span></h3><p>Redis 세션격리·토큰버킷·스트리밍 릴레이·무상태 워커. 릴레이 Streams vs Pub/Sub 보류.</p></div>
+    <div class="card"><h3>멀티에이전트 지연 <span class="tag t-impl">실측</span></h3><p>복합 순차 <b>15~21s</b>(최대~21s). 대응: 다단계 스트리밍(체감)·병렬화(보류).</p></div>
+    <div class="card"><h3>백프레셔 UX <span class="tag t-done">확정</span></h3><p>혼잡·순번 무노출 + 점진 렌더. 능동 강등 제외(품질 일관).</p></div>
+  </div>
+</section>
+
+<section id="remaining">
+  <h2><span class="num">7</span>남은 작업</h2>
+  <p class="sub">4갈래. A는 지금 환경에서 서버 내 완결·테스트 가능. B/C는 외부·인프라 의존, D는 스펙 미작성.</p>
+  <div class="grid rem" id="remGrid"></div>
+</section>
+
+</main>
+
+<footer><div class="wrap">
+  Rubicon-3 · 자동 생성 개요(진행 현황 + 설계 결정) ·
+  <a href="https://github.com/92LEEJUN/rubicon-3">repo</a> ·
+  <a href="https://github.com/92LEEJUN/rubicon-3/tree/main/docs">docs</a> ·
+  <a href="https://github.com/92LEEJUN/rubicon-3/tree/main/specs">specs</a>
+</div></footer>
+
+<script type="module">
+  import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs";
+  mermaid.initialize({ startOnLoad:true, theme:"dark", themeVariables:{ fontSize:"13px" }});
+</script>
+<script>
+const STATUS=[
+  ["MVP 컨시어지","done","이상감지→해결→부품주문, J1~J5 E2E. BE·BFF·FE·E2E."],
+  ["컴패니언","partial","메모리·컴팩션·resume·open-loop·선제 게이트 구현. 실 연동(푸시·스케줄러) 남음."],
+  ["멀티에이전트 런타임","partial","슈퍼바이저-워커·디스패치 3경로 구현. 프리페치·단계 타임아웃 남음."],
+  ["제품 추천","partial","추천 코어·트리거·선제(게이트 재사용) 구현. 표현·전환기여 배선 남음."],
+  ["O2O 풀","done","매장·픽업 BOPIS·재고·견적 이어보기·트리아지. StorePort/QuotePort Mock."],
+  ["FE 컴패니언","done","resume 카드·open-loop UI·선제 배너·증분 스트리밍 렌더."],
+  ["Phase A 동시성/스트리밍","done","세마포어·async 전환·증분 포워딩(2a)."],
+  ["Phase B (Redis)","todo","세션격리·토큰버킷·릴레이·무상태 워커."],
+  ["병렬화 / fine abort","hold","ADR-0017·0018 보류(일관성·동시성 예산)."],
+];
+const TAG={done:"t-done",partial:"t-partial",todo:"t-todo",hold:"t-hold",impl:"t-impl"};
+const LBL={done:"구현",partial:"부분",todo:"미착수",hold:"보류",impl:"실측"};
+document.getElementById("statusGrid").innerHTML=STATUS.map(([n,s,d])=>
+  `<div class="card"><h3>${n} <span class="tag ${TAG[s]}">${LBL[s]}</span></h3><p>${d}</p></div>`).join("");
+const counts=STATUS.reduce((a,[,s])=>(a[s]=(a[s]||0)+1,a),{});
+document.getElementById("kpi").innerHTML=
+  [["구현·완료",(counts.done||0)],["부분(코어+후속)",(counts.partial||0)],["미착수",(counts.todo||0)],["보류",(counts.hold||0)]]
+  .map(([l,v])=>`<div class="card"><div class="big">${v}</div><div class="lbl">${l}</div></div>`).join("");
+
+const A=(n,t)=>({n,t,s:"adopted"}), I=(n,t)=>({n,t,s:"impl"}), H=(n,t)=>({n,t,s:"hold"});
+const ADR=[
+  ["기반 — 운영/동시성",[A("0001","2-플레인 분리"),A("0002","A→B 경로"),A("0003","세션 직렬화"),A("0004","백프레셔 무노출"),A("0005","SLA 성격"),A("0006","PhaseB 토폴로지"),H("0007","릴레이 보류")]],
+  ["멀티에이전트",[A("0008","지연 반영"),A("0009","슈퍼바이저-워커"),A("0010","그래뉼래리티 중간"),A("0011","조건부 리뷰"),A("0012","단일 패스"),I("0013","프롬프트 단일출처")]],
+  ["Phase A — 스트리밍",[A("0014","스트리밍 먼저"),I("0015","2a 범위"),I("0016","async 전환"),H("0017","병렬화 보류"),H("0018","타임아웃 보류")]],
+  ["기반 아키텍처",[A("0019","3계층+BFF분리"),A("0020","Port Mock↔실"),A("0021","TokenProvider 3계층"),A("0024","라우팅 BE소유"),A("0033","ActionGate"),A("0034","provider-agnostic"),A("0036","선제 폴링→이벤트")]],
+  ["프론트엔드",[A("0022","WebSocket"),A("0023","RQ+Zustand"),A("0027","카드 surface")]],
+  ["응답/도메인/데이터",[A("0025","구조화 Template"),A("0026","복합 sections[]"),A("0028","FlowState active+suspended"),A("0029","Engagement vs Analytics"),A("0030","Consent scope"),A("0031","의도분류 하이브리드"),A("0032","RAG 하이브리드"),A("0035","데이터 4계층")]],
+  ["분석 / 택소노미",[A("0037","기여 turn기반"),A("0038","스키마 견고성"),A("0039","에러/폴백 이벤트"),A("0041","세션일관 샘플링")]],
+  ["연속성 / 컴패니언",[A("0040","연속성 컴팩션"),A("0042","선제 엄격 게이트")]],
+];
+document.getElementById("adrGrid").innerHTML=ADR.map(([g,items])=>
+  `<div class="adrgroup"><h4>${g}</h4><div class="chips">`+
+  items.map(it=>`<span class="chip"><span class="dot d-${it.s}"></span><span class="n">${it.n}</span> ${it.t}</span>`).join("")+
+  `</div></div>`).join("");
+
+const REM=[
+  ["A. 서버 내 완결 가능","a",["추천 표현(recommendation_list)·전환 기여(correlation_id)","멀티에이전트 2b 프리페치 — 첫 섹션 ≤2s","R25·주문완료 → open-loop 자동 해소","analytics 이벤트 실제 emit 배선","단계 타임아웃·민감의도 가드레일·도구화"]],
+  ["B. 실 연동 (외부 의존)","b",["AlertPort 실 푸시 + 선제 스케줄러(이벤트 vs 스케줄 ADR)","SmartThings OAuth/webhook·CS·Catalog·O2O 실데이터","LLMCompactor 토큰 budget·평가셋 튜닝"]],
+  ["C. 인프라 (Phase B)","c",["Redis: 세션격리·토큰버킷·릴레이·무상태 워커","보류: 병렬화(0017)·fine abort(0018)"]],
+  ["D. 로드맵 스펙 (미작성)","d",["enterprise-multi-account","voice-accessibility"]],
+];
+document.getElementById("remGrid").innerHTML=REM.map(([t,c,items])=>
+  `<div class="card ${c}"><h3>${t}</h3><ul>`+items.map(i=>`<li>${i}</li>`).join("")+`</ul></div>`).join("");
+</script>
+</body>
+</html>

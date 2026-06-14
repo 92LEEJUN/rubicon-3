@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>삼성 AI 컨시어지</title>
+    <!-- Pretendard(가변) — 토스st 한글 UI 표준 웹폰트. dynamic-subset로 경량 로드. -->
+    <link
+      rel="stylesheet"
+      as="style"
+      crossorigin
+      href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css"
+    />
+    <style>
+      html, body, #root { height: 100%; margin: 0; }
+      body {
+        background: #ffffff;
+        -webkit-font-smoothing: antialiased;
+        text-rendering: optimizeLegibility;
+      }
+      /* RN-Web가 Text마다 자체 font-family를 붙이므로, 전역으로 Pretendard를 강제해 일관 적용. */
+      * {
+        font-family: 'Pretendard Variable', Pretendard, -apple-system, BlinkMacSystemFont,
+          system-ui, 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif !important;
+        letter-spacing: -0.01em;
+      }
+      /* RN-web가 #root 안에 만드는 앱 컨테이너가 뷰포트 높이를 꽉 채우도록 —
+         그래야 내부 ScrollView가 스크롤되고 하단 채팅바가 화면에 고정된다. */
+      #root { display: flex; flex-direction: column; }
+      #root > * { flex: 1 1 auto; min-height: 0; }
+    </style>
+    <script type="module" crossorigin src="/rubicon-3/assets/index-xEvWQ4ep.js"></script>
+  </head>
+  <body>
+    <div id="root"></div>
+  </body>
+</html>

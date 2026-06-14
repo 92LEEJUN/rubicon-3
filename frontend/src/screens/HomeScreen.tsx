@@ -34,7 +34,7 @@ type Tile = { icon: string; type: string; tint: string; title: string; sub: stri
 const CURATED: DeckItem[] = [
   {
     palette: 'teal',
-    tag: '🌱 에너지',
+    tag: '에너지',
     title: '이번 달 절약 리포트',
     desc: 'ECO 코스로 전기·물 12% 아꼈어요. 다음 절약 팁도 받아보세요.',
     cta: '리포트 보기',
@@ -42,7 +42,7 @@ const CURATED: DeckItem[] = [
   },
   {
     palette: 'violet',
-    tag: '🗓 정기 점검',
+    tag: '정기 점검',
     title: '점검 시즌이 돌아왔어요',
     desc: '3개월마다 자가 점검을 추천해요. 5분이면 끝나요.',
     cta: '점검 시작',
@@ -50,7 +50,7 @@ const CURATED: DeckItem[] = [
   },
   {
     palette: 'magenta',
-    tag: '✨ 맞춤 추천',
+    tag: '맞춤 추천',
     title: '세제·필터 번들 추천',
     desc: '내 세탁기에 딱 맞는 세제와 필터를 묶어 최대 15% 할인.',
     cta: '번들 보기',
@@ -58,7 +58,7 @@ const CURATED: DeckItem[] = [
   },
   {
     palette: 'forest',
-    tag: '🛡 보증',
+    tag: '보증',
     title: '냉장고 워런티 만료 임박',
     desc: '30일 뒤 보증이 끝나요. 연장 옵션을 미리 확인하세요.',
     cta: '보증 확인',
@@ -67,7 +67,7 @@ const CURATED: DeckItem[] = [
   },
   {
     palette: 'ocean',
-    tag: '💧 소모품',
+    tag: '소모품',
     title: '공기청정기 필터 교체 시기',
     desc: 'HEPA 필터 수명 20% 남았어요. 미리 주문해두면 편해요.',
     cta: '필터 주문',
@@ -86,7 +86,7 @@ function buildBriefings(data: any): DeckItem[] {
       const pct = c ? Math.round(c.life_remaining * 100) : null;
       out.push({
         palette: 'sunset',
-        tag: '⚠ 점검 필요',
+        tag: '점검 필요',
         title: `${DEVICE_KO[d.type] ?? d.type} 배수 이상 · 5C`,
         desc:
           pct != null
@@ -103,7 +103,7 @@ function buildBriefings(data: any): DeckItem[] {
     const name = d ? (DEVICE_KO[d.type] ?? d.type) : '기기';
     out.push({
       palette: 'amber',
-      tag: '🔧 소모품 알림',
+      tag: '소모품 알림',
       title: `${name} 소모품 교체 시기`,
       desc: a.detail,
       cta: '교체·주문 안내',
@@ -112,8 +112,8 @@ function buildBriefings(data: any): DeckItem[] {
     });
   }
   out.push(...CURATED);
-  // 7장에 7색을 위치별로 고유 배정 — 데이터가 같은 종류를 만들어도 색이 겹치지 않게.
-  const ORDER = ['sunset', 'ocean', 'amber', 'violet', 'teal', 'magenta', 'forest'];
+  // 7장에 7색을 위치별로 고유 배정(다크 엘레강트 액센트) — 인접 카드 색이 겹치지 않게.
+  const ORDER = ['blue', 'teal', 'violet', 'amber', 'rose', 'indigo', 'emerald'];
   return out.slice(0, 7).map((c, i) => ({ ...c, palette: ORDER[i] }));
 }
 
@@ -135,10 +135,10 @@ function buildTiles(data: any): Tile[] {
 }
 
 const QUICK = [
-  { icon: '🩺', label: '진단', tint: color.primaryTint, ask: '우리집 가전 상태 진단해줘' },
-  { icon: '📦', label: '부품주문', tint: '#FFF0E8', ask: '세탁기 배수 필터 주문할래요' },
-  { icon: '🏠', label: '방문예약', tint: '#EAF6FF', ask: '방문 수리 예약하고 싶어요' },
-  { icon: '✨', label: '추천', tint: '#F1EEFF', ask: '맞춤 제품 추천해줘' },
+  { icon: '🩺', label: '진단', ask: '우리집 가전 상태 진단해줘' },
+  { icon: '📦', label: '부품주문', ask: '세탁기 배수 필터 주문할래요' },
+  { icon: '🏠', label: '방문예약', ask: '방문 수리 예약하고 싶어요' },
+  { icon: '✨', label: '추천', ask: '맞춤 제품 추천해줘' },
 ];
 
 export function HomeScreen({
@@ -172,7 +172,7 @@ export function HomeScreen({
                 style={styles.quickItem}
                 lift={false}
               >
-                <View style={[styles.quickChip, { backgroundColor: q.tint }]}>
+                <View style={styles.quickChip}>
                   <Text style={styles.quickIcon}>{q.icon}</Text>
                 </View>
                 <Text style={styles.quickLabel}>{q.label}</Text>
@@ -283,6 +283,7 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     alignItems: 'center',
     justifyContent: 'center',
+    backgroundColor: color.surfaceAlt,
   },
   quickIcon: { fontSize: 26 },
   quickLabel: { fontSize: font.size.sm, color: color.textSub, fontWeight: font.weight.semibold as any },

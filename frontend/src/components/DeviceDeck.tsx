@@ -25,63 +25,25 @@ export type DeckItem = {
   deviceType?: string;
 };
 
-// 세련된 팔레트 7종 — 사진은 위에서 살리고(상단 투명) 아래로 갈수록 컬러 그라데이션(가독성).
-// base: 사진 없는 카드의 전체 그라데이션. overlay: 사진 위 하단 스크림. glow: 카드 글로우. text: 흰 CTA 글자색.
-type Palette = { base: string; overlay: string; glow: string; text: string };
+// 다크 엘레강트 팔레트 — 사진은 자연색 그대로(어두운 스크림만), 색은 **작은 액센트**로만.
+// accent: 태그 점·글로우. text: 흰 CTA 알약의 글자색. bg: 사진 없는 카드의 깊은(muted) 그라데이션.
+type Palette = { accent: string; text: string; bg: string };
 const PALETTES: Record<string, Palette> = {
-  sunset: {
-    base: 'linear-gradient(150deg, #FF8A8A 0%, #E0455F 100%)',
-    overlay:
-      'linear-gradient(180deg, rgba(0,0,0,0) 0%, rgba(224,69,95,0.66) 50%, rgba(190,38,66,0.96) 100%)',
-    glow: '#FF6B6B',
-    text: '#D6324B',
-  },
-  ocean: {
-    base: 'linear-gradient(150deg, #5CA8FF 0%, #1456C4 100%)',
-    overlay:
-      'linear-gradient(180deg, rgba(0,0,0,0) 0%, rgba(34,108,214,0.66) 50%, rgba(16,70,170,0.96) 100%)',
-    glow: '#3182F6',
-    text: '#1B64DA',
-  },
-  amber: {
-    base: 'linear-gradient(150deg, #FFC061 0%, #E07A14 100%)',
-    overlay:
-      'linear-gradient(180deg, rgba(0,0,0,0) 0%, rgba(216,116,0,0.66) 50%, rgba(176,92,0,0.96) 100%)',
-    glow: '#FF9F43',
-    text: '#C76A00',
-  },
-  teal: {
-    base: 'linear-gradient(150deg, #3FD9C4 0%, #088C7C 100%)',
-    overlay:
-      'linear-gradient(180deg, rgba(0,0,0,0) 0%, rgba(8,150,134,0.66) 50%, rgba(6,110,98,0.96) 100%)',
-    glow: '#0BC4AC',
-    text: '#06997F',
-  },
-  violet: {
-    base: 'linear-gradient(150deg, #A488FF 0%, #5B3FD6 100%)',
-    overlay:
-      'linear-gradient(180deg, rgba(0,0,0,0) 0%, rgba(91,63,214,0.66) 50%, rgba(70,48,170,0.96) 100%)',
-    glow: '#7C5CFC',
-    text: '#5B3FD6',
-  },
-  magenta: {
-    base: 'linear-gradient(150deg, #FF8AC2 0%, #D6418A 100%)',
-    overlay:
-      'linear-gradient(180deg, rgba(0,0,0,0) 0%, rgba(214,65,138,0.66) 50%, rgba(176,40,110,0.96) 100%)',
-    glow: '#FF6EB4',
-    text: '#D6418A',
-  },
-  forest: {
-    base: 'linear-gradient(150deg, #5BD98A 0%, #149650 100%)',
-    overlay:
-      'linear-gradient(180deg, rgba(0,0,0,0) 0%, rgba(20,150,80,0.66) 50%, rgba(14,120,64,0.96) 100%)',
-    glow: '#2BC36B',
-    text: '#0AA15A',
-  },
+  blue: { accent: '#3E7BFA', text: '#1B64DA', bg: 'linear-gradient(155deg, #243B6B 0%, #0E1730 100%)' },
+  teal: { accent: '#12B886', text: '#0B8F6B', bg: 'linear-gradient(155deg, #15463C 0%, #0A201C 100%)' },
+  violet: { accent: '#845EF7', text: '#6741D9', bg: 'linear-gradient(155deg, #352453 0%, #170E27 100%)' },
+  amber: { accent: '#E8943A', text: '#B5701C', bg: 'linear-gradient(155deg, #3E2E1B 0%, #1F160E 100%)' },
+  rose: { accent: '#E8638A', text: '#C24668', bg: 'linear-gradient(155deg, #43253A 0%, #24121F 100%)' },
+  indigo: { accent: '#5C7CFA', text: '#3B5BDB', bg: 'linear-gradient(155deg, #262F5A 0%, #121633 100%)' },
+  emerald: { accent: '#2BA471', text: '#1B8157', bg: 'linear-gradient(155deg, #143A2A 0%, #0A2018 100%)' },
 };
 
-// 상단 미세 다크 스크림(배지 가독성). 사진 카드에만 의미.
-const TOP_SCRIM = 'linear-gradient(180deg, rgba(0,0,0,0.26) 0%, rgba(0,0,0,0) 24%)';
+// 중립 다크 스크림 — 사진 카드(자연색 유지)·솔리드 카드용. 위는 투명, 아래로 갈수록 어둡게.
+const SCRIM_PHOTO =
+  'linear-gradient(180deg, rgba(15,17,22,0) 0%, rgba(15,17,22,0.30) 46%, rgba(11,13,18,0.90) 100%)';
+const SCRIM_SOLID =
+  'linear-gradient(180deg, rgba(0,0,0,0) 0%, rgba(0,0,0,0.10) 52%, rgba(0,0,0,0.40) 100%)';
+const TOP_SCRIM = 'linear-gradient(180deg, rgba(0,0,0,0.22) 0%, rgba(0,0,0,0) 26%)';
 
 const DECK_EMOJI: Record<string, string> = {
   washer: '🧺',
@@ -92,19 +54,23 @@ const DECK_EMOJI: Record<string, string> = {
 function CardFace({ item }: { item: DeckItem }) {
   const img = item.deviceType ? DEVICE_IMAGE[item.deviceType] : undefined;
   const emoji = item.deviceType ? DECK_EMOJI[item.deviceType] : undefined;
-  const p = PALETTES[item.palette] ?? PALETTES.ocean;
+  const p = PALETTES[item.palette] ?? PALETTES.blue;
   return (
     <>
       {img ? (
         <Image source={{ uri: img }} style={styles.photo} resizeMode="cover" />
       ) : (
-        <View style={[styles.photo, { backgroundImage: p.base } as any]} />
+        <View style={[styles.photo, { backgroundImage: p.bg } as any]} />
       )}
       {img ? <View style={[styles.fill, { backgroundImage: TOP_SCRIM } as any]} pointerEvents="none" /> : null}
-      <View style={[styles.fill, { backgroundImage: p.overlay } as any]} pointerEvents="none" />
+      <View
+        style={[styles.fill, { backgroundImage: img ? SCRIM_PHOTO : SCRIM_SOLID } as any]}
+        pointerEvents="none"
+      />
       <View style={styles.faceContent}>
         <View style={styles.topRow}>
           <View style={styles.tag}>
+            <View style={[styles.tagDot, { backgroundColor: p.accent }]} />
             <Text style={styles.tagText}>{item.tag}</Text>
           </View>
           {emoji ? (
@@ -191,11 +157,11 @@ export function DeviceDeck({
             {
               ...StyleSheet.flatten(styles.card),
               height,
-              // 팔레트 컬러 글로우 — 카드가 떠 보이게
-              shadowColor: (PALETTES[front.palette] ?? PALETTES.ocean).glow,
-              shadowOpacity: 0.4,
-              shadowRadius: 30,
-              shadowOffset: { width: 0, height: 16 },
+              // 은은한 액센트 글로우 — 카드가 떠 보이게(과하지 않게)
+              shadowColor: (PALETTES[front.palette] ?? PALETTES.blue).accent,
+              shadowOpacity: 0.26,
+              shadowRadius: 28,
+              shadowOffset: { width: 0, height: 14 },
               x,
               scale: sc,
               rotateY,
@@ -251,13 +217,17 @@ const styles = StyleSheet.create({
   faceContent: { flex: 1, padding: space.xl },
   topRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   tag: {
-    backgroundColor: 'rgba(255,255,255,0.22)',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 7,
+    backgroundColor: 'rgba(255,255,255,0.18)',
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: radius.pill,
     // @ts-expect-error web-only: 글래스 블러
     backdropFilter: 'blur(8px)',
   },
+  tagDot: { width: 7, height: 7, borderRadius: 4 },
   tagText: { color: '#fff', fontSize: font.size.xs, fontWeight: font.weight.bold as any },
   glassBadge: {
     width: 40,

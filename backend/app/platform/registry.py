@@ -7,5 +7,6 @@
 
 규칙: 한 스트림 = 한 import 줄. 추가 순. 부수효과(등록) 목적의 import이므로 noqa.
 """
+from .. import openapi as _api_maturity  # noqa: F401  (S4: X-API-Version 헤더 등록)
 from .. import resilience as _resilience  # noqa: F401  (S2 회복력 — RESILIENCE_ENABLED 시 shutdown 훅)
 from ..observability import middleware_obs as _obs_mw  # noqa: F401  (S1 관측성: 미들웨어 등록)

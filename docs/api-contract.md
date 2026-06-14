@@ -157,4 +157,41 @@ BFF는 클라이언트 표면을 받고, **추론·도메인 처리는 BE 도메
 ## 6. 비범위
 
 - 실제 결제·인증 프로토콜 세부(SSO 등)는 실 전환 시. MVP는 Mock 경계(architecture §5).
-- Rate limit·버저닝 정책은 후속.
+- Rate limit 정책은 후속(S7). **버저닝/deprecation 정책은 §7로 구체화**(ADR-0060).
+
+## 7. 버저닝 / Deprecation 정책 (S4 · ADR-0060)
+
+> §6의 "버저닝 후속"을 구체화한다. **추가형·하위호환**이 원칙이며, 기존 §2·§2.4 계약 형태는
+> 불변이다. 12-Factor #2(API first)의 "계약을 기계가 읽고 점검 가능"을 만족시키는 토대.
+
+### 7.1 버전 식별
+- **계약 버전** — 날짜 기반 단일 문자열(`API_VERSION`, 예 `2025-06-01`). 단일 소스는
+  `backend/app/openapi.py:API_VERSION`이며 OpenAPI 산출물의 `info.x-api-version`에 실린다.
+- **응답 헤더** — 모든 HTTP 응답에 추가형 헤더 `X-API-Version: <API_VERSION>`를 싣는다(본문·상태코드
+  불변). 클라이언트는 무시해도 되고(회귀 불변), 통합 진단·로깅에 쓴다.
+- **경로 버저닝(`/v1`)** — **파괴적 변경이 불가피할 때만** 도입한다. 현재는 미사용(헤더 버전으로 충분).
+  도입 시 기존 무접두 경로는 유예기간 동안 기본 버전으로 병행한다.
+
+### 7.2 하위호환 vs 파괴적 변경
+| 분류 | 예 | 버전 영향 |
+|------|-----|-----------|
+| **하위호환(버전 불변)** | optional 필드 추가, 새 엔드포인트, optional 쿼리 파라미터 추가, 새 enum/`kind` 값(permissive) | 버전 안 올림. FE는 미지 값을 폴백 처리(`contract.ts` 주석 규약) |
+| **파괴적(새 버전 필요)** | 필드 제거/이름변경/타입변경, 필수 파라미터 추가, 상태코드 의미 변경, 응답 봉투 구조 변경 | 새 버전 + deprecation 절차(§7.3) |
+
+- 신규 `template.kind`·`cta.kind`는 **permissive**(미등록은 text 폴백)라 하위호환이다(§2.1·contract.ts).
+
+### 7.3 Deprecation 절차
+1. **고지** — 폐기 대상 응답에 `Deprecation: true`(또는 폐기 시작 RFC1123 날짜)와
+   `Sunset: <RFC1123>`(제거 예정일) 헤더를 싣는다.
+2. **유예** — sunset까지 구·신 버전을 병행 제공한다(소비자 마이그레이션 기간).
+3. **3계층 동기** — 계약 변경은 `docs/api-contract.md`·`docs/response-templates.md`·ADR **그리고**
+   `bff/gateway/`·`frontend/src/types/contract.ts`까지 같이 갱신·검증한다(CLAUDE.md 규칙).
+4. **제거** — sunset 경과 후 구 버전 라우트/필드를 제거하고 ADR로 기록한다.
+
+### 7.4 기계가 읽는 계약 (OpenAPI · 타입 생성 · 계약 테스트)
+- **OpenAPI export** — `scripts/export_openapi.py` → `build/openapi.json`(FastAPI 기본 schema +
+  `x-api-version`). BE 노출 인터페이스의 단일 기계 산출물.
+- **스키마→타입** — `scripts/gen_types.py` → `frontend/src/types/contract.generated.ts`(별도 산출물).
+  `--check`로 손-작성 `contract.ts`와 드리프트를 보고한다(정본은 `contract.ts`, 생성물은 점검 보조).
+- **계약 테스트** — `backend/tests/test_contract.py`가 BE 응답 키 ↔ `contract.ts` 키(template kind·
+  chunk type) 정합과 `X-API-Version` 헤더를 검증한다(LLM off·Mock·결정적).

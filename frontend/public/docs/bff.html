@@ -99,7 +99,68 @@
       <div class="chips"><span class="chip">APP_ENV</span><span class="chip">명시 env 우선</span></div></div>
   </div>
 
-  <div class="note bff">계약(응답 봉투·CTA kind·신원 헤더·게이트 상태코드) 변경 시 <code>docs/api-contract.md</code>·BE·FE <code>types/contract.ts</code>와 <b>3계층 동기화</b>. 검증: <code>cd bff &amp;&amp; python -m pytest</code>.</div>
+  <!-- 신원 흐름 -->
+  <h2 class="sec"><span class="n">🔑</span> 신원 흐름 시퀀스</h2>
+  <p class="sec-sub">토큰/게스트 → 헤더 포워딩 → 커밋 게이트(401/409 패스스루).</p>
+  <div class="seq bff">
+    <div class="step"><b>FE 요청</b><span>Authorization 토큰 또는 guest_token(쿼리/쿠키), 또는 없음</span></div>
+    <div class="step"><b>BFF 신원 해석(auth.py)</b><span>토큰 → user(MOCK_USER_ID) · 없음 → guest(토큰 발급)</span></div>
+    <div class="step"><b>BE로 헤더 포워딩</b><span><code>X-User-Id</code> 또는 <code>X-Guest-Token</code></span></div>
+    <div class="step"><b>커밋 시 BE 판정</b><span>게스트 커밋 → BE 401 <code>LoginRequired</code> · 미확인 → 409 <code>ConfirmationRequired</code></span></div>
+    <div class="step"><b>BFF 패스스루</b><span>401/409를 변형 없이 FE로 중계 → FE가 LoginWall/ConfirmDialog</span></div>
+  </div>
+
+  <!-- WS 프로토콜 -->
+  <h2 class="sec"><span class="n">🔌</span> WS <code>/chat</code> 메시지 프로토콜</h2>
+  <p class="sec-sub">FE↔BFF↔BE 스트림. 청크는 한 줄당 1개(섹션 봉투 §2.1).</p>
+  <div class="grid g2">
+    <div>
+      <p class="desc" style="margin:0 0 6px">① FE → BFF (핸드셰이크 + 메시지)</p>
+      <div class="code"><span class="c">// 신원은 메시지/핸드셰이크가 운반</span>
+{ <span class="k">"text"</span>: <span class="s">"세탁기 5C 떠요"</span>,
+  <span class="k">"screen_context"</span>: { <span class="k">"screen"</span>: <span class="s">"home"</span> },
+  <span class="k">"user_id"</span>: <span class="s">"usr_01"</span> }</div>
+    </div>
+    <div>
+      <p class="desc" style="margin:0 0 6px">② BFF ← BE (청크 스트림)</p>
+      <div class="code">{ <span class="k">"type"</span>: <span class="s">"delta"</span>, <span class="k">"text"</span>: <span class="s">"확인했어요…"</span> }
+{ <span class="k">"type"</span>: <span class="s">"section"</span>, <span class="k">"section"</span>: { <span class="k">"label"</span>:<span class="s">"진단"</span>, <span class="k">"intent"</span>:<span class="s">"troubleshoot"</span>,
+    <span class="k">"template"</span>:{<span class="k">"kind"</span>:<span class="s">"guide_steps"</span>, …}, <span class="k">"ctas"</span>:[…] } }
+{ <span class="k">"type"</span>: <span class="s">"done"</span> }</div>
+    </div>
+  </div>
+  <p class="desc">청크 타입: <span class="pill">delta</span>(텍스트 누적) · <span class="pill">section</span>(템플릿 섹션) · <span class="pill">flow</span>(흐름 상태) · <span class="pill">error</span> · <span class="pill">done</span>(종료). BFF는 그대로 릴레이.</p>
+
+  <!-- 요청/응답 예시 -->
+  <h2 class="sec"><span class="n">▤</span> 요청 / 응답 봉투 예시</h2>
+  <p class="sec-sub">HTTP 커밋 경로의 대표 응답.</p>
+  <div class="grid g2">
+    <div><p class="desc" style="margin:0 0 6px">미확인 주문 → <b>409 ConfirmationRequired</b></p>
+      <div class="code">{ <span class="k">"code"</span>: <span class="s">"ConfirmationRequired"</span>,
+  <span class="k">"message"</span>: <span class="s">"주문 확인이 필요합니다."</span>,
+  <span class="k">"template"</span>: { <span class="k">"kind"</span>: <span class="s">"confirmation"</span>,
+    <span class="k">"data"</span>: { <span class="k">"order"</span>: {…}, <span class="k">"summary"</span>: { <span class="k">"total"</span>: <span class="n">12000</span> } } } }</div></div>
+    <div><p class="desc" style="margin:0 0 6px">게스트 커밋 → <b>401 LoginRequired</b></p>
+      <div class="code">{ <span class="k">"code"</span>: <span class="s">"LoginRequired"</span>,
+  <span class="k">"message"</span>: <span class="s">"주문·예약은 로그인 후 확정할 수 있어요."</span>,
+  <span class="k">"template"</span>: { <span class="k">"kind"</span>: <span class="s">"text"</span>, <span class="k">"data"</span>: {…} },
+  <span class="k">"cta"</span>: { <span class="k">"label"</span>: <span class="s">"로그인"</span>, <span class="k">"action"</span>: <span class="s">"navigate"</span>, <span class="k">"kind"</span>: <span class="s">"login"</span> } }</div></div>
+  </div>
+  <p class="desc">업스트림 실패 → <code>transform.py</code>가 표준 폴백 봉투로 정규화: <code>{ template:{kind:"text", data:{message:"일시적인 문제가…"}} }</code>(R13).</p>
+
+  <!-- 토글·env -->
+  <h2 class="sec"><span class="n">⚙</span> env · 토글</h2>
+  <p class="sec-sub">BFF가 읽는 환경값(config.py).</p>
+  <div class="tbl-card"><table>
+    <tr><th>env</th><th>효과</th><th>기본</th></tr>
+    <tr><td><span class="pill">BE_BASE_URL</span></td><td>BE 도메인 API 베이스 URL(중계 대상)</td><td>환경별</td></tr>
+    <tr><td><span class="pill">BFF_UPSTREAM_TIMEOUT</span></td><td>업스트림 타임아웃(초)</td><td>환경별</td></tr>
+    <tr><td><span class="pill">APP_ENV</span></td><td>dev/stg/prd 환경 계층</td><td>dev</td></tr>
+    <tr><td><span class="pill">RATE_LIMIT</span> · <span class="pill">SECURITY_HEADERS</span></td><td>토큰버킷 429 · 보안 헤더(추가형)</td><td class="no">off</td></tr>
+    <tr><td><span class="pill">LOG_JSON</span></td><td>JSON 구조화 로깅</td><td>prd on</td></tr>
+  </table></div>
+
+  <div class="note bff">계약(응답 봉투·CTA kind·신원 헤더·게이트 상태코드) 변경 시 BE·FE <code>types/contract.ts</code>와 <b>3계층 동기화</b>. 검증: <code>cd bff &amp;&amp; python -m pytest</code>.</div>
 
 </div>
 <footer>BFF · 게이트웨이 카테고리 · 현재 코드 구현 기준</footer>

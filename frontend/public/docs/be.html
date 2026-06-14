@@ -161,6 +161,98 @@
     </div>
   </div>
 
+  <!-- 엔티티 -->
+  <h2 class="sec"><span class="n">▦</span> 도메인 엔티티 (핵심 필드)</h2>
+  <p class="sec-sub"><code>domain/models.py</code> 등 — 주요 엔티티와 필드.</p>
+  <div class="er">
+    <div class="ent"><h4>User</h4><ul>
+      <li><b>id</b> · display_name</li><li>linked_device_ids[]</li>
+      <li>preferences { notify_opt_in, interest_categories[] }</li>
+      <li>consent { scopes[] }</li><li>addresses[]</li></ul></div>
+    <div class="ent"><h4>Device</h4><ul>
+      <li><b>id</b> · type · model</li><li>status (ONLINE…)</li>
+      <li>consumables[ { name, life_remaining, threshold } ]</li><li>metrics{}</li></ul></div>
+    <div class="ent"><h4>Order</h4><ul>
+      <li><b>id</b> · user_id</li><li>items[ {part_id,name,unit_price,qty} ]</li>
+      <li>status (DRAFT…) · summary{ subtotal,tax,discount,total }</li>
+      <li>fulfillment (delivery|pickup) · store_id · pickup_status</li></ul></div>
+    <div class="ent"><h4>Quote</h4><ul>
+      <li><b>id</b> · user_id · source</li><li>items[] · total</li><li>status (ACTIVE…)</li></ul></div>
+    <div class="ent"><h4>Booking</h4><ul>
+      <li><b>id</b> · slot_id</li><li>status (REQUESTED…)</li>
+      <li>visit_type · store_id · context_ref</li></ul></div>
+    <div class="ent"><h4>OpenLoop</h4><ul>
+      <li><b>id</b> · kind · ref(유일키)</li><li>label · status (open…)</li><li>priority</li></ul></div>
+    <div class="ent"><h4>EngagementRecord</h4><ul>
+      <li><b>user_id</b> · ref</li><li>state (viewed/acknowledged/dismissed/interested)</li></ul></div>
+    <div class="ent"><h4>Satisfaction · Signal · Proposal</h4><ul>
+      <li>Satisfaction { topic, score, kind, resolved }</li>
+      <li>Signal { kind, ref, value, consent_ok }</li>
+      <li>Proposal { kind, target, evidence[], impact, status }</li></ul></div>
+  </div>
+
+  <!-- 오케스트레이션 시퀀스 -->
+  <h2 class="sec"><span class="n">🧭</span> 오케스트레이션 시퀀스</h2>
+  <p class="sec-sub">한 턴(<code>/internal/turn</code>)의 처리 단계.</p>
+  <div class="seq be">
+    <div class="step"><b>입력 수신</b><span>text + screen_context + 신원(메모리 주입)</span></div>
+    <div class="step"><b>가드레일 pre (병렬)</b><span>입력 검사 — 의도 추출과 gather, fail-closed</span></div>
+    <div class="step"><b>의도 분류</b><span>classify — LLM 구조화 + 규칙(device_status·troubleshoot·order·recommend·general)</span></div>
+    <div class="step"><b>라우팅</b><span>LLM 플래너 또는 규칙 폴백 → capability/도메인 선택</span></div>
+    <div class="step"><b>도메인 실행</b><span>tool/Service 호출(결정적) · 멀티에이전트면 슈퍼바이저-워커</span></div>
+    <div class="step"><b>합성(compose)</b><span>복합 응답 종합 → 섹션 봉투(말만 생성·데이터 불변)</span></div>
+    <div class="step"><b>가드레일 post → 스트림</b><span>방출 직전 검사 · 2-track 스트리밍(카드 선방출 + delta)</span></div>
+  </div>
+
+  <!-- 토글 매트릭스 -->
+  <h2 class="sec"><span class="n">⚙</span> 토글 매트릭스</h2>
+  <p class="sec-sub">신기능은 토글 뒤(기본 off = 회귀 불변, 스트랭글러).</p>
+  <div class="tbl-card"><table>
+    <tr><th>env</th><th>효과</th><th>기본</th></tr>
+    <tr><td><span class="pill">LLM_BACKED</span></td><td>LLM 자연어 경로(off=결정적 섹션)</td><td class="no">off</td></tr>
+    <tr><td><span class="pill">MULTIAGENT</span></td><td>슈퍼바이저-워커 멀티에이전트</td><td class="no">off</td></tr>
+    <tr><td><span class="pill">CAPABILITY_ORCH</span></td><td>capability 오케스트레이터 라우팅</td><td class="no">off</td></tr>
+    <tr><td><span class="pill">GUARDRAIL</span></td><td>가드레일 발동(pre/post)</td><td class="no">off</td></tr>
+    <tr><td><span class="pill">COMPOSE</span></td><td>복합 응답 종합(reduce)</td><td class="no">off</td></tr>
+    <tr><td><span class="pill">MULTITENANT</span></td><td>Principal/게스트 신원(off=기본 사용자)</td><td class="no">off</td></tr>
+    <tr><td><span class="pill">PERSISTENCE</span></td><td>상태 영속 <span class="mono">memory|db</span>(+SQLITE_PATH)</td><td>memory</td></tr>
+    <tr><td><span class="pill">EXPERIMENTS</span></td><td>A/B 할당(off=control)</td><td class="no">off</td></tr>
+    <tr><td><span class="pill">SELF_IMPROVE</span></td><td>개선 제안 엔진(신호·제안)</td><td class="no">off</td></tr>
+    <tr><td><span class="pill">COST_TRACKING</span> · <span class="pill">MODEL_ROUTING</span> · <span class="pill">RESPONSE_CACHE</span></td><td>비용 회계·모델 라우팅·응답 캐싱</td><td class="no">off</td></tr>
+    <tr><td><span class="pill">TRACING</span> · <span class="pill">RESILIENCE</span></td><td>추적·서킷브레이커/회복력</td><td class="no">off</td></tr>
+    <tr><td><span class="pill">OPENAI_API_KEY</span></td><td>실 LLM(backend/.env) — CI엔 없음(수동 검증)</td><td>—</td></tr>
+  </table></div>
+
+  <!-- 에러코드 + 의도 -->
+  <div class="grid g2" style="margin-top:8px">
+    <div>
+      <h2 class="sec"><span class="n">⚠</span> 에러 코드</h2>
+      <div class="tbl-card"><table>
+        <tr><th>코드</th><th>HTTP</th><th>의미</th></tr>
+        <tr><td>ConfirmationRequired</td><td>409</td><td>커밋 전 확인(R17)</td></tr>
+        <tr><td>LoginRequired</td><td>401</td><td>게스트 커밋 차단</td></tr>
+        <tr><td>OutOfStock</td><td>409</td><td>재고 없음 + 대체 매장</td></tr>
+        <tr><td>QuoteExpired</td><td>410</td><td>견적 만료</td></tr>
+        <tr><td>QuoteForbidden</td><td>403</td><td>본인 견적 아님</td></tr>
+        <tr><td>QuoteNotConvertible</td><td>409</td><td>전환 불가 상태</td></tr>
+        <tr><td>PickupTransitionError</td><td>409</td><td>잘못된 픽업 전이</td></tr>
+        <tr><td>not_found</td><td>404</td><td>미발견</td></tr>
+      </table></div>
+    </div>
+    <div>
+      <h2 class="sec"><span class="n">⤳</span> 의도 → 핸들러</h2>
+      <div class="tbl-card"><table>
+        <tr><th>intent</th><th>핸들러 / 서비스</th></tr>
+        <tr><td><span class="pill">device_status</span></td><td>DeviceService — 상태·소모품</td></tr>
+        <tr><td><span class="pill">troubleshoot</span></td><td>KnowledgeService(RAG) — 진단·가이드</td></tr>
+        <tr><td><span class="pill">order</span></td><td>OrderService/StoreService — 부품·커밋</td></tr>
+        <tr><td><span class="pill">recommend</span></td><td>RecommendationService — 추천 agent</td></tr>
+        <tr><td><span class="pill">general</span></td><td>일반 응답 / clarify(모호 시)</td></tr>
+      </table></div>
+      <p class="desc" style="margin-top:10px">복합 질의는 여러 intent로 분해(is_compound) → 섹션 N개로 합성.</p>
+    </div>
+  </div>
+
   <div class="note be">검증: <code>cd backend &amp;&amp; python -m pytest</code>. 실 LLM은 CI에 없어 수동(<code>backend/verify_*.py</code>).</div>
 </div>
 <footer>BE · 도메인 정리 · 현재 코드 구현 기준</footer>

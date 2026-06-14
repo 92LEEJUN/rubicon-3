@@ -142,8 +142,78 @@
     <tr><td><b>MediaChips / Choices</b></td><td><span class="pill">choices</span></td><td>멀티모달 칩·선택지/CTA</td></tr>
   </table></div>
 
-  <div class="note fe">전 화면·템플릿에 로딩(Skeleton)·빈/에러 상태 + 스트리밍 타이핑 인디케이터(R14).
-    모션은 <code>design/motion.ts</code> 토큰 + framer-motion(<code>components/motion.tsx</code>), reduced-motion 존중.</div>
+  <!-- 화면↔데이터 -->
+  <h2 class="sec"><span class="n">⇄</span> 화면 ↔ 데이터 매핑</h2>
+  <p class="sec-sub">각 화면이 호출하는 BFF 엔드포인트/WS와 받는 템플릿 kind.</p>
+  <div class="tbl-card"><table>
+    <tr><th>화면</th><th>호출</th><th>받는 데이터 / 템플릿</th></tr>
+    <tr><td>S1 홈</td><td><span class="method get">GET</span> <span class="pill">/home</span> · <span class="pill">/recommendations</span></td><td><span class="pill">home_summary</span>(devices·alerts·recommendations) · <span class="pill">recommendation_list</span></td></tr>
+    <tr><td>S3 채팅</td><td><span class="method ws">WS</span> <span class="pill">/chat</span></td><td>스트림 청크 <span class="pill">delta</span>/<span class="pill">section</span>/<span class="pill">done</span> → 섹션 봉투 + 템플릿</td></tr>
+    <tr><td>이어가기/재관여</td><td><span class="method get">GET</span> <span class="pill">/resume</span> · <span class="pill">/reengagement</span> <span class="method post">POST</span> <span class="pill">.../deliver</span></td><td>ResumePayload · ReEngagement(primary_label·message·also_count)</td></tr>
+    <tr><td>미해결</td><td><span class="method post">POST</span> <span class="pill">/open-loops/{ref}/{action}</span></td><td>OpenLoop(상태 갱신)</td></tr>
+    <tr><td>커밋</td><td><span class="method post">POST</span> <span class="pill">/orders</span> · <span class="pill">/bookings</span></td><td>성공 Order/Booking · 미확인 409 <span class="pill">confirmation</span> · 게스트 401 <span class="pill">LoginRequired</span></td></tr>
+    <tr><td>카드 탭(S4)</td><td><span class="method post">POST</span> <span class="pill">/surface</span></td><td><span class="pill">bridge</span>(간단) 또는 panel(복잡)</td></tr>
+  </table></div>
+
+  <!-- 인터랙션 흐름 -->
+  <h2 class="sec"><span class="n">↳</span> 인터랙션 흐름</h2>
+  <p class="sec-sub">탭·전송 시 일어나는 일.</p>
+  <div class="grid g3">
+    <div class="card tag-fe"><h3>카드 탭 → surface</h3>
+      <div class="seq fe">
+        <div class="step"><b>카드 탭</b><span>홈/CS 카드</span></div>
+        <div class="step"><b>POST /surface</b><span>BE 동적 판단</span></div>
+        <div class="step"><b>간단 → Bridge 모달</b><span>복잡 → 채팅 패널(S3)</span></div>
+      </div>
+    </div>
+    <div class="card tag-fe"><h3>CTA → 커밋 게이트</h3>
+      <div class="seq fe">
+        <div class="step"><b>주문/예약 CTA</b><span>isCommitCta</span></div>
+        <div class="step"><b>POST 커밋</b><span>confirmed=false</span></div>
+        <div class="step"><b>409 → ConfirmDialog</b><span>확인 후 confirmed=true 재요청</span></div>
+      </div>
+    </div>
+    <div class="card tag-fe"><h3>게스트 커밋</h3>
+      <div class="seq fe">
+        <div class="step"><b>게스트가 커밋</b><span>토큰 없음</span></div>
+        <div class="step"><b>401 LoginRequired</b><span>BE→BFF 중계</span></div>
+        <div class="step"><b>LoginWall 표시</b><span>로그인 후 머지·이어감</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 디자인 토큰 -->
+  <h2 class="sec"><span class="n">🎨</span> 디자인 토큰 레퍼런스</h2>
+  <p class="sec-sub"><code>design/tokens.ts</code> · <code>design/motion.ts</code> — 컴포넌트는 토큰만 참조(하드코딩 금지).</p>
+  <div class="swatches">
+    <span class="sw"><i style="background:#3182F6"></i>primary <code>#3182F6</code></span>
+    <span class="sw"><i style="background:#1B64DA"></i>primaryDark <code>#1B64DA</code></span>
+    <span class="sw"><i style="background:#191F28"></i>text <code>#191F28</code></span>
+    <span class="sw"><i style="background:#4E5968"></i>textSub <code>#4E5968</code></span>
+    <span class="sw"><i style="background:#8B95A1"></i>textMuted <code>#8B95A1</code></span>
+    <span class="sw"><i style="background:#F2F4F6;border-color:#ddd"></i>surfaceAlt <code>#F2F4F6</code></span>
+    <span class="sw"><i style="background:#0AB26B"></i>success <code>#0AB26B</code></span>
+    <span class="sw"><i style="background:#FF8A00"></i>warning <code>#FF8A00</code></span>
+    <span class="sw"><i style="background:#F04452"></i>danger <code>#F04452</code></span>
+  </div>
+  <div class="grid g3">
+    <div class="card"><h3>Spacing</h3><p class="desc mono">xs 4 · sm 8 · md 12 · lg 16 · xl 24 · xxl 32 · xxxl 44</p></div>
+    <div class="card"><h3>Radius / Type</h3><p class="desc mono">radius sm8·md12·lg16·xl20·pill999<br>font xs12·sm13·md15·lg17·xl20·xxl26·display32 · weight 400~800</p></div>
+    <div class="card"><h3>Motion</h3><p class="desc mono">duration fast .16·base .24·slow .36<br>spring press(420/28)·enter(260/24)</p></div>
+  </div>
+
+  <!-- 컴포넌트 상태 -->
+  <h2 class="sec"><span class="n">◷</span> 컴포넌트 상태 4종</h2>
+  <p class="sec-sub">전 화면·템플릿 공통(R14).</p>
+  <div class="grid g2">
+    <div class="wire" style="width:100%;flex:1"><div class="wbox"><div class="l">로딩</div><div class="t">Skeleton 시머(components/Skeleton.tsx)</div></div></div>
+    <div class="wire" style="width:100%;flex:1"><div class="wbox"><div class="l">빈 상태</div><div class="t">has_context=false → 안내·CTA</div></div></div>
+    <div class="wire" style="width:100%;flex:1"><div class="wbox"><div class="l">에러·재시도</div><div class="t">폴백 메시지(transform) → 재시도</div></div></div>
+    <div class="wire" style="width:100%;flex:1"><div class="wbox dark"><div class="l">스트리밍</div><div class="t">타이핑 인디케이터 → 섹션 페이드</div></div></div>
+  </div>
+
+  <div class="note fe">모션은 <code>design/motion.ts</code> 토큰 + framer-motion(<code>components/motion.tsx</code>), reduced-motion 존중.
+    Mock 모드(<code>!apiBase</code>)면 시나리오 라우터로 단독 구동(서버 불필요).</div>
 
 </div>
 <footer>FE · 화면 와이어프레임 · 현재 코드 구현 기준</footer>

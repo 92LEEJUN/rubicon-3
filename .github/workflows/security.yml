@@ -1,0 +1,30 @@
+name: Security
+
+# 의존성 취약점 스캔(S7, ADR-0063, 요구사항 5).
+# 기존 ci.yml(S9 소유)은 편집하지 않는다 — 본 워크플로는 별도 파일이다.
+# pip-audit는 CI 단계에서만 설치하며, 런타임 의존성에는 추가하지 않는다.
+
+on:
+  push:
+  pull_request:
+  schedule:
+    - cron: "0 6 * * 1"  # 매주 월요일 06:00 UTC 정기 스캔
+
+permissions:
+  contents: read
+
+jobs:
+  pip-audit:
+    name: pip-audit (backend + bff)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install pip-audit
+        run: pip install pip-audit
+      - name: Audit backend requirements
+        run: pip-audit -r backend/requirements.txt
+      - name: Audit bff requirements
+        run: pip-audit -r bff/requirements.txt

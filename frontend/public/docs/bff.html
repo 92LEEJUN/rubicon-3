@@ -57,6 +57,19 @@
   </div>
 
   <!-- 2. 라우팅·중계 -->
+  <details class="fold"><summary>코드 · 신원 해석 + BE 헤더 포워딩<span class="fp">gateway/auth.py</span></summary>
+  <div class="code"><span class="c"># 토큰 있음→user, 없음→guest(토큰 발급/재사용)</span>
+def <span class="k">resolve_identity</span>(authorization, guest_token=None) -&gt; Identity:
+    if authorization:
+        return Identity(<span class="s">"user"</span>, MOCK_USER_ID)
+    return Identity(<span class="s">"guest"</span>, guest_token or _new_guest_token())
+
+class <span class="k">Identity</span>:
+    def headers(self):   <span class="c"># BE HTTP 호출 신원 헤더</span>
+        return {<span class="s">"X-User-Id"</span>: self.id} if self.kind==<span class="s">"user"</span> else {<span class="s">"X-Guest-Token"</span>: self.id}
+    def ws_fields(self): <span class="c"># /internal/turn WS 페이로드</span>
+        return {<span class="s">"user_id"</span>: self.user_id, <span class="s">"guest_token"</span>: self.guest_token}</div></details>
+
   <h2 class="sec"><span class="n">2</span> 라우팅 · 중계 (BE 프록시)</h2>
   <p class="sec-sub">gateway/main.py + backend_client.py — FE 친화 경로를 BE <code>/internal/*</code>로 중계. 신원 헤더 부착.</p>
   <div class="tbl-card"><table>
@@ -81,11 +94,30 @@
   </div>
 
   <!-- 4. 응답 정형 -->
+  <details class="fold"><summary>코드 · 인터랙션 회신 → 다음 턴 텍스트<span class="fp">gateway/transform.py</span></summary>
+  <div class="code">def <span class="k">interaction_to_text</span>(msg) -&gt; str:
+    kind, payload = msg.get(<span class="s">"kind"</span>), msg.get(<span class="s">"payload"</span>) or {}
+    if kind == <span class="s">"confirmation"</span>:
+        return <span class="s">"주문을 확정할게요."</span> if payload.get(<span class="s">"confirmed"</span>) else <span class="s">"주문을 취소할게요."</span>
+    if kind == <span class="s">"choices"</span>:  return str(payload.get(<span class="s">"label"</span>) or payload.get(<span class="s">"value"</span>))
+    if kind == <span class="s">"booking"</span>:  return f"{payload.get('slot_id')} 시간으로 방문 예약할게요."
+    return msg.get(<span class="s">"text"</span>) or <span class="s">"계속할게요."</span></div></details>
+
   <h2 class="sec"><span class="n">4</span> 응답 정형 · 폴백 (계약)</h2>
   <p class="sec-sub">gateway/transform.py — 업스트림 실패를 <b>클라이언트 계약(폴백 응답)</b>으로 정규화(R13). 대화·화면 중단 금지.</p>
   <div class="note bff">BE/네트워크 오류 → 표준 폴백 메시지·템플릿으로 변환해 중계. FE는 항상 일관된 봉투를 받는다(계약 3계층 동기화).</div>
 
   <!-- 5~8 -->
+  <details class="fold"><summary>코드 · 업스트림 중계 + 폴백 정규화(R13)<span class="fp">gateway/transform.py</span></summary>
+  <div class="code">def <span class="k">fallback_body</span>(message=_FALLBACK_MSG, code=<span class="s">"upstream_unavailable"</span>):
+    return {<span class="s">"code"</span>: code, <span class="s">"message"</span>: message,
+            <span class="s">"fallback"</span>: {<span class="s">"kind"</span>: <span class="s">"text"</span>, <span class="s">"data"</span>: {<span class="s">"message"</span>: message}}}
+
+async def <span class="k">relay</span>(call):  <span class="c"># 상태코드·본문 그대로 중계, 장애는 503 폴백</span>
+    try: r = await call()
+    except httpx.HTTPError: return JSONResponse(503, fallback_body())
+    return JSONResponse(r.status_code, r.json())  <span class="c"># 401/409도 변형 없이 패스스루</span></div></details>
+
   <h2 class="sec"><span class="n">5</span> 보안 · 관측 · 분석 · 구성</h2>
   <p class="sec-sub">운영 횡단 관심사. 토글로 게이트(기본 off=회귀 불변).</p>
   <div class="grid g2">

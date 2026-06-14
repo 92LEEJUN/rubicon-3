@@ -52,6 +52,16 @@
   </div>
 
   <!-- 2 CS -->
+  <details class="fold"><summary>코드 · OrderService.checkout — 미확인 시 409 게이트(R17)<span class="fp">services/services.py</span></summary>
+  <div class="code"><span class="k">def</span> checkout(self, user_id, part_ids, confirmed=False) -&gt; Order:
+    <span class="c"># 동시성: 같은 user_id 커밋 직렬화(oversell 방지)</span>
+    with _ORDER_LOCKS.acquire(user_id):
+        if not confirmed:
+            draft = self._port.place_order(user_id, part_ids, confirmed=False)
+            raise <span class="k">ConfirmationRequired</span>(draft)   <span class="c"># → 409</span>
+        return self._port.place_order(user_id, part_ids, confirmed=True)
+<span class="c"># checkout_pickup: 재고 게이트(OutOfStock) → 확인(R17) → RESERVED</span></div></details>
+
   <h2 class="sec"><span class="n">🩺</span> CS · 진단</h2>
   <p class="sec-sub">기기 상태·에러코드·셀프수리·워런티·서비스 트리아지.</p>
   <div class="card tag-be">
@@ -67,6 +77,16 @@
   </div>
 
   <!-- 3 O2O -->
+  <details class="fold"><summary>코드 · DeviceService · KnowledgeService 시그니처<span class="fp">services/services.py</span></summary>
+  <div class="code">class <span class="k">DeviceService</span>:
+    def list_devices(self) -&gt; list[Device]: ...
+    def get_status(self, device_query: str) -&gt; DeviceStatusResult: ...
+    def consumable_alerts(self, device: Device) -&gt; list[Anomaly]: ...
+
+class <span class="k">KnowledgeService</span>:  <span class="c"># RAG: 오류코드 매칭 + 벡터</span>
+    def find_solutions(self, query, error_code=None) -&gt; SolutionSearchResult: ...
+    def best_solution(self, query, error_code=None) -&gt; Solution | None: ...</div></details>
+
   <h2 class="sec"><span class="n">📍</span> O2O · 오프라인 연계</h2>
   <p class="sec-sub">거점·재고·픽업(BOPIS)·방문 예약.</p>
   <div class="card tag-be">
@@ -119,6 +139,19 @@
   </div>
 
   <!-- 6 신뢰·안전·운영 -->
+  <details class="fold"><summary>코드 · RuleBasedClassifier — 키워드 규칙 + 복합 감지<span class="fp">orchestrator/classify.py</span></summary>
+  <div class="code"><span class="c"># 플래너(LLM) 미연결/실패 시 규칙 폴백</span>
+def <span class="k">classify</span>(self, message) -&gt; IntentResult:
+    intents = []
+    if _has(t, _TROUBLE):   intents.append(<span class="s">"troubleshoot"</span>)
+    if _has(t, _RECOMMEND): intents.append(<span class="s">"recommend"</span>)
+    if _has(t, _ORDER):     intents.append(<span class="s">"order"</span>)
+    if _has(t, _STATUS) and <span class="s">"troubleshoot"</span> not in intents:
+        intents.append(<span class="s">"device_status"</span>)
+    if not intents: intents.append(<span class="s">"general"</span>)
+    is_compound = len(intents) &gt; 1 or (_has(t, _CONJ) and intents)
+    return IntentResult(intents=uniq, is_compound=…)</div></details>
+
   <h2 class="sec"><span class="n">🛡</span> 신뢰 · 안전 · 운영 (플랫폼)</h2>
   <p class="sec-sub">횡단 관심사 — 전부 토글 뒤(off=회귀 불변). append-only 배선(wiring).</p>
   <div class="grid g3">
@@ -192,6 +225,20 @@
   </div>
 
   <!-- 오케스트레이션 시퀀스 -->
+  <details class="fold"><summary>코드 · 도메인 모델 원본(Device · Order)<span class="fp">domain/models.py</span></summary>
+  <div class="code">class <span class="k">Device</span>(_Base):
+    id: Id; type: str; model: str
+    status: DeviceHealth = <span class="s">"ONLINE"</span>
+    consumables: list[Consumable] = []   <span class="c"># {name, life_remaining, threshold}</span>
+    metrics: dict[str, float] = {}
+
+class <span class="k">Order</span>(_Base):
+    id: Id; user_id: Id
+    items: list[OrderItem] = []          <span class="c"># {part_id, name, unit_price, qty}</span>
+    status: OrderStatus = <span class="s">"DRAFT"</span>
+    summary: OrderSummary                 <span class="c"># subtotal·shipping·tax·discount·total</span>
+    fulfillment: Fulfillment = <span class="s">"delivery"</span>; store_id; pickup_status</div></details>
+
   <h2 class="sec"><span class="n">🧭</span> 오케스트레이션 시퀀스</h2>
   <p class="sec-sub">한 턴(<code>/internal/turn</code>)의 처리 단계.</p>
   <div class="seq be">
@@ -224,6 +271,15 @@
   </table></div>
 
   <!-- 에러코드 + 의도 -->
+  <details class="fold"><summary>코드 · 커밋 게이트 응답(상태코드·code)<span class="fp">api/internal.py</span></summary>
+  <div class="code"><span class="c"># 게스트 커밋</span>
+return JSONResponse(401, {<span class="s">"code"</span>: <span class="s">"LoginRequired"</span>,
+    <span class="s">"message"</span>: <span class="s">"주문·예약은 로그인 후 확정할 수 있어요."</span>, …})
+<span class="c"># 미확인 커밋</span>
+return JSONResponse(409, {<span class="s">"code"</span>: <span class="s">"ConfirmationRequired"</span>, <span class="s">"message"</span>: gate.message, …})
+<span class="c"># 재고 없음 / 견적 만료 / 픽업 전이</span>
+JSONResponse(409, {<span class="s">"code"</span>: <span class="s">"OutOfStock"</span>, …})  ·  JSONResponse(410, {<span class="s">"code"</span>: <span class="s">"QuoteExpired"</span>, …})</div></details>
+
   <div class="grid g2" style="margin-top:8px">
     <div>
       <h2 class="sec"><span class="n">⚠</span> 에러 코드</h2>

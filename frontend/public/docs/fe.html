@@ -64,6 +64,18 @@
     </div>
   </div>
 
+  <details class="fold"><summary>코드 · useHomeData — /home 조회 + fixture 폴백<span class="fp">state/useHomeData.ts</span></summary>
+  <div class="code"><span class="c">// 실패/미설정 시 fixture 폴백, 에러는 숨김</span>
+export function <span class="k">useHomeData</span>(cfg: ApiConfig) {
+  const [data, setData] = useState(homeSummary.data);
+  useEffect(() =&gt; {
+    let alive = true;
+    getHome(cfg).then((d) =&gt; { if (alive &amp;&amp; d) setData(d); });
+    return () =&gt; { alive = false; };
+  }, [cfg.base, cfg.token]);
+  return data;
+}</div></details>
+
   <!-- S3 채팅 패널 -->
   <h2 class="sec"><span class="n">S3</span> 채팅 패널 (전역 오버레이)</h2>
   <p class="sec-sub">ChatPanel — 어디서든 대화. 이어가기·재관여·미해결·스트리밍 섹션·커밋 게이트.</p>
@@ -94,6 +106,32 @@
       </ul>
     </div>
   </div>
+
+  <details class="fold"><summary>코드 · useChat — 청크 reducer 누적<span class="fp">state/useChat.ts</span></summary>
+  <div class="code">export function <span class="k">useChat</span>(transport: ChatTransport) {
+  const [state, dispatch] = useReducer(chatReducer, initialChat);
+  useEffect(() =&gt; { transport.onChunk((c) =&gt; dispatch(c)); transport.connect();
+    return () =&gt; transport.close(); }, [transport]);
+  function <span class="k">send</span>(text, screenContext?) {
+    dispatch({ type: <span class="s">'send'</span> });
+    transport.send({ type: <span class="s">'user_message'</span>, text, screen_context: screenContext ?? null });
+  }
+  <span class="c">// replyInteraction(cta) · resumeFromRef(ref) — 후속/맥락 재진입</span>
+  return { state, send, replyInteraction, resumeFromRef };
+}</div></details>
+  <details class="fold"><summary>코드 · useCommit — 409(확인)·401(로그인) 게이트<span class="fp">state/useCommit.ts</span></summary>
+  <div class="code"><span class="c">// 커밋 결과로 게이트 상태 토글</span>
+function <span class="k">apply</span>(res: CommitResult, kind) {
+  if (res.status === <span class="s">'confirm'</span>) {        <span class="c">// 409</span>
+    pending.current = { kind, payload: res.payload };
+    setConfirmTemplate(res.template);  track(<span class="s">'checkout_shown'</span>, { kind });
+  } else if (res.status === <span class="s">'login'</span>) {     <span class="c">// 401</span>
+    setShowLogin(true);
+  } else if (res.status === <span class="s">'ok'</span>) {
+    track(<span class="s">'order_confirmed'</span>, { kind });  opts?.onCommitted?.(kind, res.data);
+  }
+}
+<span class="c">// start(cta)→confirmed:false · confirm()→confirmed:true 재제출 · login()→토큰 후 재시도</span></div></details>
 
   <!-- S2 + S4 -->
   <div class="grid g2" style="margin-top:8px">
@@ -141,6 +179,23 @@
     <tr><td><b>Bridge</b></td><td><span class="pill">bridge</span></td><td>카드 탭 간단 정보(S4)</td></tr>
     <tr><td><b>MediaChips / Choices</b></td><td><span class="pill">choices</span></td><td>멀티모달 칩·선택지/CTA</td></tr>
   </table></div>
+
+  <details class="fold"><summary>코드 · 공유 계약 타입(Cta · Template · MessageSection · Chunk)<span class="fp">types/contract.ts</span></summary>
+  <div class="code">type <span class="k">CtaAction</span> = <span class="s">'chat'</span> | <span class="s">'commit'</span> | <span class="s">'navigate'</span>;
+type <span class="k">CtaKind</span> = <span class="s">'order'|'booking'|'login'|'select_device'|'restock_alert'</span>
+            | <span class="s">'compare'|'explain'|'recommend'|'choices'|'handoff'</span>;
+interface <span class="k">Cta</span> { label: string; action: CtaAction; kind?: CtaKind | string; payload?: object; }
+
+type <span class="k">TemplateKind</span> = <span class="s">'text'|'device_status'|'guide_steps'|'product_card'|'order_summary'</span>
+  | <span class="s">'confirmation'|'recommendation_list'|'home_summary'|'status_tracker'</span>
+  | <span class="s">'bridge'|'handoff_card'|'booking'|'choices'</span>;  <span class="c">// 미등록 kind → text 폴백</span>
+interface <span class="k">Template</span>&lt;T&gt; { kind: TemplateKind | string; data: T; }
+interface <span class="k">MessageSection</span> { label; intent; template: Template; ctas: Cta[]; handled: boolean; }
+
+<span class="c">// WS /chat 서버→클라 청크</span>
+type <span class="k">Chunk</span> = { type:<span class="s">'delta'</span>; text } | { type:<span class="s">'section'</span>; section: MessageSection }
+  | { type:<span class="s">'flow'</span>; active_flow } | { type:<span class="s">'done'</span>; message_id? }
+  | { type:<span class="s">'error'</span>; code; fallback?: Template };</div></details>
 
   <!-- 화면↔데이터 -->
   <h2 class="sec"><span class="n">⇄</span> 화면 ↔ 데이터 매핑</h2>
@@ -201,6 +256,18 @@
     <div class="card"><h3>Radius / Type</h3><p class="desc mono">radius sm8·md12·lg16·xl20·pill999<br>font xs12·sm13·md15·lg17·xl20·xxl26·display32 · weight 400~800</p></div>
     <div class="card"><h3>Motion</h3><p class="desc mono">duration fast .16·base .24·slow .36<br>spring press(420/28)·enter(260/24)</p></div>
   </div>
+
+  <details class="fold"><summary>코드 · 디자인 토큰 원본(color · space · radius · font)<span class="fp">design/tokens.ts</span></summary>
+  <div class="code">export const <span class="k">color</span> = {
+  primary: <span class="s">'#3182F6'</span>, primaryDark: <span class="s">'#1B64DA'</span>, primaryTint: <span class="s">'#E8F2FE'</span>,
+  bg: <span class="s">'#FFFFFF'</span>, surface: <span class="s">'#FFFFFF'</span>, surfaceAlt: <span class="s">'#F2F4F6'</span>, border: <span class="s">'#E5E8EB'</span>,
+  text: <span class="s">'#191F28'</span>, textSub: <span class="s">'#4E5968'</span>, textMuted: <span class="s">'#8B95A1'</span>,
+  success: <span class="s">'#0AB26B'</span>, warning: <span class="s">'#FF8A00'</span>, danger: <span class="s">'#F04452'</span>,
+};
+export const <span class="k">space</span>  = { xs:4, sm:8, md:12, lg:16, xl:24, xxl:32, xxxl:44 };
+export const <span class="k">radius</span> = { sm:8, md:12, lg:16, xl:20, pill:999 };
+export const <span class="k">font</span>   = { size:{ xs:12, sm:13, md:15, lg:17, xl:20, xxl:26, display:32 },
+                 weight:{ regular:'400', medium:'500', semibold:'600', bold:'700', heavy:'800' } };</div></details>
 
   <!-- 컴포넌트 상태 -->
   <h2 class="sec"><span class="n">◷</span> 컴포넌트 상태 4종</h2>

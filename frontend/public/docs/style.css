@@ -139,3 +139,16 @@ footer { border-top: 1px solid var(--line); margin-top: 60px; padding: 24px 20px
 .ent li{ font-size:12px; padding:2.5px 0; color:var(--sub); font-family:ui-monospace,monospace; }
 .ent li b{ color:var(--ink); }
 .yes{ color:#0aa15a; font-weight:800; } .no{ color:#b0b8c1; }
+
+/* foldable — 코드 레벨 디테일(<details>) */
+details.fold{ background:var(--card); border:1px solid var(--line); border-radius:12px; margin:10px 0; overflow:hidden; box-shadow:var(--shadow); }
+details.fold>summary{ cursor:pointer; padding:11px 14px; font-size:13px; font-weight:700; color:var(--sub); list-style:none; display:flex; align-items:center; gap:8px; user-select:none; }
+details.fold>summary::-webkit-details-marker{ display:none; }
+details.fold>summary:before{ content:'▸'; color:var(--mut); font-size:11px; transition:transform .15s ease; }
+details.fold[open]>summary:before{ transform:rotate(90deg); }
+details.fold>summary:hover{ background:var(--soft); }
+details.fold>summary .fp{ font-family:ui-monospace,monospace; font-size:11px; padding:1px 7px; border-radius:6px; margin-left:auto; }
+.fe details.fold>summary .fp{ color:var(--fe); background:var(--fe-bg); }
+.bff details.fold>summary .fp{ color:var(--bff); background:var(--bff-bg); }
+.be details.fold>summary .fp{ color:var(--be); background:var(--be-bg); }
+details.fold .code{ margin:0; border-radius:0; border-top:1px solid var(--line); max-height:420px; }

@@ -58,6 +58,19 @@ def _transient_errors():
         return (Exception,)
 
 
+def _maybe_cost(kwargs, response):
+    """S6 비용 계측(ADR-0062) — `COST_TRACKING` on일 때만 비용 기록. 예외는 본 경로로 전파하지 않는다.
+
+    off면 `cost.maybe_record`가 즉시 None(무동작). 시그니처·반환·재시도 로직은 불변(회귀 불변).
+    """
+    try:
+        from .cost import maybe_record
+
+        maybe_record(kwargs.get("model", MODEL), kwargs.get("messages"), response)
+    except Exception:
+        pass
+
+
 def chat_completion(**kwargs):
     """Phase A 동기 LLM 래퍼 — 동시성 세마포어 + 일시적 오류 지수 백오프+지터(스레드 컨텍스트용)."""
     transient = _transient_errors()
@@ -65,7 +78,9 @@ def chat_completion(**kwargs):
     with _SEM:  # 동시 호출 상한
         for attempt in range(len(_RETRY_DELAYS) + 1):
             try:
-                return get_client().chat.completions.create(**kwargs)
+                resp = get_client().chat.completions.create(**kwargs)
+                _maybe_cost(kwargs, resp)  # S6 비용 계측(토글 off면 무동작)
+                return resp
             except transient as exc:  # 일시적 → 백오프 재시도
                 last = exc
                 if attempt == len(_RETRY_DELAYS):
@@ -93,7 +108,9 @@ async def achat_completion(**kwargs):
     async with _get_async_sem():  # 동시 호출 상한
         for attempt in range(len(_RETRY_DELAYS) + 1):
             try:
-                return await get_async_client().chat.completions.create(**kwargs)
+                resp = await get_async_client().chat.completions.create(**kwargs)
+                _maybe_cost(kwargs, resp)  # S6 비용 계측(토글 off면 무동작)
+                return resp
             except transient as exc:  # 일시적 → 백오프 재시도
                 last = exc
                 if attempt == len(_RETRY_DELAYS):

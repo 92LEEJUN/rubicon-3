@@ -100,6 +100,22 @@
   </div>
 
   <div class="note bff">계약(응답 봉투·CTA kind·신원 헤더·게이트 상태코드) 변경 시 <code>docs/api-contract.md</code>·BE·FE <code>types/contract.ts</code>와 <b>3계층 동기화</b>. 검증: <code>cd bff &amp;&amp; python -m pytest</code>.</div>
+
+  <h2 class="sec"><span class="n">§</span> 설계 결정 · 근거</h2>
+  <p class="sec-sub">api-contract.md·operations.md 종합.</p>
+  <div class="tbl-card"><table>
+    <tr><th>항목</th><th>결정 / 구현</th><th>근거</th></tr>
+    <tr><td>3계층 분리</td><td>FE · BFF(독립 서비스) · BE</td><td>ADR-0019</td></tr>
+    <tr><td>신원·커밋 계약</td><td>헤더/WS 신원 전달·게스트 허용·401/409 중계</td><td>ADR-0050</td></tr>
+    <tr><td>멀티유저·세션</td><td>세션 격리 경계 + 커밋(CTA→ActionGate)</td><td>ADR-0049</td></tr>
+    <tr><td>Mock 모드</td><td>FE 단독 동작 미러(클라이언트 전용)</td><td>ADR-0051</td></tr>
+    <tr><td>보안 심화(S7)</td><td>레이트리밋(토큰버킷·429)·보안 헤더·검증</td><td>ADR-0063</td></tr>
+  </table></div>
+  <div class="chips" style="margin-top:14px">
+    <a class="chip bff" href="https://github.com/92LEEJUN/rubicon-3/blob/main/docs/api-contract.md">api-contract.md</a>
+    <a class="chip" href="https://github.com/92LEEJUN/rubicon-3/blob/main/docs/operations.md">operations.md</a>
+    <a class="chip" href="https://github.com/92LEEJUN/rubicon-3/tree/main/docs/adr">ADR 인덱스</a>
+  </div>
 </div>
 <footer>BFF · 게이트웨이 카테고리 · 현재 코드 구현 기준</footer>
 </body>

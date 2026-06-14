@@ -144,6 +144,24 @@
 
   <div class="note fe">전 화면·템플릿에 로딩(Skeleton)·빈/에러 상태 + 스트리밍 타이핑 인디케이터(R14).
     모션은 <code>design/motion.ts</code> 토큰 + framer-motion(<code>components/motion.tsx</code>), reduced-motion 존중.</div>
+
+  <h2 class="sec"><span class="n">§</span> 설계 결정 · 근거</h2>
+  <p class="sec-sub">코드 구현을 뒷받침하는 스펙·ADR(frontend-architecture.md 종합).</p>
+  <div class="tbl-card"><table>
+    <tr><th>항목</th><th>결정 / 구현</th><th>근거</th></tr>
+    <tr><td>상태관리</td><td>React Query(서버 상태) + Zustand(UI 상태)</td><td>ADR-0023</td></tr>
+    <tr><td>스트리밍 트랜스포트</td><td>WebSocket(vs SSE/fetch) — <code>/chat</code></td><td>ADR-0022</td></tr>
+    <tr><td>응답 표현</td><td>구조화 Template + sections[]·handled(복합 R7)</td><td>ADR-0025·0026</td></tr>
+    <tr><td>카드 탭 surface</td><td>BE 동적 bridge/panel 결정</td><td>ADR-0027</td></tr>
+    <tr><td>Mock 모드</td><td>FE 단독 동작(<code>!apiBase</code>)·시나리오 라우터·회귀 불변</td><td>ADR-0051</td></tr>
+    <tr><td>모션·디자인</td><td>모션 토큰 + framer-motion×RNW·다크 엘레강트 카드</td><td>ADR-0068</td></tr>
+  </table></div>
+  <div class="chips" style="margin-top:14px">
+    <a class="chip fe" href="https://github.com/92LEEJUN/rubicon-3/blob/main/docs/frontend-architecture.md">frontend-architecture.md</a>
+    <a class="chip fe" href="https://github.com/92LEEJUN/rubicon-3/blob/main/docs/wireframes.md">wireframes.md</a>
+    <a class="chip fe" href="https://github.com/92LEEJUN/rubicon-3/blob/main/docs/response-templates.md">response-templates.md</a>
+    <a class="chip" href="https://github.com/92LEEJUN/rubicon-3/tree/main/docs/adr">ADR 인덱스</a>
+  </div>
 </div>
 <footer>FE · 화면 와이어프레임 · 현재 코드 구현 기준</footer>
 </body>

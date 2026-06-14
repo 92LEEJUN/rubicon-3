@@ -73,3 +73,24 @@ jobs:
         run: cd frontend && npx eslint .
       - name: Prettier check
         run: cd frontend && npx prettier --check "src/**/*.{ts,tsx}"
+
+  # 추가형(S9·ADR-0065) — 릴리스 스크립트가 실제로 도는지 빠르게 검증(기존 잡 동작 불변).
+  release-dry-run:
+    name: release dry-run (version stamp + DORA)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # 버전 스탬프·리드타임용 git 메타.
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Version stamp (dev)
+        run: |
+          python scripts/release.py stamp --env dev --out build
+          cat build/VERSION
+      - name: DORA record + report (smoke)
+        run: |
+          python scripts/dora.py record deployment --env dev --sha "${{ github.sha }}" \
+            --commit-date "$(git show -s --format=%cI HEAD)" --store build/dora-metrics.jsonl
+          python scripts/dora.py report --store build/dora-metrics.jsonl

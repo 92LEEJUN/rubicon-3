@@ -1,0 +1,29 @@
+# S9 딜리버리/DORA(ADR-0065) — 로컬 컨테이너 구성(런 단계).
+# APP_ENV·포트 바인딩 인지. 빌드 인자로 버전 라벨 전달 가능.
+# 사용: APP_ENV=dev GIT_SHA=$(git rev-parse --short HEAD) docker compose up --build
+
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        APP_ENV: ${APP_ENV:-dev}
+        GIT_SHA: ${GIT_SHA:-unknown}
+        VERSION: ${VERSION:-unknown}
+        BUILD_DATE: ${BUILD_DATE:-unknown}
+    image: rubicon-3-backend:${VERSION:-local}
+    environment:
+      APP_ENV: ${APP_ENV:-dev}
+      PORT: ${PORT:-8000}
+      # 실 LLM 은 기본 off(회귀 불변). 필요 시 env 로만 주입.
+      LLM_BACKED: ${LLM_BACKED:-}
+    ports:
+      - "${PORT:-8000}:8000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request,sys; urllib.request.urlopen('http://127.0.0.1:8000/health'); sys.exit(0)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    restart: unless-stopped

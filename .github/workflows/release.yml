@@ -1,0 +1,81 @@
+name: Release
+
+# S9 딜리버리/DORA(ADR-0065) — 환경별 배포 파이프라인(dev/stg/prd) + 버전 스탬프 + DORA 기록.
+# 빌드↔릴리스↔런 분리: 이 워크플로는 '릴리스'(버전 스탬프·아티팩트)와 '런'(환경 배포 게이트)을 담당.
+# stg/prd 는 GitHub Environment 보호(승인 게이트)로 보호된다(레포 Settings → Environments).
+# 추가형: 기존 ci.yml·deploy-pages.yml·security.yml 동작 불변.
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "배포 대상 환경"
+        required: true
+        default: dev
+        type: choice
+        options: [dev, stg, prd]
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: read
+
+jobs:
+  release:
+    name: release (${{ github.event.inputs.environment || 'prd' }})
+    runs-on: ubuntu-latest
+    # 입력 환경(디스패치) 또는 태그 푸시 시 prd. Environment 보호로 stg/prd 승인 게이트.
+    environment: ${{ github.event.inputs.environment || 'prd' }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # 버전 스탬프·리드타임용 git 메타 확보(얕은 클론 방지).
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Resolve target env
+        id: env
+        run: echo "app_env=${{ github.event.inputs.environment || 'prd' }}" >> "$GITHUB_OUTPUT"
+
+      - name: Build release version stamp
+        id: stamp
+        run: |
+          python scripts/release.py stamp --env "${{ steps.env.outputs.app_env }}" --out build
+          echo "version=$(cat build/VERSION)" >> "$GITHUB_OUTPUT"
+          cat build/version.json
+
+      - name: Upload release artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-${{ steps.env.outputs.app_env }}-${{ github.sha }}
+          path: build/
+
+      - name: Record DORA deployment event
+        run: |
+          COMMIT_DATE=$(git show -s --format=%cI HEAD)
+          python scripts/dora.py record deployment \
+            --env "${{ steps.env.outputs.app_env }}" \
+            --sha "${{ github.sha }}" \
+            --commit-date "$COMMIT_DATE" \
+            --store build/dora-metrics.jsonl
+          python scripts/dora.py report --store build/dora-metrics.jsonl --out build/dora-report.json
+          cat build/dora-report.json
+
+      - name: Upload DORA metrics
+        uses: actions/upload-artifact@v4
+        with:
+          name: dora-${{ steps.env.outputs.app_env }}-${{ github.sha }}
+          path: |
+            build/dora-metrics.jsonl
+            build/dora-report.json
+
+      - name: Release summary
+        run: |
+          {
+            echo "## Release ${{ steps.stamp.outputs.version }}"
+            echo "- env: ${{ steps.env.outputs.app_env }}"
+            echo "- sha: ${{ github.sha }}"
+          } >> "$GITHUB_STEP_SUMMARY"

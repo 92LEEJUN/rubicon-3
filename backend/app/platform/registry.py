@@ -9,3 +9,4 @@
 """
 # 스트림 모듈 import를 여기에 append한다(부수효과=등록). 미사용 import 경고는 줄 끝 noqa로 억제.
 # 예) from ..observability import middleware as _obs   # F401 억제 주석을 함께 붙일 것
+from .. import openapi as _api_maturity  # noqa: E402,F401  (S4: X-API-Version 헤더 등록 부수효과)

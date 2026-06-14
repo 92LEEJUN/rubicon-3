@@ -39,6 +39,7 @@ const CURATED: DeckItem[] = [
     desc: 'ECO 코스로 전기·물 12% 아꼈어요. 다음 절약 팁도 받아보세요.',
     cta: '리포트 보기',
     ask: '우리집 에너지 절약 리포트랑 다음 팁 알려줘',
+    img: 'energy',
   },
   {
     palette: 'violet',
@@ -47,6 +48,7 @@ const CURATED: DeckItem[] = [
     desc: '3개월마다 자가 점검을 추천해요. 5분이면 끝나요.',
     cta: '점검 시작',
     ask: '우리집 가전 정기 점검 도와줘',
+    img: 'checkup',
   },
   {
     palette: 'magenta',
@@ -55,6 +57,7 @@ const CURATED: DeckItem[] = [
     desc: '내 세탁기에 딱 맞는 세제와 필터를 묶어 최대 15% 할인.',
     cta: '번들 보기',
     ask: '세탁기에 맞는 세제랑 필터 번들 추천해줘',
+    img: 'bundle',
   },
   {
     palette: 'forest',
@@ -65,16 +68,10 @@ const CURATED: DeckItem[] = [
     ask: '냉장고 워런티 연장 옵션 알려줘',
     deviceType: 'refrigerator',
   },
-  {
-    palette: 'ocean',
-    tag: '소모품',
-    title: '공기청정기 필터 교체 시기',
-    desc: 'HEPA 필터 수명 20% 남았어요. 미리 주문해두면 편해요.',
-    cta: '필터 주문',
-    ask: '공기청정기 HEPA 필터 주문할래',
-    deviceType: 'air_purifier',
-  },
 ];
+
+// 기기 사진이 없는 타입 → 주제 사진 대체(덱 카드용). 모든 카드가 사진을 갖게 한다.
+const DEVICE_CARD_IMG: Record<string, string> = { air_purifier: 'cleanair' };
 
 function buildBriefings(data: any): DeckItem[] {
   const out: DeckItem[] = [];
@@ -109,6 +106,7 @@ function buildBriefings(data: any): DeckItem[] {
       cta: '교체·주문 안내',
       ask: `${name} 소모품 교체 방법 알려주고 주문도 도와줘`,
       deviceType: d?.type,
+      img: d?.type ? DEVICE_CARD_IMG[d.type] : undefined,
     });
   }
   out.push(...CURATED);

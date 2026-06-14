@@ -10,7 +10,7 @@
 import React, { useState } from 'react';
 import { Image, StyleSheet, Text, View } from 'react-native';
 import { animate, motion, useMotionValue, useReducedMotion, useTransform } from 'framer-motion';
-import { DEVICE_IMAGE } from '../design/deviceImages';
+import { CARD_IMAGE, DEVICE_IMAGE } from '../design/deviceImages';
 import { color, font, radius, shadow, space } from '../design/tokens';
 
 const MotionView = motion.create(View as any);
@@ -22,7 +22,8 @@ export type DeckItem = {
   desc: string;
   cta: string;
   ask: string;
-  deviceType?: string;
+  deviceType?: string; // 기기 사진 + 이모지 배지
+  img?: string; // CARD_IMAGE 키(주제 사진) — deviceType 사진보다 우선
 };
 
 // 다크 엘레강트 팔레트 — 사진은 자연색 그대로(어두운 스크림만), 색은 **작은 액센트**로만.
@@ -52,7 +53,9 @@ const DECK_EMOJI: Record<string, string> = {
 };
 
 function CardFace({ item }: { item: DeckItem }) {
-  const img = item.deviceType ? DEVICE_IMAGE[item.deviceType] : undefined;
+  const img =
+    (item.img ? CARD_IMAGE[item.img] : undefined) ??
+    (item.deviceType ? DEVICE_IMAGE[item.deviceType] : undefined);
   const emoji = item.deviceType ? DECK_EMOJI[item.deviceType] : undefined;
   const p = PALETTES[item.palette] ?? PALETTES.blue;
   return (

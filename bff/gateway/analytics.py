@@ -25,6 +25,7 @@ KNOWN_EVENTS = frozenset({
     "cart_item_added", "checkout_shown", "order_confirmed", "order_cancelled",
     "notification_delivered", "notification_opened", "notification_dismissed",
     "handoff_started", "resolution_confirmed", "fallback_shown", "error_shown",
+    "experiment_exposed",  # S8 실험 A/B 노출(ADR-0064, append-only)
 })
 
 # 경계 있는 버퍼 — 인프로세스 read-back(검증·로컬 가시성)용. 영속 아님.

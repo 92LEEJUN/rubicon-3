@@ -49,6 +49,7 @@
 | [0059](0059-backing-services.md) | **백킹서비스 = Port + Mock + 환경 토글** — DB(Postgres 지향)·캐시(Redis)·큐·세션 외부화 Port + Mock·마이그레이션 러너. 추가형 회귀 불변 | 채택 |
 | [0060](0060-api-maturity.md) | **API 성숙(API-first)** — 날짜 기반 버저닝·`X-API-Version`·Deprecation/Sunset 절차·OpenAPI export·스키마→타입 생성·계약 테스트. 하위호환 | 채택 |
 | [0061](0061-privacy-dsr.md) | **개인정보·DSR** — 동의 scope 부여/철회·DSR 접근/삭제/정정·보존 정책·감사 훅(`/internal/privacy/*` 라우터). `MULTITENANT` off=회귀 불변 | 채택 |
+| [0064](0064-experiments-ab.md) | **실험·롤아웃(Runtime A/B)** — 결정적 sticky 할당·실험 레지스트리·canary/홀드아웃 게이트·노출 로깅(analytics append)·FE 훅/BE 헬퍼(`/internal/experiments/*`). `EXPERIMENTS` off=회귀 불변 | 채택 |
 
 ### Phase A — 스트리밍 / 동시성 실행 (operations.md §6·§9·§14)
 | # | 결정 | 상태 |

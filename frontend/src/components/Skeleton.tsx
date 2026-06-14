@@ -3,7 +3,7 @@
  * reduced-motion이면 정적 박스(콘텐츠 동일). frontend-architecture §6 "스켈레톤 4종" 토대.
  */
 import React from 'react';
-import { View, ViewStyle } from 'react-native';
+import { StyleSheet, View, ViewStyle } from 'react-native';
 import { useReducedMotion } from 'framer-motion';
 import { MotionView } from './motion';
 import { color, radius as radiusToken, space } from '../design/tokens';
@@ -33,7 +33,7 @@ export function Skeleton({
   }
   return (
     <MotionView
-      style={[base, style] as any}
+      style={StyleSheet.flatten([base, style]) as any}
       testID={testID}
       animate={{ opacity: [0.5, 1, 0.5] }}
       transition={{ duration: 1.2, repeat: Infinity, ease: 'easeInOut' }}

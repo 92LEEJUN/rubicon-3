@@ -6,13 +6,17 @@
  * 모션은 표현 계층이라 비활성·테스트에서도 자식 콘텐츠·기능은 동일하다(요구 4-1·4-2).
  */
 import React from 'react';
-import { Pressable, View, ViewStyle } from 'react-native';
+import { Pressable, StyleSheet, View, ViewStyle } from 'react-native';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { fadeInUp, hoverLift, pressTap, spring, staggerParent } from '../design/motion';
 
 export const MotionView = motion.create(View as any);
 export const MotionPressable = motion.create(Pressable as any);
 export { AnimatePresence };
+
+// framer-motion은 `style`을 CSS 객체로 다룬다 — RN 배열 스타일을 넘기면 인덱스 순회로 깨진다.
+// Motion* 컴포넌트에 넘기기 전 항상 단일 객체로 평탄화한다.
+const flat = (s?: ViewStyle | ViewStyle[]) => StyleSheet.flatten(s) as any;
 
 type Kids = { children: React.ReactNode; style?: ViewStyle | ViewStyle[]; testID?: string };
 
@@ -28,7 +32,7 @@ export function FadeInView({ children, style, testID, delay = 0 }: Kids & { dela
   }
   return (
     <MotionView
-      style={style as any}
+      style={flat(style)}
       testID={testID}
       initial={fadeInUp.hidden}
       animate={fadeInUp.show}
@@ -51,7 +55,7 @@ export function Stagger({ children, style, testID, stagger = 0.06 }: Kids & { st
   }
   return (
     <MotionView
-      style={style as any}
+      style={flat(style)}
       testID={testID}
       initial="hidden"
       animate="show"
@@ -73,7 +77,7 @@ export function StaggerItem({ children, style, testID }: Kids) {
     );
   }
   return (
-    <MotionView style={style as any} testID={testID} variants={fadeInUp}>
+    <MotionView style={flat(style)} testID={testID} variants={fadeInUp}>
       {children}
     </MotionView>
   );
@@ -108,7 +112,7 @@ export function PressableScale({
   return (
     <MotionPressable
       onPress={onPress}
-      style={style as any}
+      style={flat(style)}
       testID={testID}
       accessibilityRole={accessibilityRole}
       whileTap={pressTap}

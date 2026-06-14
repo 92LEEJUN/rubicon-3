@@ -12,5 +12,11 @@ export default defineConfig({
     alias: { "react-native": "react-native-web" },
     extensions: [".web.tsx", ".web.ts", ".tsx", ".ts", ".web.js", ".js"],
   },
-  define: { __DEV__: JSON.stringify(false), "process.env.NODE_ENV": JSON.stringify("production") },
+  // react-native-web의 Animated 등이 `global`을 참조한다 — 브라우저 번들에선 globalThis로 매핑
+  // (없으면 프로덕션 빌드에서 ReferenceError: global is not defined). 표준 RNW×Vite 설정.
+  define: {
+    __DEV__: JSON.stringify(false),
+    "process.env.NODE_ENV": JSON.stringify("production"),
+    global: "globalThis",
+  },
 });

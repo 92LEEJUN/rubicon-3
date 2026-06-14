@@ -25,7 +25,7 @@ export function Card({
         testID={testID}
         accessibilityRole="button"
         onPress={onPress}
-        style={cardStyle as any}
+        style={StyleSheet.flatten(cardStyle) as any}
         whileTap={pressTap}
         whileHover={hoverLift}
         transition={spring.press as any}
@@ -89,7 +89,7 @@ export function Button({
       testID={testID}
       accessibilityRole="button"
       onPress={onPress}
-      style={[styles.btn, primary ? styles.btnPrimary : styles.btnSecondary] as any}
+      style={StyleSheet.flatten([styles.btn, primary ? styles.btnPrimary : styles.btnSecondary]) as any}
       whileTap={pressTap}
       whileHover={hoverLift}
       transition={spring.press as any}

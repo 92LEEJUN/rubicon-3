@@ -80,7 +80,7 @@ def _orch(supervisor, guardrail):
 
 
 async def _turn(orch, message, session_id):
-    """(first_token_ms, total_ms, composed, blocked, n_sections)."""
+    """(first_token_ms, total_ms, composed, blocked, n_sections). 내러티브는 delta로 방출(2-track)."""
     t0 = time.perf_counter()
     first = None
     composed = blocked = False
@@ -88,12 +88,11 @@ async def _turn(orch, message, session_id):
     async for ch in orch.astream(message, session_id=session_id):
         if first is None:
             first = (time.perf_counter() - t0) * 1000
-        if ch["type"] == "section":
+        if ch["type"] == "delta":
+            composed = True                      # 내러티브 = delta(ADR-0055)
+        elif ch["type"] == "section":
             n += 1
-            sec = ch["section"]
-            if sec["intent"] == "narration":
-                composed = True
-            if sec["intent"] == "blocked":
+            if ch["section"]["intent"] == "blocked":
                 blocked = True
     total = (time.perf_counter() - t0) * 1000
     return first, total, composed, blocked, n
@@ -109,8 +108,8 @@ async def _run_convo(name, script, caps_by_msg):
     for i, (msg, _) in enumerate(script, 1):
         f, t, composed, blocked, n = await _turn(orch, msg, sid)
         sess_total += t
-        tag = ("⛔ 차단(스킵)" if blocked else
-               (f"✅ compose({n}섹션)" if composed else f"· skip({n}섹션)"))
+        tag = ("⛔ 차단(라우팅 취소)" if blocked else
+               (f"✅ compose({n}카드+내러티브)" if composed else f"· skip({n}섹션)"))
         print(f"    T{i:<2}{f:>10.1f}ms{t:>8.1f}ms   {tag}")
         print(f"        └ \"{msg[:38]}…\"")
     print(f"    {'─'*44}\n    세션 누적 총 E2E: {sess_total:8.1f} ms")
@@ -132,12 +131,13 @@ async def main():
         os.environ.pop(k, None)
 
     print("\n" + "-" * 72)
-    print("해석")
-    print("  · 라우팅 홉(~%.0fms)은 턴마다 메시지가 달라 캐시 미스 → 매 턴 재발생." % (ROUTE_DELAY*1000))
-    print("  · compose(~%.0fms)는 처리 섹션 ≥2 턴에서만, 캐시 없이 매번 추가." % (COMPOSE_DELAY*1000))
-    print("  · 단일 섹션 턴(skip)은 라우팅 홉만 → first-token이 낮다.")
-    print("  · 차단 턴은 capability·compose를 건너뛰지만 pre-screen이 라우팅과 병렬이라")
-    print("    라우팅 홉(~%.0fms)만큼은 기다린다(차단 시 라우팅 낭비, ADR-0054)." % (ROUTE_DELAY*1000))
+    print("해석 (2-track 적용 후, ADR-0055)")
+    print("  · first-token = 라우팅 홉(~%.0fms) 수준으로 통일 — compose 턴도 카드를 먼저" % (ROUTE_DELAY*1000))
+    print("    방출하므로 compose(~%.0fms)가 first-token을 더 이상 가리지 않는다." % (COMPOSE_DELAY*1000))
+    print("  · 총 E2E는 내러티브 완료까지(~라우팅+compose). compose 턴만 길고, 내러티브는")
+    print("    delta로 점진 방출돼 체감 대기가 짧다(guardrail off면 토큰 스트리밍).")
+    print("  · 차단 턴은 라우팅 task를 cancel → first-token ~0ms, 세션 누적에서 라우팅 1콜 절약.")
+    print("  · (캐시는 멀티턴 적중률 ≈0이라 레버 아님 — 분석 결과 제외.)")
     print("-" * 72)
 
 

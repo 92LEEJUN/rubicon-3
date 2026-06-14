@@ -564,39 +564,49 @@ class CapabilityOrchestrator:
                           "handled": s.handled, "brief": brief})
         return facts
 
-    @staticmethod
-    def _narration_section(text: str) -> MessageSection:
-        """종합 내러티브 섹션 — 기존 text kind 재사용(계약 무추가, ADR-0053·요구사항 4-1)."""
-        return MessageSection(
-            label="정리", intent="narration", handled=True,
-            template=Template(kind="text", data={
-                "message": text, "prose": True, "composed": True}))
+    async def _screen_and_route(self, message: str) -> tuple[Verdict, Optional[Plan]]:
+        """가드레일 pre-screen과 라우팅을 **병렬 task**로 — 차단이면 라우팅 취소(ADR-0055).
 
-    async def _screen_and_route(self, message: str) -> tuple[Verdict, Plan]:
-        """가드레일 pre-screen과 라우팅을 **병렬**(gather)로 — screen 예외는 fail-closed(차단, ADR-0054)."""
-        async def _screen() -> Verdict:
-            try:
-                return await self.guardrail.ascreen(message)
-            except Exception:
-                return Verdict(allowed=False, reason="guardrail_error")   # fail-closed
-        verdict, plan = await asyncio.gather(_screen(), self.aroute(message))
-        return verdict, plan
-
-    async def _compose_sections(self, message: str, plan: Plan,
-                                sections: list[MessageSection]) -> list[MessageSection]:
-        """처리 섹션이 2개 이상이면 내러티브를 선두에 둔다. 실패·미충족이면 원본 그대로(폴백)."""
-        if not (compose_on() and self._can_compose()):
-            return sections
-        handled = [s for s in sections if s.handled]
-        if len(handled) < 2:                          # 종합할 게 없음 → 스킵(요구사항 1-5)
-            return sections
+        screen은 결정적이라 빠르다. 라우팅 task를 먼저 띄워 동시 진행하되, screen이 block이면
+        라우팅 task를 cancel해 낭비를 없앤다(차단 턴 first-token=screen 수준). screen 예외는
+        fail-closed(차단, ADR-0054)."""
+        route_task = asyncio.create_task(self.aroute(message))
         try:
-            text = await self.llm_planner.acompose(message, plan, self._section_facts(sections))
+            verdict = await self.guardrail.ascreen(message)
         except Exception:
-            return sections                           # compose 실패 → 원본 폴백(요구사항 1-4)
-        if not text:
-            return sections
-        return [self._narration_section(text)] + sections
+            verdict = Verdict(allowed=False, reason="guardrail_error")   # fail-closed
+        if not verdict.allowed:
+            route_task.cancel()
+            try:
+                await route_task
+            except (asyncio.CancelledError, Exception):
+                pass
+            return verdict, None
+        return verdict, await route_task
+
+    async def _emit_narration(self, message: str, plan: Plan,
+                              sections: list[MessageSection], mask_on: bool):
+        """2-track 내러티브 — 처리 섹션 ≥2면 compose를 delta로 방출(ADR-0055).
+
+        guardrail off → 토큰 스트리밍(acompose_stream). on → 완성 후 마스킹(단일 delta, 안전 우선).
+        미충족·실패면 무방출(카드로 완결, 요구사항 4-1). 스트리밍 스텁 미보유 시 버퍼 폴백."""
+        if not (compose_on() and self._can_compose()):
+            return
+        if len([s for s in sections if s.handled]) < 2:    # 종합할 게 없음(요구사항 1)
+            return
+        facts = self._section_facts(sections)
+        try:
+            stream_ok = (not mask_on) and hasattr(self.llm_planner, "acompose_stream")
+            if stream_ok:
+                async for tok in self.llm_planner.acompose_stream(message, plan, facts):
+                    if tok:
+                        yield {"type": "delta", "text": tok}
+            else:
+                text = await self.llm_planner.acompose(message, plan, facts)
+                if text:
+                    yield {"type": "delta", "text": self.guardrail.mask(text) if mask_on else text}
+        except Exception:
+            return                                          # 내러티브 생략(턴 유지, 요구사항 4-1)
 
     def build_turn(self, message: str, session_id: str = "s1",
                    screen_context: Optional[dict] = None, user=None) -> AssistantTurn:
@@ -632,11 +642,11 @@ class CapabilityOrchestrator:
         """stream_turn의 비동기 버전 — 슈퍼바이저(plan→compose) + 가드레일 배선(ADR-0053·0054).
 
         흐름(토글 켜졌을 때):
-          ① 가드레일 pre-screen ∥ 라우팅(gather, 병렬). 차단(block)이면 capability 스킵 →
-             안전 거부 1섹션(fail-closed, ADR-0054).
-          ② capability 실행(결정적). ③ COMPOSE on + 처리 섹션 ≥2면 슈퍼바이저 종합 내러티브를
-             선두에(배리어 후, ADR-0053). ④ 가드레일 post-check(PII 마스킹) → 방출.
-        봉투는 §2.1(section* → flow → done, 실패 시 error)로 동일하다. 토글 off면 기존과 동일.
+          ① 가드레일 pre-screen ∥ 라우팅(task, 병렬). 차단이면 라우팅 취소 + capability 스킵 →
+             안전 거부 1섹션(fail-closed·취소, ADR-0054·0055).
+          ② capability 실행(결정적) → 가드레일 post-check. ③ **카드 섹션을 먼저 방출**(2-track,
+             first-token=라우팅 홉). ④ COMPOSE on + 처리 섹션 ≥2면 내러티브를 delta로 스트리밍(ADR-0055).
+        봉투는 `section* → delta? → flow → done`(실패 시 error). 토글 off면 기존과 동일.
         capability handler는 동기(결정적)이므로 await 없이 그대로 호출한다."""
         try:
             session = self._session(session_id)
@@ -645,7 +655,7 @@ class CapabilityOrchestrator:
 
             gon = guardrail_on() and self.guardrail is not None
             if gon:
-                verdict, plan = await self._screen_and_route(message)   # ① 병렬 pre-screen
+                verdict, plan = await self._screen_and_route(message)   # ① 병렬 pre-screen + 취소
                 if not verdict.allowed:                                 # 차단 → fail-closed
                     refusal = self.guardrail.refusal_section(verdict)
                     yield {"type": "section", "section": refusal.model_dump(mode="json")}
@@ -656,9 +666,7 @@ class CapabilityOrchestrator:
                 plan = await self.aroute(message)
 
             sections = self._run_capabilities(plan, ctx, message, session)   # ②
-            sections = await self._compose_sections(message, plan, sections)  # ③ 종합(스킵/폴백 내장)
-
-            if gon:   # ④ post-check — 텍스트 PII 마스킹(구조 필드 불변). 예외면 error 폴백(fail-closed)
+            if gon:   # post-check — 텍스트 PII 마스킹(구조 필드 불변). 예외면 error 폴백(fail-closed)
                 try:
                     sections = self.guardrail.check(sections)
                 except Exception as exc:
@@ -667,7 +675,6 @@ class CapabilityOrchestrator:
                                "message": "안전 점검 중 문제가 생겨 응답을 보류했어요. 잠시 후 다시 시도해 주세요."}},
                            "detail": str(exc)}
                     return
-
             active_flow = "troubleshoot" if any(
                 s.intent == "troubleshoot" for s in sections) else None
             message_id = f"msg_{uuid.uuid4().hex[:8]}"
@@ -677,7 +684,9 @@ class CapabilityOrchestrator:
                                 "data": {"message": "일시적인 문제가 발생했어요. 잠시 후 다시 시도해 주세요."}},
                    "detail": str(exc)}
             return
-        for section in sections:
+        for section in sections:   # ③ 카드 선-방출(2-track) — first-token=라우팅 홉
             yield {"type": "section", "section": section.model_dump(mode="json")}
+        async for chunk in self._emit_narration(message, plan, sections, mask_on=gon):  # ④ 내러티브 delta
+            yield chunk
         yield {"type": "flow", "active_flow": active_flow}
         yield {"type": "done", "message_id": message_id}

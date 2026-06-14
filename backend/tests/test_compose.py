@@ -54,36 +54,41 @@ def _sections(chunks):
     return [c["section"] for c in chunks if c["type"] == "section"]
 
 
-# ── compose(요구사항 1) ──────────────────────────────────────────────────────
+def _deltas(chunks):
+    return [c for c in chunks if c["type"] == "delta"]
+
+
+# ── compose(요구사항 1) — 내러티브는 delta로 방출(2-track, ADR-0055) ──────────
 def test_compose_off_no_narration(container, monkeypatch):
     # COMPOSE 미설정 → 종합 없음(회귀 불변, 요구사항 1-3)
     monkeypatch.delenv("COMPOSE", raising=False)
     stub = _SuperStub(["diagnose", "recommend"])
     chunks = asyncio.run(_collect(_orch(container, stub).astream("세탁기 물이 안 빠져요")))
-    assert not any(s["intent"] == "narration" for s in _sections(chunks))
+    assert not _deltas(chunks)
     assert stub.compose_calls == 0
 
 
-def test_compose_on_adds_narration_first(container, monkeypatch):
-    # COMPOSE on + 처리 섹션 ≥2 → 내러티브 선두(요구사항 1-1)
+def test_compose_on_emits_narration_delta_after_cards(container, monkeypatch):
+    # COMPOSE on + 처리 섹션 ≥2 → 카드 섹션 먼저, 내러티브 delta 뒤(요구사항 1-1·1-2)
     monkeypatch.setenv("COMPOSE", "1")
     stub = _SuperStub(["diagnose", "recommend"])
     chunks = asyncio.run(_collect(_orch(container, stub).astream("세탁기 물이 안 빠져요")))
-    secs = _sections(chunks)
-    assert secs[0]["intent"] == "narration"                     # 선두
-    assert secs[0]["template"]["kind"] == "text"                # text 재사용(계약 무추가, 4-1)
-    assert secs[0]["template"]["data"]["composed"] is True
-    assert "정리" in secs[0]["template"]["data"]["message"] or stub.text in \
-        secs[0]["template"]["data"]["message"]
+    types = [c["type"] for c in chunks]
+    assert "delta" in types
+    last_section = max(i for i, t in enumerate(types) if t == "section")
+    first_delta = min(i for i, t in enumerate(types) if t == "delta")
+    assert last_section < first_delta                           # 카드가 내러티브보다 앞(2-track)
+    assert _deltas(chunks)[0]["text"] == stub.text              # 버퍼 경로(stub은 stream 미보유)
     assert stub.compose_calls == 1
 
 
 def test_compose_preserves_structured_sections(container, monkeypatch):
-    # 내러티브가 붙어도 구조화 섹션(카드·CTA·data)은 변형 없이 유지(요구사항 1-2)
+    # 내러티브가 delta여도 구조화 섹션(카드·CTA·data)은 변형 없이 유지(요구사항 1-3)
     monkeypatch.setenv("COMPOSE", "1")
     stub = _SuperStub(["diagnose", "recommend"])
     chunks = asyncio.run(_collect(_orch(container, stub).astream("세탁기 물이 안 빠져요")))
     secs = _sections(chunks)
+    assert not any(s["intent"] == "narration" for s in secs)    # 내러티브는 섹션이 아님
     guide = next(s for s in secs if s["template"]["kind"] == "guide_steps")
     assert guide["template"]["data"]["steps"]                   # 단계 데이터 보존
     reco = next(s for s in secs if s["template"]["kind"] == "recommendation_list")
@@ -91,30 +96,29 @@ def test_compose_preserves_structured_sections(container, monkeypatch):
 
 
 def test_compose_skipped_single_section(container, monkeypatch):
-    # 처리 섹션 1개면 종합 스킵(요구사항 1-5)
+    # 처리 섹션 1개면 종합 스킵(요구사항 1)
     monkeypatch.setenv("COMPOSE", "1")
     stub = _SuperStub(["diagnose"])
     chunks = asyncio.run(_collect(_orch(container, stub).astream("세탁기 물이 안 빠져요")))
-    assert not any(s["intent"] == "narration" for s in _sections(chunks))
+    assert not _deltas(chunks)
     assert stub.compose_calls == 0
 
 
 def test_compose_failure_falls_back(container, monkeypatch):
-    # compose 예외 → 내러티브 없이 원본 섹션(요구사항 1-4, 턴 유지)
+    # compose 예외 → 내러티브 없이 카드만(요구사항 4-1, 턴 유지)
     monkeypatch.setenv("COMPOSE", "1")
     stub = _ComposeBoom(["diagnose", "recommend"])
     chunks = asyncio.run(_collect(_orch(container, stub).astream("세탁기 물이 안 빠져요")))
-    secs = _sections(chunks)
-    assert not any(s["intent"] == "narration" for s in secs)
-    assert any(s["template"]["kind"] == "guide_steps" for s in secs)   # 원본 유지
+    assert not _deltas(chunks)
+    assert any(s["template"]["kind"] == "guide_steps" for s in _sections(chunks))   # 카드 유지
     assert chunks[-1]["type"] == "done"
 
 
 def test_compose_skipped_without_acompose(container, monkeypatch):
-    # 슈퍼바이저가 acompose 미보유(LLM_BACKED 경로 아님) → 종합 불가, 원본 그대로
+    # 슈퍼바이저가 acompose 미보유(LLM_BACKED 경로 아님) → 종합 불가, 카드만
     monkeypatch.setenv("COMPOSE", "1")
     chunks = asyncio.run(_collect(_orch(container).astream("세탁기 물이 안 빠져요")))
-    assert not any(s["intent"] == "narration" for s in _sections(chunks))
+    assert not _deltas(chunks)
 
 
 def test_compose_facts_include_all_sections(container, monkeypatch):

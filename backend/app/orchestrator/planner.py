@@ -9,9 +9,9 @@
 from __future__ import annotations
 
 import json
-from typing import Optional
+from typing import AsyncIterator, Optional
 
-from ..llm import MODEL, achat_completion, get_client
+from ..llm import MODEL, achat_completion, get_async_client, get_client
 from .capability import Capability, Plan
 from .prompts import COMPOSER_PROMPT
 
@@ -140,3 +140,22 @@ class LLMPlanner:
             ],
         )
         return (resp.choices[0].message.content or "").strip()
+
+    async def acompose_stream(self, message: str, plan: Plan,
+                              facts: list[dict]) -> AsyncIterator[str]:
+        """compose 토큰 스트리밍(2-track, ADR-0055) — OpenAI stream=True로 델타를 yield.
+
+        guardrail off 경로에서만 쓴다(on이면 버퍼 acompose+마스킹). 재시도 래퍼(achat_completion)는
+        스트림과 결합이 복잡해 직접 async 클라이언트로 호출한다(서빙 단일 루프)."""
+        stream = await get_async_client().chat.completions.create(
+            model=self.model,
+            messages=[
+                {"role": "system", "content": COMPOSER_PROMPT},
+                {"role": "user", "content": _compose_prompt(message, plan, facts)},
+            ],
+            stream=True,
+        )
+        async for chunk in stream:
+            delta = chunk.choices[0].delta.content if chunk.choices else None
+            if delta:
+                yield delta

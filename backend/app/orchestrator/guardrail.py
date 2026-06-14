@@ -71,7 +71,8 @@ class Guardrail:
         """screen의 비동기 버전 — 라우팅과 gather로 병렬(ADR-0054). 결정적이라 동기 위임."""
         return self.screen(message)
 
-    def _mask_text(self, text: str) -> str:
+    def mask(self, text: str) -> str:
+        """텍스트 PII 마스킹(공개) — 내러티브 버퍼 경로(ADR-0055)·섹션 post-check 공통."""
         out = text
         for pat, repl in _PII_PATTERNS:
             out = pat.sub(repl, out)
@@ -88,7 +89,7 @@ class Guardrail:
             if isinstance(data, dict):
                 msg = data.get("message")
                 if isinstance(msg, str) and msg:
-                    data["message"] = self._mask_text(msg)
+                    data["message"] = self.mask(msg)
         return sections
 
     def refusal_section(self, verdict: Verdict) -> MessageSection:

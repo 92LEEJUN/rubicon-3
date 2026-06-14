@@ -108,9 +108,9 @@ async def main(rounds=9):
         os.environ.pop(k, None)
 
     print("\n" + "-" * 72)
-    print("요약 (중앙값)")
-    print(f"  · compose가 더하는 first-token : +{fB - fA:6.1f} ms  (배리어+종합 1콜)")
-    print(f"  · compose가 더하는 총 E2E      : +{tB - tA:6.1f} ms")
+    print("요약 (중앙값, 2-track 적용 후 ADR-0055)")
+    print(f"  · compose가 더하는 first-token : +{fB - fA:6.1f} ms  (카드 선-방출 → ≈0 기대)")
+    print(f"  · compose가 더하는 총 E2E      : +{tB - tA:6.1f} ms  (내러티브 완료까지)")
     print(f"  · guardrail이 더하는 first-token: +{fC - fB:6.1f} ms  (pre 병렬 → ≈0 기대)")
     print(f"  · guardrail이 더하는 총 E2E     : +{tC - tB:6.1f} ms  (post 마스킹)")
     print("-" * 72)

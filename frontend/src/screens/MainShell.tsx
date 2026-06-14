@@ -1,7 +1,6 @@
 /** 메인 셸 — 상단 브랜드 + 토글(홈↔고객지원) + 하단 고정 채팅바(전 탭 공통, wireframes §6). */
 import React, { useState } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
-import { Caption, Heading } from '../components/primitives';
 import { SegmentedTabs } from '../components/SegmentedTabs';
 import { HomeScreen } from './HomeScreen';
 import { SupportScreen } from './SupportScreen';
@@ -39,14 +38,13 @@ export function MainShell({
     <View style={styles.root} testID="screen-main">
       <View style={styles.header}>
         <View style={styles.brandRow}>
-          <Caption>Samsung</Caption>
+          <Text style={styles.brand}>삼성 AI 컨시어지</Text>
           {onDocs && (
             <Pressable onPress={onDocs} testID="open-docs" accessibilityRole="link">
-              <Text style={styles.docsLink}>아키텍처 문서 →</Text>
+              <Text style={styles.docsLink}>문서 →</Text>
             </Pressable>
           )}
         </View>
-        <Heading>AI 컨시어지</Heading>
         <View style={{ height: space.md }} />
         <SegmentedTabs
           value={tab}
@@ -101,6 +99,7 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
   },
   brandRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  brand: { fontSize: font.size.lg, color: color.text, fontWeight: font.weight.bold as any },
   docsLink: { fontSize: font.size.sm, color: color.textMuted, fontWeight: '600' },
   chatBar: {
     flexDirection: 'row',

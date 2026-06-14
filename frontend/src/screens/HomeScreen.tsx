@@ -1,21 +1,14 @@
-/** S1 홈 (변형 B, wireframes §2) — 브리핑 카드 스택(스와이프) + 2열 작은 카드 + 추천.
+/** S1 홈 — 토스(Toss)st 재설계: 큰 인사 + 퀵액션 + 클린 리스트 카드(ADR-0068).
  *
  * home_summary(devices·alerts·recommendations)에서 콘텐츠를 파생한다(실데이터/fixture 폴백).
- * 하단 채팅바는 MainShell이 고정으로 렌더(홈·CS 공통). 카드/타일 탭 → 맥락 질문으로 채팅 진입.
+ * 하단 채팅바는 MainShell이 고정 렌더. 카드/행 탭 → 맥락 질문으로 채팅 진입.
+ * 비주얼: 화이트 표면·토스 블루 단일 액센트·큰 볼드 타이포·아주 부드러운 섀도우·넉넉한 여백.
  */
-import React, { useState } from 'react';
-import {
-  NativeScrollEvent,
-  NativeSyntheticEvent,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-  useWindowDimensions,
-} from 'react-native';
+import React from 'react';
+import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { TemplateView } from '../templates';
 import { FadeInView, PressableScale, Stagger, StaggerItem } from '../components/motion';
-import { color, font, gradient, radius, shadow, space } from '../design/tokens';
+import { color, font, radius, shadow, space } from '../design/tokens';
 
 const DEVICE_KO: Record<string, string> = {
   washer: '세탁기',
@@ -32,9 +25,8 @@ const CONS_KO: Record<string, string> = {
   water_filter: '정수필터',
   hepa_filter: 'HEPA 필터',
 };
-const won = (n: number) => `₩${Number(n).toLocaleString('ko-KR')}`;
 
-type Briefing = { badge: string; title: string; desc: string; cta: string; ask: string };
+type Briefing = { tone: 'warning' | 'danger' | 'primary'; tag: string; title: string; desc: string; cta: string; ask: string };
 type Tile = { icon: string; tint: string; title: string; sub: string; ok?: boolean; ask: string };
 
 function buildBriefings(data: any): Briefing[] {
@@ -46,13 +38,14 @@ function buildBriefings(data: any): Briefing[] {
         (d.consumables ?? [])[0];
       const pct = c ? Math.round(c.life_remaining * 100) : null;
       out.push({
-        badge: '⚠ 점검 필요',
-        title: `${DEVICE_KO[d.type] ?? d.type} 배수 이상 (5C)`,
+        tone: 'danger',
+        tag: '점검 필요',
+        title: `${DEVICE_KO[d.type] ?? d.type} 배수 이상 · 5C`,
         desc:
           pct != null
             ? `${CONS_KO[c.name] ?? '소모품'} 수명 ${pct}%. 지금 청소·교체하면 오류를 예방할 수 있어요.`
             : '상태 확인이 필요해요.',
-        cta: '해결 방법 보기 →',
+        cta: '해결 방법 보기',
         ask: `${DEVICE_KO[d.type] ?? d.type}에서 물이 안 빠져요. 5C 떠요. 해결하고 부품도 주문할래요.`,
       });
     }
@@ -61,10 +54,11 @@ function buildBriefings(data: any): Briefing[] {
     const d = (data.devices ?? []).find((x: any) => x.id === a.device_id);
     const name = d ? (DEVICE_KO[d.type] ?? d.type) : '기기';
     out.push({
-      badge: a.severity === 'warning' ? '⚠ 소모품' : 'ⓘ 안내',
-      title: `${name} 소모품 알림`,
+      tone: a.severity === 'warning' ? 'warning' : 'primary',
+      tag: a.severity === 'warning' ? '소모품 알림' : '안내',
+      title: `${name} 소모품 교체 시기`,
       desc: a.detail,
-      cta: '교체·주문 안내 →',
+      cta: '교체·주문 안내',
       ask: `${name} 소모품 교체 방법 알려주고 주문도 도와줘`,
     });
   }
@@ -77,29 +71,28 @@ function buildTiles(data: any): Tile[] {
     const ok = d.status === 'ONLINE';
     tiles.push({
       icon: DEVICE_ICON[d.type] ?? '📱',
-      tint: ok ? color.successTint : color.warningTint,
-      title: `${DEVICE_KO[d.type] ?? d.type} ${ok ? '정상' : '점검'}`,
+      tint: ok ? color.successTint : color.dangerTint,
+      title: `${DEVICE_KO[d.type] ?? d.type}`,
       sub: d.model,
       ok,
       ask: `${DEVICE_KO[d.type] ?? d.type} 상태 확인해줘`,
     });
   }
-  tiles.push({
-    icon: '📦',
-    tint: color.primaryTint,
-    title: '부품 주문',
-    sub: '배수 필터 ₩12,000',
-    ask: '세탁기 배수 필터 주문할래요',
-  });
-  tiles.push({
-    icon: '🏠',
-    tint: color.dangerTint,
-    title: '방문 예약',
-    sub: '출장 수리 가능',
-    ask: '방문 수리 예약하고 싶어요',
-  });
   return tiles;
 }
+
+const QUICK = [
+  { icon: '🩺', label: '진단', tint: color.primaryTint, ask: '우리집 가전 상태 진단해줘' },
+  { icon: '📦', label: '부품주문', tint: '#FFF0E8', ask: '세탁기 배수 필터 주문할래요' },
+  { icon: '🏠', label: '방문예약', tint: '#EAF6FF', ask: '방문 수리 예약하고 싶어요' },
+  { icon: '✨', label: '추천', tint: '#F1EEFF', ask: '맞춤 제품 추천해줘' },
+];
+
+const TONE_BADGE: Record<string, { bg: string; fg: string }> = {
+  warning: { bg: color.warningTint, fg: color.warning },
+  danger: { bg: color.dangerTint, fg: color.danger },
+  primary: { bg: color.primaryTint, fg: color.primaryDark },
+};
 
 export function HomeScreen({
   data,
@@ -112,77 +105,112 @@ export function HomeScreen({
   const briefings = buildBriefings(data);
   const tiles = buildTiles(data);
   const recs: any[] = data.recommendations ?? [];
-  const { width } = useWindowDimensions();
-  const cardW = Math.min(width, 480) - space.lg * 2;
-  const [page, setPage] = useState(0);
-
-  function onScroll(e: NativeSyntheticEvent<NativeScrollEvent>) {
-    const i = Math.round(e.nativeEvent.contentOffset.x / (cardW + space.md));
-    if (i !== page) setPage(i);
-  }
 
   return (
     <View style={styles.root} testID="screen-home">
-      <ScrollView contentContainerStyle={styles.content}>
-        {/* 브리핑 카드 — 스택 스와이프 */}
-        <Text style={styles.label}>오늘의 브리핑</Text>
-        <View style={styles.deckWrap}>
-          <View style={[styles.behind, styles.behind2]} />
-          <View style={styles.behind} />
-          <ScrollView
-            horizontal
-            pagingEnabled
-            showsHorizontalScrollIndicator={false}
-            snapToInterval={cardW + space.md}
-            decelerationRate="fast"
-            onMomentumScrollEnd={onScroll}
-            testID="briefing-deck"
-            contentContainerStyle={{ gap: space.md }}
-          >
-            {briefings.map((b, i) => (
+      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+        {/* 큰 인사 */}
+        <FadeInView>
+          <Text style={styles.greeting}>안녕하세요, 준희님 👋</Text>
+          <Text style={styles.greetingSub}>오늘 챙기면 좋을 것들을 모았어요</Text>
+        </FadeInView>
+
+        {/* 퀵 액션 — 둥근 아이콘 4개 */}
+        <Stagger style={styles.quickRow} testID="quick-actions">
+          {QUICK.map((q, i) => (
+            <StaggerItem key={i} style={styles.quickItemWrap}>
               <PressableScale
-                key={i}
-                testID={`briefing-${i}`}
-                onPress={() => onOpenChat?.(b.ask)}
-                style={[styles.briefCard, { width: cardW }]}
+                testID={`quick-${i}`}
+                onPress={() => onOpenChat?.(q.ask)}
+                style={styles.quickItem}
                 lift={false}
               >
-                <Text style={styles.briefBadge}>{b.badge}</Text>
-                <Text style={styles.briefTitle}>{b.title}</Text>
-                <Text style={styles.briefDesc}>{b.desc}</Text>
-                <View style={styles.briefCta}>
-                  <Text style={styles.briefCtaText}>{b.cta}</Text>
+                <View style={[styles.quickChip, { backgroundColor: q.tint }]}>
+                  <Text style={styles.quickIcon}>{q.icon}</Text>
                 </View>
-              </PressableScale>
-            ))}
-          </ScrollView>
-        </View>
-        <View style={styles.dots}>
-          {briefings.map((_, i) => (
-            <View key={i} style={[styles.dot, i === page && styles.dotOn]} />
-          ))}
-        </View>
-
-        {/* 2열 작은 카드 — stagger 등장 + 스프링 누름 */}
-        <Text style={styles.label}>한눈에 보기</Text>
-        <Stagger style={styles.grid} testID="tile-grid">
-          {tiles.map((t, i) => (
-            <StaggerItem key={i} style={styles.tileWrap}>
-              <PressableScale testID={`tile-${i}`} onPress={() => onOpenChat?.(t.ask)} style={styles.tile}>
-                <View style={[styles.tileChip, { backgroundColor: t.tint }]}>
-                  <Text style={styles.tileIcon}>{t.icon}</Text>
-                </View>
-                <Text style={styles.tileTitle}>{t.title}</Text>
-                <Text style={styles.tileSub}>{t.sub}</Text>
+                <Text style={styles.quickLabel}>{q.label}</Text>
               </PressableScale>
             </StaggerItem>
           ))}
         </Stagger>
 
-        {/* 개인화 추천 */}
+        {/* 오늘 챙길 것 — 클린 카드 리스트 */}
+        {briefings.length ? (
+          <>
+            <Text style={styles.section}>오늘 챙길 것</Text>
+            <Stagger style={styles.deck} stagger={0.07}>
+              {briefings.map((b, i) => {
+                const badge = TONE_BADGE[b.tone];
+                return (
+                  <StaggerItem key={i}>
+                    <PressableScale
+                      testID={`briefing-${i}`}
+                      onPress={() => onOpenChat?.(b.ask)}
+                      style={styles.briefCard}
+                    >
+                      <View style={[styles.tag, { backgroundColor: badge.bg }]}>
+                        <Text style={[styles.tagText, { color: badge.fg }]}>{b.tag}</Text>
+                      </View>
+                      <Text style={styles.briefTitle}>{b.title}</Text>
+                      <Text style={styles.briefDesc}>{b.desc}</Text>
+                      <View style={styles.briefCtaRow}>
+                        <Text style={styles.briefCta}>{b.cta}</Text>
+                        <Text style={styles.chevron}>›</Text>
+                      </View>
+                    </PressableScale>
+                  </StaggerItem>
+                );
+              })}
+            </Stagger>
+          </>
+        ) : null}
+
+        {/* 내 기기 — 한 카드 안 행 리스트 */}
+        {tiles.length ? (
+          <FadeInView delay={0.05}>
+            <Text style={styles.section}>내 기기</Text>
+            <View style={styles.listCard}>
+              {tiles.map((t, i) => (
+                <PressableScale
+                  key={i}
+                  testID={`tile-${i}`}
+                  onPress={() => onOpenChat?.(t.ask)}
+                  style={[styles.row, i < tiles.length - 1 && styles.rowDivider]}
+                  lift={false}
+                >
+                  <View style={[styles.rowChip, { backgroundColor: t.tint }]}>
+                    <Text style={styles.rowIcon}>{t.icon}</Text>
+                  </View>
+                  <View style={styles.rowBody}>
+                    <Text style={styles.rowTitle}>{t.title}</Text>
+                    <Text style={styles.rowSub}>{t.sub}</Text>
+                  </View>
+                  <View
+                    style={[
+                      styles.statusPill,
+                      { backgroundColor: t.ok ? color.successTint : color.dangerTint },
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.statusText,
+                        { color: t.ok ? color.success : color.danger },
+                      ]}
+                    >
+                      {t.ok ? '정상' : '점검'}
+                    </Text>
+                  </View>
+                  <Text style={styles.chevronMuted}>›</Text>
+                </PressableScale>
+              ))}
+            </View>
+          </FadeInView>
+        ) : null}
+
+        {/* 맞춤 추천 */}
         {recs.length ? (
           <FadeInView testID="home-recommend" delay={0.08}>
-            <Text style={styles.label}>맞춤 추천</Text>
+            <Text style={styles.section}>맞춤 추천</Text>
             <PressableScale
               onPress={() => onOpenChat?.('추천 제품 자세히 알려줘')}
               style={styles.recCard}
@@ -191,6 +219,8 @@ export function HomeScreen({
             </PressableScale>
           </FadeInView>
         ) : null}
+
+        <View style={{ height: space.xl }} />
       </ScrollView>
     </View>
   );
@@ -199,109 +229,92 @@ export function HomeScreen({
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: color.bg },
   content: {
-    padding: space.lg,
+    paddingHorizontal: space.lg,
+    paddingTop: space.sm,
     paddingBottom: space.xl,
     maxWidth: 480,
     width: '100%',
     alignSelf: 'center',
   },
-  label: {
-    fontSize: font.size.xs,
-    color: color.textMuted,
-    fontWeight: font.weight.semibold as any,
-    marginTop: space.md,
-    marginBottom: space.sm,
-  },
 
-  deckWrap: { position: 'relative', paddingTop: 8 },
-  behind: {
-    position: 'absolute',
-    left: 8,
-    right: 8,
-    top: 0,
-    height: 168,
-    borderRadius: 22,
-    backgroundColor: '#7FB5FF',
-    opacity: 0.7,
-  },
-  behind2: { left: 16, right: 16, top: -8, backgroundColor: '#BBD9FF', opacity: 0.6 },
-  briefCard: {
-    minHeight: 176,
-    borderRadius: 22,
-    padding: space.lg,
-    justifyContent: 'flex-start',
-    backgroundColor: color.primary,
-    ...(shadow.card as any),
-    ...({ backgroundImage: gradient.brand } as any),
-  },
-  briefBadge: {
-    alignSelf: 'flex-start',
-    color: '#fff',
-    fontSize: font.size.xs,
+  greeting: {
+    fontSize: font.size.display,
     fontWeight: font.weight.bold as any,
-    backgroundColor: 'rgba(255,255,255,0.22)',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: radius.pill,
+    color: color.text,
+    lineHeight: 40,
   },
-  briefTitle: {
-    color: '#fff',
-    fontSize: font.size.xl,
-    fontWeight: font.weight.bold as any,
-    marginTop: space.md,
-  },
-  briefDesc: {
-    color: 'rgba(255,255,255,0.92)',
-    fontSize: font.size.md,
-    lineHeight: 22,
-    marginTop: space.sm,
-  },
-  briefCta: {
-    alignSelf: 'flex-start',
-    backgroundColor: '#fff',
-    borderRadius: radius.pill,
-    paddingHorizontal: space.lg,
-    paddingVertical: space.sm,
-    marginTop: space.md,
-  },
-  briefCtaText: {
-    color: color.primaryDark,
-    fontSize: font.size.sm,
-    fontWeight: font.weight.bold as any,
-  },
+  greetingSub: { fontSize: font.size.md, color: color.textSub, marginTop: 6 },
 
-  dots: { flexDirection: 'row', gap: 6, justifyContent: 'center', marginTop: space.md },
-  dot: { width: 7, height: 7, borderRadius: 4, backgroundColor: color.border },
-  dotOn: { width: 18, backgroundColor: color.primary },
-
-  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: space.md },
-  tileWrap: { width: '47%', flexGrow: 1 },
-  tile: {
-    flex: 1,
-    backgroundColor: color.surface,
+  // 퀵 액션
+  quickRow: { flexDirection: 'row', marginTop: space.xl, gap: space.sm },
+  quickItemWrap: { flex: 1 },
+  quickItem: { alignItems: 'center', gap: space.sm, paddingVertical: space.xs },
+  quickChip: {
+    width: 58,
+    height: 58,
     borderRadius: 18,
-    padding: space.lg,
-    ...(shadow.card as any),
-  },
-  tileChip: {
-    width: 38,
-    height: 38,
-    borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  tileIcon: { fontSize: 18 },
-  tileTitle: {
-    fontSize: font.size.md,
+  quickIcon: { fontSize: 26 },
+  quickLabel: { fontSize: font.size.sm, color: color.textSub, fontWeight: font.weight.semibold as any },
+
+  section: {
+    fontSize: font.size.lg,
+    color: color.text,
+    fontWeight: font.weight.bold as any,
+    marginTop: space.xxl,
+    marginBottom: space.md,
+  },
+
+  // 챙길 것 카드
+  deck: { gap: space.md },
+  briefCard: {
+    backgroundColor: color.surface,
+    borderRadius: radius.xl,
+    padding: space.xl,
+    ...(shadow.card as any),
+  },
+  tag: { alignSelf: 'flex-start', paddingHorizontal: 10, paddingVertical: 4, borderRadius: radius.pill },
+  tagText: { fontSize: font.size.xs, fontWeight: font.weight.bold as any },
+  briefTitle: {
+    fontSize: font.size.xl,
     fontWeight: font.weight.bold as any,
     color: color.text,
     marginTop: space.md,
   },
-  tileSub: { fontSize: font.size.xs, color: color.textMuted, marginTop: 3 },
+  briefDesc: { fontSize: font.size.md, color: color.textSub, lineHeight: 23, marginTop: 6 },
+  briefCtaRow: { flexDirection: 'row', alignItems: 'center', marginTop: space.lg },
+  briefCta: { fontSize: font.size.md, color: color.primary, fontWeight: font.weight.bold as any },
+  chevron: { fontSize: 20, color: color.primary, fontWeight: font.weight.bold as any, marginLeft: 2 },
+
+  // 기기 리스트 카드
+  listCard: {
+    backgroundColor: color.surface,
+    borderRadius: radius.xl,
+    paddingHorizontal: space.lg,
+    ...(shadow.card as any),
+  },
+  row: { flexDirection: 'row', alignItems: 'center', paddingVertical: space.lg, gap: space.md },
+  rowDivider: { borderBottomWidth: 1, borderBottomColor: color.surfaceAlt },
+  rowChip: {
+    width: 44,
+    height: 44,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  rowIcon: { fontSize: 20 },
+  rowBody: { flex: 1 },
+  rowTitle: { fontSize: font.size.md, fontWeight: font.weight.bold as any, color: color.text },
+  rowSub: { fontSize: font.size.xs, color: color.textMuted, marginTop: 2 },
+  statusPill: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: radius.pill },
+  statusText: { fontSize: font.size.xs, fontWeight: font.weight.bold as any },
+  chevronMuted: { fontSize: 18, color: color.textMuted, marginLeft: 2 },
 
   recCard: {
     backgroundColor: color.surface,
-    borderRadius: 18,
+    borderRadius: radius.xl,
     padding: space.lg,
     ...(shadow.card as any),
   },

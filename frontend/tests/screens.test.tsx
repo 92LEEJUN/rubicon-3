@@ -6,7 +6,7 @@ import { App, DEMO_Q } from '../src/App';
 test('home renders summary and opens chat', () => {
   render(<App initialScreen="home" />);
   expect(screen.getByTestId('screen-home')).toBeInTheDocument();
-  expect(screen.getByText('AI 컨시어지')).toBeInTheDocument(); // 헤딩(정확 일치)
+  expect(screen.getByText('삼성 AI 컨시어지')).toBeInTheDocument(); // 헤더 브랜드(토스st 컴팩트)
   fireEvent.click(screen.getByTestId('open-chat'));
   expect(screen.getByTestId('screen-chat')).toBeInTheDocument();
 });

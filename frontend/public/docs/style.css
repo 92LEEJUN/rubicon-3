@@ -1,0 +1,120 @@
+/* 역할별 문서 — 공유 스타일. 가독성·시각화 우선(Pretendard). 레이어 색: FE 파랑·BFF 청록·BE 보라. */
+:root {
+  --fe: #3182f6; --fe-bg: #eaf2fe;
+  --bff: #12b886; --bff-bg: #e6f7f1;
+  --be: #7c5cfc; --be-bg: #efeafe;
+  --ink: #191f28; --sub: #4e5968; --mut: #8b95a1; --line: #e5e8eb;
+  --bg: #f7f9fb; --card: #ffffff; --soft: #f2f4f6;
+  --radius: 16px; --shadow: 0 6px 24px rgba(20,30,50,.06);
+}
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body {
+  margin: 0; background: var(--bg); color: var(--ink);
+  font-family: 'Pretendard Variable', Pretendard, -apple-system, BlinkMacSystemFont, system-ui, 'Apple SD Gothic Neo', sans-serif;
+  line-height: 1.6; letter-spacing: -.01em; -webkit-font-smoothing: antialiased;
+}
+a { color: inherit; }
+code, .mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .86em; }
+
+/* 상단 내비 */
+.nav {
+  position: sticky; top: 0; z-index: 20; background: rgba(255,255,255,.86);
+  backdrop-filter: blur(10px); border-bottom: 1px solid var(--line);
+}
+.nav-in { max-width: 1080px; margin: 0 auto; padding: 12px 20px; display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+.nav .brand { font-weight: 800; font-size: 15px; }
+.nav .links { display: flex; gap: 6px; margin-left: auto; flex-wrap: wrap; }
+.nav .links a { text-decoration: none; font-size: 13px; font-weight: 700; color: var(--sub); padding: 6px 12px; border-radius: 999px; }
+.nav .links a:hover { background: var(--soft); }
+.nav .links a.fe.on { background: var(--fe-bg); color: var(--fe); }
+.nav .links a.bff.on { background: var(--bff-bg); color: var(--bff); }
+.nav .links a.be.on { background: var(--be-bg); color: var(--be); }
+
+/* 레이아웃 */
+.wrap { max-width: 1080px; margin: 0 auto; padding: 0 20px 80px; }
+.hero { padding: 48px 0 28px; }
+.hero .kicker { font-size: 12px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
+.hero h1 { font-size: 34px; font-weight: 800; margin: 8px 0 6px; letter-spacing: -.02em; }
+.hero p { font-size: 16px; color: var(--sub); margin: 0; max-width: 720px; }
+.fe .kicker { color: var(--fe); } .bff .kicker { color: var(--bff); } .be .kicker { color: var(--be); }
+
+h2.sec { font-size: 22px; font-weight: 800; margin: 44px 0 4px; display: flex; align-items: center; gap: 10px; }
+h2.sec .n { display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; border-radius: 9px; font-size: 14px; color: #fff; }
+.fe h2.sec .n { background: var(--fe); } .bff h2.sec .n { background: var(--bff); } .be h2.sec .n { background: var(--be); }
+.sec-sub { color: var(--mut); font-size: 14px; margin: 0 0 16px 38px; }
+
+/* 카드·그리드 */
+.grid { display: grid; gap: 16px; }
+.g2 { grid-template-columns: repeat(2, 1fr); }
+.g3 { grid-template-columns: repeat(3, 1fr); }
+.card { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); padding: 20px; box-shadow: var(--shadow); }
+.card h3 { margin: 0 0 4px; font-size: 17px; font-weight: 800; }
+.card .desc { color: var(--sub); font-size: 14px; margin: 0 0 12px; }
+.card.link { text-decoration: none; display: block; transition: transform .12s ease, box-shadow .12s ease; }
+.card.link:hover { transform: translateY(-3px); box-shadow: 0 14px 36px rgba(20,30,50,.12); }
+
+/* 칩/배지 */
+.chip { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 700; padding: 4px 10px; border-radius: 999px; background: var(--soft); color: var(--sub); }
+.chip.fe { background: var(--fe-bg); color: var(--fe); }
+.chip.bff { background: var(--bff-bg); color: var(--bff); }
+.chip.be { background: var(--be-bg); color: var(--be); }
+.chip.tog { background: #fff4e5; color: #b5701c; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.pill { font-family: ui-monospace, monospace; font-size: 12px; background: var(--soft); border: 1px solid var(--line); padding: 2px 8px; border-radius: 7px; color: var(--ink); }
+.method { font-weight: 800; font-size: 11px; padding: 2px 7px; border-radius: 6px; color: #fff; }
+.method.get { background: #12b886; } .method.post { background: #3182f6; } .method.ws { background: #7c5cfc; }
+
+/* 표 */
+table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+th, td { text-align: left; padding: 9px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { font-size: 12px; color: var(--mut); text-transform: uppercase; letter-spacing: .04em; }
+tr:last-child td { border-bottom: none; }
+.tbl-card { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; box-shadow: var(--shadow); }
+
+/* 와이어프레임 */
+.screen { display: flex; gap: 28px; flex-wrap: wrap; align-items: flex-start; margin: 14px 0 8px; }
+.wire { width: 300px; flex: 0 0 300px; border: 2px solid #cdd5df; border-radius: 26px; padding: 12px; background: linear-gradient(#fff, #fbfcfe); box-shadow: var(--shadow); }
+.wire .notch { width: 90px; height: 6px; background: #d6dce4; border-radius: 99px; margin: 2px auto 12px; }
+.wbox { border: 1.5px dashed #b6c0cc; border-radius: 10px; background: #f7f9fb; padding: 9px 11px; margin-bottom: 8px; }
+.wbox .l { font-size: 10px; font-weight: 800; letter-spacing: .05em; text-transform: uppercase; color: #97a1ac; }
+.wbox .t { font-size: 13px; color: #3a4350; font-weight: 600; }
+.wbox .s { font-size: 11.5px; color: #8b95a1; }
+.wbox.fill { border-style: solid; background: var(--fe-bg); border-color: #bcd6fb; }
+.wbox.fill .l, .wbox.fill .t { color: var(--fe); }
+.wbox.dark { background: #2b3340; border-color: #2b3340; }
+.wbox.dark .l { color: #aeb7c2; } .wbox.dark .t { color: #fff; } .wbox.dark .s { color: #c4ccd6; }
+.wrow { display: flex; gap: 8px; } .wrow > .wbox { flex: 1; margin-bottom: 8px; }
+.wbar { display: flex; gap: 6px; background: var(--soft); border-radius: 999px; padding: 6px; margin-bottom: 8px; }
+.wbar > div { flex: 1; text-align: center; font-size: 12px; font-weight: 700; color: var(--mut); padding: 5px; border-radius: 999px; }
+.wbar > div.on { background: #fff; color: var(--fe); box-shadow: 0 1px 4px rgba(0,0,0,.08); }
+.wquick { display: flex; gap: 8px; margin-bottom: 8px; }
+.wquick > div { flex: 1; text-align: center; }
+.wquick .ic { width: 40px; height: 40px; border-radius: 12px; background: var(--soft); margin: 0 auto 4px; }
+.wquick .cap { font-size: 10px; color: var(--mut); }
+.wnote { flex: 1; min-width: 280px; }
+.wnote h4 { margin: 0 0 8px; font-size: 14px; color: var(--mut); text-transform: uppercase; letter-spacing: .04em; }
+.complist { list-style: none; margin: 0; padding: 0; }
+.complist li { padding: 10px 0; border-bottom: 1px solid var(--line); display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap; }
+.complist li:last-child { border-bottom: none; }
+.complist .nm { font-weight: 700; font-size: 14px; }
+.complist .fp { font-family: ui-monospace, monospace; font-size: 11.5px; color: var(--fe); background: var(--fe-bg); padding: 1px 7px; border-radius: 6px; }
+.complist .rl { color: var(--sub); font-size: 13px; flex: 1 1 260px; }
+
+/* 흐름 다이어그램 */
+.flow { display: flex; align-items: stretch; gap: 0; flex-wrap: wrap; margin: 18px 0; }
+.flow .node { flex: 1; min-width: 150px; background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 14px 16px; box-shadow: var(--shadow); }
+.flow .node b { display: block; font-size: 15px; }
+.flow .node span { font-size: 12.5px; color: var(--sub); }
+.flow .arr { display: flex; align-items: center; color: var(--mut); font-size: 22px; padding: 0 6px; }
+.tag-fe { border-top: 3px solid var(--fe); } .tag-bff { border-top: 3px solid var(--bff); } .tag-be { border-top: 3px solid var(--be); }
+
+.note { background: var(--soft); border-left: 4px solid var(--mut); border-radius: 8px; padding: 12px 16px; font-size: 13.5px; color: var(--sub); margin: 14px 0; }
+.note.fe { border-color: var(--fe); } .note.bff { border-color: var(--bff); } .note.be { border-color: var(--be); }
+footer { border-top: 1px solid var(--line); margin-top: 60px; padding: 24px 20px; text-align: center; color: var(--mut); font-size: 13px; }
+
+@media (max-width: 760px) {
+  .g2, .g3 { grid-template-columns: 1fr; }
+  .hero h1 { font-size: 27px; }
+  .wire { flex: 0 0 100%; width: 100%; }
+}

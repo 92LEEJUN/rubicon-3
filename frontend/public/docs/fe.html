@@ -1,0 +1,150 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>FE · 화면 와이어프레임</title>
+<link rel="stylesheet" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css" />
+<link rel="stylesheet" href="./style.css" />
+</head>
+<body class="fe">
+<nav class="nav"><div class="nav-in">
+  <span class="brand">📐 Rubicon 구성 문서</span>
+  <div class="links">
+    <a href="./index.html">허브</a>
+    <a class="fe on" href="./fe.html">FE</a>
+    <a class="bff" href="./bff.html">BFF</a>
+    <a class="be" href="./be.html">BE</a>
+    <a href="../">← 앱으로</a>
+  </div>
+</div></nav>
+
+<div class="wrap">
+  <div class="hero">
+    <div class="kicker">Frontend · React Native Web</div>
+    <h1>화면 와이어프레임 &amp; 구성요소</h1>
+    <p>실제 구현된 화면을 <b>저충실도 박스</b>로 정리했습니다. 각 화면의 영역과 그 영역을 그리는 컴포넌트(파일·역할)를 함께 표기합니다.
+       전역 채팅 패널은 모든 화면 위에 오버레이로 뜹니다(별도 라우트 아님).</p>
+    <div class="chips" style="margin-top:14px">
+      <span class="chip">react-native-web</span><span class="chip">Vite</span><span class="chip">framer-motion</span>
+      <span class="chip">디자인 토큰 + Pretendard</span><span class="chip tog">Mock 모드(!apiBase)</span>
+    </div>
+  </div>
+
+  <!-- S1 홈 -->
+  <h2 class="sec"><span class="n">S1</span> 홈</h2>
+  <p class="sec-sub">MainShell + HomeScreen — 개인화 선제안·요약. 하단 채팅바는 전 탭 공통 고정.</p>
+  <div class="screen">
+    <div class="wire">
+      <div class="notch"></div>
+      <div class="wbox"><div class="l">Header · MainShell</div><div class="t">삼성 AI 컨시어지 · 문서↗</div></div>
+      <div class="wbar"><div class="on">홈</div><div>고객지원</div></div>
+      <div class="wbox"><div class="t" style="font-size:18px;font-weight:800">안녕하세요, 준희님 👋</div><div class="s">오늘 챙기면 좋을 것들</div></div>
+      <div class="wquick">
+        <div><div class="ic"></div><div class="cap">진단</div></div>
+        <div><div class="ic"></div><div class="cap">주문</div></div>
+        <div><div class="ic"></div><div class="cap">예약</div></div>
+        <div><div class="ic"></div><div class="cap">추천</div></div>
+      </div>
+      <div class="wbox dark"><div class="l">오늘 챙길 것 · DeviceDeck</div><div class="t">3D 스택 스와이프 (7장 · 실사진)</div><div class="s">● ○ ○ ○ ○ ○ ○</div></div>
+      <div class="wbox"><div class="l">내 기기 · 리스트 카드</div><div class="t">🧺 세탁기 · 점검</div><div class="t">❄️ 냉장고 · 정상</div></div>
+      <div class="wbox"><div class="l">맞춤 추천</div><div class="t">recommendation_list</div></div>
+      <div class="wbox fill"><div class="l">고정 채팅바 · MainShell</div><div class="t">[ 입력… ] ▶</div></div>
+    </div>
+    <div class="wnote">
+      <h4>구성요소</h4>
+      <ul class="complist">
+        <li><span class="nm">MainShell</span><span class="fp">screens/MainShell.tsx</span><span class="rl">헤더(브랜드·세그먼트 탭)·홈↔CS 전환·하단 고정 채팅바. 전송 시 채팅 오픈.</span></li>
+        <li><span class="nm">HomeScreen</span><span class="fp">screens/HomeScreen.tsx</span><span class="rl">인사 + 퀵액션 4 + 덱 + 기기 리스트 + 추천. home_summary에서 파생.</span></li>
+        <li><span class="nm">DeviceDeck</span><span class="fp">components/DeviceDeck.tsx</span><span class="rl">3D 스택 스와이프 카드(framer drag·틸트·실사진+다크 스크림·팔레트 7).</span></li>
+        <li><span class="nm">SegmentedTabs</span><span class="fp">components/SegmentedTabs.tsx</span><span class="rl">홈/고객지원 토글.</span></li>
+        <li><span class="nm">primitives</span><span class="fp">components/primitives.tsx</span><span class="rl">Card·Button·Badge·타이포 — 토큰만 참조.</span></li>
+        <li><span class="nm">useHomeData</span><span class="fp">state/useHomeData.ts</span><span class="rl">BFF <code>/home</code> 조회(실패 시 fixture 폴백).</span></li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- S3 채팅 패널 -->
+  <h2 class="sec"><span class="n">S3</span> 채팅 패널 (전역 오버레이)</h2>
+  <p class="sec-sub">ChatPanel — 어디서든 대화. 이어가기·재관여·미해결·스트리밍 섹션·커밋 게이트.</p>
+  <div class="screen">
+    <div class="wire">
+      <div class="notch"></div>
+      <div class="wbox"><div class="l">‹ 뒤로 · AI</div><div class="t">데모 모드 · 예시 응답</div></div>
+      <div class="wbox fill"><div class="l">ReEngagementBanner</div><div class="t">지난번 세탁기 문제 이어서?</div></div>
+      <div class="wbox"><div class="l">ResumeCard · 이어가기</div><div class="s">요약 + 미해결 + 상대시간</div></div>
+      <div class="wbox"><div class="l">OpenLoopList</div><div class="s">주문 12345 · 오류 5C</div></div>
+      <div class="wrow"><div class="wbox" style="background:var(--soft)"><div class="t">사용자 말풍선 ›</div></div></div>
+      <div class="wbox dark"><div class="l">StreamingMessage</div><div class="t">진단 · 해결 단계 · 부품</div><div class="s">섹션 페이드 + 타이핑 인디케이터</div></div>
+      <div class="wbox"><div class="l">CommitGate</div><div class="t">주문 확인 / 로그인 월</div></div>
+      <div class="wbox fill"><div class="l">입력창</div><div class="t">[ 메시지… ] ▶</div></div>
+    </div>
+    <div class="wnote">
+      <h4>구성요소</h4>
+      <ul class="complist">
+        <li><span class="nm">ChatPanel</span><span class="fp">screens/ChatPanel.tsx</span><span class="rl">멀티턴 대화·WS 스트림/Mock 재생. 첫 질문 자동 전송, 칩·입력으로 이어감.</span></li>
+        <li><span class="nm">StreamingMessage</span><span class="fp">components/StreamingMessage.tsx</span><span class="rl">delta 누적 텍스트 + 섹션 스택(FadeIn) + 타이핑 인디케이터(R14).</span></li>
+        <li><span class="nm">SectionView / message</span><span class="fp">components/message.tsx</span><span class="rl">복합 응답 섹션(R7) → 템플릿 렌더 + CTA.</span></li>
+        <li><span class="nm">ResumeCard</span><span class="fp">components/ResumeCard.tsx</span><span class="rl">다시 열기 시 요약·미해결·상대시간 복원.</span></li>
+        <li><span class="nm">ReEngagementBanner</span><span class="fp">components/ReEngagementBanner.tsx</span><span class="rl">선제 재관여(AnimatePresence 슬라이드 enter/exit).</span></li>
+        <li><span class="nm">OpenLoopList</span><span class="fp">components/OpenLoopList.tsx</span><span class="rl">미해결 스레드 목록·해소/닫기.</span></li>
+        <li><span class="nm">CommitGate</span><span class="fp">components/CommitGate.tsx</span><span class="rl">주문/예약 확인 다이얼로그 + 게스트 로그인 월(R17).</span></li>
+        <li><span class="nm">useChat·useCommit·useResume·useReEngagement·useOpenLoops</span><span class="fp">state/*</span><span class="rl">대화·커밋·이어가기·재관여·미해결 상태 훅.</span></li>
+        <li><span class="nm">transport</span><span class="fp">transport/{api,commit,companion}.ts</span><span class="rl">WS <code>/chat</code> 스트림·커밋 왕복·컴패니언 조회. Mock/실 전환.</span></li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- S2 + S4 -->
+  <div class="grid g2" style="margin-top:8px">
+    <div>
+      <h2 class="sec"><span class="n">S2</span> 고객지원</h2>
+      <p class="sec-sub">SupportScreen — 문제 해결·상담·방문 진입.</p>
+      <div class="wire" style="width:100%;flex:1">
+        <div class="wbox"><div class="l">증상·에러코드 입력</div><div class="t">무엇을 도와드릴까요?</div></div>
+        <div class="wrow"><div class="wbox"><div class="t">자가진단</div></div><div class="wbox"><div class="t">방문예약</div></div></div>
+        <div class="wbox"><div class="l">진행 중</div><div class="s">주문·예약 상태 트래커</div></div>
+        <div class="wbox fill"><div class="l">고정 채팅바</div><div class="t">[ 입력… ] ▶</div></div>
+      </div>
+      <ul class="complist" style="margin-top:12px">
+        <li><span class="nm">SupportScreen</span><span class="fp">screens/SupportScreen.tsx</span><span class="rl">CS 진입·트리아지·방문 예약 흐름.</span></li>
+      </ul>
+    </div>
+    <div>
+      <h2 class="sec"><span class="n">S4</span> 브릿지 모달</h2>
+      <p class="sec-sub">카드 탭 시 간단 정보(대화 미진입). 복잡하면 S3 패널 — BE 동적 판단.</p>
+      <div class="wire" style="width:100%;flex:1">
+        <div class="wbox dark"><div class="l">Bridge · bottom sheet</div><div class="t">세탁기 상태 요약</div><div class="s">간단 정보 + [자세히 → 채팅]</div></div>
+        <div class="wbox"><div class="l">surface 결정</div><div class="s">simple→bridge · complex→panel</div></div>
+      </div>
+      <ul class="complist" style="margin-top:12px">
+        <li><span class="nm">Bridge / 템플릿</span><span class="fp">templates/index.tsx</span><span class="rl"><code>POST /surface</code> 결과로 bridge/panel 분기(ADR-0027).</span></li>
+        <li><span class="nm">DemoBadge</span><span class="fp">components/DemoBadge.tsx</span><span class="rl">Mock 모드 표시(데모).</span></li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- 템플릿 -->
+  <h2 class="sec"><span class="n">▥</span> 메시지 템플릿 레지스트리</h2>
+  <p class="sec-sub">kind → 컴포넌트 매핑(response-templates.md). 채팅 섹션·홈·브릿지에서 재사용. 모르는 kind는 text 폴백.</p>
+  <div class="tbl-card"><table>
+    <tr><th>컴포넌트</th><th>kind / 용도</th><th>쓰임</th></tr>
+    <tr><td><b>TextTemplate</b></td><td><span class="pill">text</span></td><td>자연어 답변·폴백</td></tr>
+    <tr><td><b>DeviceStatus</b></td><td><span class="pill">device_status</span> + Gauge</td><td>기기 상태·소모품 게이지</td></tr>
+    <tr><td><b>GuideSteps</b></td><td><span class="pill">guide_steps</span></td><td>셀프수리 단계</td></tr>
+    <tr><td><b>ProductCard / RecommendationList</b></td><td><span class="pill">product_card</span> · <span class="pill">recommendation_list</span></td><td>부품·제품 추천</td></tr>
+    <tr><td><b>OrderSummary / AmountRow / QtyStepper</b></td><td><span class="pill">order_summary</span></td><td>주문 요약·금액 분해·수량</td></tr>
+    <tr><td><b>Confirmation</b></td><td><span class="pill">confirmation</span></td><td>커밋 전 확인(R17)</td></tr>
+    <tr><td><b>StatusTracker</b></td><td><span class="pill">status_tracker</span></td><td>주문·픽업·예약 진행</td></tr>
+    <tr><td><b>HandoffCard / Booking / RadioRow</b></td><td><span class="pill">handoff</span> · <span class="pill">booking</span></td><td>방문 예약·슬롯 선택(R18)</td></tr>
+    <tr><td><b>HomeSummary</b></td><td><span class="pill">home_summary</span></td><td>홈 종합(기기·알림·추천)</td></tr>
+    <tr><td><b>Bridge</b></td><td><span class="pill">bridge</span></td><td>카드 탭 간단 정보(S4)</td></tr>
+    <tr><td><b>MediaChips / Choices</b></td><td><span class="pill">choices</span></td><td>멀티모달 칩·선택지/CTA</td></tr>
+  </table></div>
+
+  <div class="note fe">전 화면·템플릿에 로딩(Skeleton)·빈/에러 상태 + 스트리밍 타이핑 인디케이터(R14).
+    모션은 <code>design/motion.ts</code> 토큰 + framer-motion(<code>components/motion.tsx</code>), reduced-motion 존중.</div>
+</div>
+<footer>FE · 화면 와이어프레임 · 현재 코드 구현 기준</footer>
+</body>
+</html>

@@ -39,11 +39,26 @@ export function MainShell({
       <View style={styles.header}>
         <View style={styles.brandRow}>
           <Text style={styles.brand}>삼성 AI 컨시어지</Text>
-          {onDocs && (
-            <Pressable onPress={onDocs} testID="open-docs" accessibilityRole="link">
-              <Text style={styles.docsLink}>문서 →</Text>
+          <View style={styles.headerLinks}>
+            <Pressable
+              testID="open-docs-site"
+              accessibilityRole="link"
+              onPress={() => {
+                try {
+                  (globalThis as any).open?.('./docs/index.html', '_blank');
+                } catch {
+                  /* noop (네이티브/테스트) */
+                }
+              }}
+            >
+              <Text style={styles.docsLink}>📐 구성문서 ↗</Text>
             </Pressable>
-          )}
+            {onDocs && (
+              <Pressable onPress={onDocs} testID="open-docs" accessibilityRole="link">
+                <Text style={styles.docsLink}>문서 →</Text>
+              </Pressable>
+            )}
+          </View>
         </View>
         <View style={{ height: space.md }} />
         <SegmentedTabs
@@ -100,6 +115,7 @@ const styles = StyleSheet.create({
   },
   brandRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   brand: { fontSize: font.size.lg, color: color.text, fontWeight: font.weight.bold as any },
+  headerLinks: { flexDirection: 'row', alignItems: 'center', gap: space.md },
   docsLink: { fontSize: font.size.sm, color: color.textMuted, fontWeight: '600' },
   chatBar: {
     flexDirection: 'row',

@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Rubicon · 구성 문서 허브</title>
+<link rel="stylesheet" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css" />
+<link rel="stylesheet" href="./style.css" />
+</head>
+<body>
+<nav class="nav"><div class="nav-in">
+  <span class="brand">📐 Rubicon 구성 문서</span>
+  <div class="links">
+    <a href="./index.html">허브</a>
+    <a class="fe on" href="./fe.html">FE</a>
+    <a class="bff on" href="./bff.html">BFF</a>
+    <a class="be on" href="./be.html">BE</a>
+    <a href="../">← 앱으로</a>
+  </div>
+</div></nav>
+
+<div class="wrap">
+  <div class="hero">
+    <div class="kicker" style="color:var(--mut)">현재 구현 기준 · 역할별 정리</div>
+    <h1>삼성 AI 컨시어지 — 구성 문서</h1>
+    <p>지금 코드에 구현된 화면·게이트웨이·도메인을 <b>담당자별로 읽기 쉽게</b> 정리했습니다.
+       FE는 화면 와이어프레임, BFF는 큰 카테고리, BE는 큰 도메인 단위로 묶었습니다.</p>
+  </div>
+
+  <h2 class="sec"><span class="n" style="background:var(--mut)">∑</span> 3계층 개요</h2>
+  <p class="sec-sub">클라이언트(FE) ↔ 게이트웨이(BFF) ↔ 도메인·오케스트레이터(BE). 신원·계약·스트리밍이 세 계층을 가로지른다.</p>
+  <div class="flow">
+    <div class="node tag-fe"><b>FE</b><span>React Native Web · 화면·템플릿 렌더·전역 채팅 패널</span></div>
+    <div class="arr">⇄</div>
+    <div class="node tag-bff"><b>BFF</b><span>인증/SSO·중계·WS 릴레이·응답 정형·보안·관측</span></div>
+    <div class="arr">⇄</div>
+    <div class="node tag-be"><b>BE</b><span>도메인 서비스 + LLM 오케스트레이터(의도·tool·멀티에이전트)</span></div>
+  </div>
+
+  <h2 class="sec"><span class="n" style="background:var(--mut)">3</span> 역할별 문서</h2>
+  <p class="sec-sub">각 카드를 눌러 담당 영역으로 이동하세요.</p>
+  <div class="grid g3">
+    <a class="card link tag-fe" href="./fe.html">
+      <span class="chip fe">FRONTEND</span>
+      <h3 style="margin-top:10px">화면 와이어프레임</h3>
+      <p class="desc">홈·고객지원·채팅 패널·브릿지 모달과 14종 템플릿의 구성요소를 저충실도 박스로 정리.</p>
+      <div class="chips"><span class="pill">8 screens</span><span class="pill">12 components</span><span class="pill">templates</span></div>
+    </a>
+    <a class="card link tag-bff" href="./bff.html">
+      <span class="chip bff">BFF GATEWAY</span>
+      <h3 style="margin-top:10px">큰 카테고리</h3>
+      <p class="desc">인증·SSO/게스트, 라우팅·중계, 실시간 채팅 릴레이, 응답 정형, 보안, 관측, 분석.</p>
+      <div class="chips"><span class="pill">8 categories</span><span class="pill">25+ routes</span></div>
+    </a>
+    <a class="card link tag-be" href="./be.html">
+      <span class="chip be">BACKEND</span>
+      <h3 style="margin-top:10px">큰 도메인</h3>
+      <p class="desc">쇼핑·CS/진단·O2O·컴패니언·AI 오케스트레이션·신뢰/안전·신원을 도메인별로.</p>
+      <div class="chips"><span class="pill">7 domains</span><span class="pill">services·endpoints·models</span></div>
+    </a>
+  </div>
+
+  <div class="note">이 문서는 <b>gh-pages</b>로 배포되어 앱과 같은 사이트(<code>/rubicon-3/docs/</code>)에서 열람합니다.
+    진실의 출처(SoT)는 레포의 <code>docs/</code>·코드이며, 본 페이지는 현재 구성을 담당자 친화적으로 시각화한 뷰입니다.</p>
+  </div>
+</div>
+<footer>Rubicon · 구성 문서 허브 · 현재 코드 구현 기준</footer>
+</body>
+</html>

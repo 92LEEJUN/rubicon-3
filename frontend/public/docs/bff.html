@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>BFF · 게이트웨이 카테고리</title>
+<link rel="stylesheet" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css" />
+<link rel="stylesheet" href="./style.css" />
+</head>
+<body class="bff">
+<nav class="nav"><div class="nav-in">
+  <span class="brand">📐 Rubicon 구성 문서</span>
+  <div class="links">
+    <a href="./index.html">허브</a>
+    <a class="fe" href="./fe.html">FE</a>
+    <a class="bff on" href="./bff.html">BFF</a>
+    <a class="be" href="./be.html">BE</a>
+    <a href="../">← 앱으로</a>
+  </div>
+</div></nav>
+
+<div class="wrap">
+  <div class="hero">
+    <div class="kicker">BFF · FE↔BE 게이트웨이 (Python, 별도 suite)</div>
+    <h1>게이트웨이 — 큰 카테고리</h1>
+    <p>BFF는 클라이언트와 도메인 백엔드 사이의 <b>얇은 게이트웨이</b>입니다. 인증/SSO·중계·실시간 릴레이·응답 정형·보안·관측·분석을
+       책임지고, 비즈니스 로직은 BE에 위임합니다. 아래는 <code>bff/gateway/</code> 모듈을 큰 카테고리로 묶은 것입니다.</p>
+  </div>
+
+  <div class="flow">
+    <div class="node tag-fe"><b>FE</b><span>HTTP·WS 요청 + 토큰/게스트</span></div>
+    <div class="arr">→</div>
+    <div class="node tag-bff"><b>BFF Gateway</b><span>① 신원 해석 → ② 중계/릴레이 → ③ 응답 정형 → ④ 보안·관측·분석</span></div>
+    <div class="arr">→</div>
+    <div class="node tag-be"><b>BE</b><span>/internal/* 도메인 API</span></div>
+  </div>
+
+  <!-- 1. 인증·신원 (SSO) -->
+  <h2 class="sec"><span class="n">1</span> 인증 · 신원 (SSO / 게스트)</h2>
+  <p class="sec-sub">gateway/auth.py — 토큰 검증·신원 해석·BE 헤더 포워딩. 실 전환: 삼성계정 SSO·세션 TTL·조용한 재인증.</p>
+  <div class="grid g2">
+    <div class="card tag-bff">
+      <h3>Identity 해석</h3>
+      <p class="desc">요청 → 로그인/게스트 신원 결정. 토큰은 도메인 모델에 저장하지 않음(NFR).</p>
+      <ul class="complist">
+        <li><span class="nm">토큰 있음</span><span class="rl">→ <code>user</code> (MOCK_USER_ID) 로그인 컨텍스트</span></li>
+        <li><span class="nm">토큰 없음</span><span class="rl">→ <code>guest</code> (guest_token 쿼리/쿠키 또는 신규 발급)</span></li>
+        <li><span class="nm">BE 포워딩</span><span class="rl"><code>X-User-Id</code> / <code>X-Guest-Token</code> 헤더로 신원 중계</span></li>
+      </ul>
+    </div>
+    <div class="card tag-bff">
+      <h3>커밋 게이트 (위임)</h3>
+      <p class="desc">게스트도 자문·대화는 허용. 주문/예약 커밋은 BFF가 막지 않고 <b>BE의 401 LoginRequired를 그대로 중계</b>(공유 계약).</p>
+      <div class="chips"><span class="chip">게스트→로그인 머지</span><span class="chip">401/409 패스스루</span></div>
+      <p class="desc" style="margin-top:10px">실 SSO·세션은 후속(<span class="chip tog">deferred</span>).</p>
+    </div>
+  </div>
+
+  <!-- 2. 라우팅·중계 -->
+  <h2 class="sec"><span class="n">2</span> 라우팅 · 중계 (BE 프록시)</h2>
+  <p class="sec-sub">gateway/main.py + backend_client.py — FE 친화 경로를 BE <code>/internal/*</code>로 중계. 신원 헤더 부착.</p>
+  <div class="tbl-card"><table>
+    <tr><th>method</th><th>BFF 경로</th><th>중계 / 용도</th></tr>
+    <tr><td><span class="method get">GET</span></td><td><span class="pill">/home</span></td><td>홈 종합(기기·알림·추천)</td></tr>
+    <tr><td><span class="method get">GET</span></td><td><span class="pill">/devices</span> · <span class="pill">/devices/{id}</span></td><td>기기 목록·상태</td></tr>
+    <tr><td><span class="method get">GET</span></td><td><span class="pill">/catalog/recommend</span> · <span class="pill">/recommendations</span></td><td>추천</td></tr>
+    <tr><td><span class="method post">POST</span> <span class="method get">GET</span></td><td><span class="pill">/orders</span> · <span class="pill">/orders/{id}</span> · <span class="pill">/orders/{id}/pickup</span></td><td>주문 커밋·이력·픽업 전이</td></tr>
+    <tr><td><span class="method get">GET</span></td><td><span class="pill">/stores</span> · <span class="pill">/stores/{id}/stock/{part}</span></td><td>거점·재고(O2O)</td></tr>
+    <tr><td><span class="method get">GET</span> <span class="method post">POST</span></td><td><span class="pill">/quotes/{ref}</span> · <span class="pill">/quotes/{ref}/convert</span></td><td>견적 조회·전환</td></tr>
+    <tr><td><span class="method get">GET</span> <span class="method post">POST</span></td><td><span class="pill">/bookings</span> · <span class="pill">/bookings/slots</span></td><td>방문 예약·슬롯(R18)</td></tr>
+    <tr><td><span class="method get">GET</span> <span class="method post">POST</span></td><td><span class="pill">/resume</span> · <span class="pill">/reengagement</span> · <span class="pill">/reengagement/deliver</span> · <span class="pill">/open-loops/{ref}/{action}</span></td><td>컴패니언(이어가기·재관여·미해결)</td></tr>
+    <tr><td><span class="method post">POST</span></td><td><span class="pill">/surface</span></td><td>카드 탭 → bridge/panel 결정</td></tr>
+  </table></div>
+
+  <!-- 3. 실시간 -->
+  <h2 class="sec"><span class="n">3</span> 실시간 채팅 릴레이</h2>
+  <p class="sec-sub">WebSocket <code>/chat</code> — FE↔BE 스트림 양방향 릴레이. 섹션 봉투(§2.1)를 그대로 흘려보냄.</p>
+  <div class="card tag-bff">
+    <div class="chips"><span class="method ws">WS</span> <span class="pill">/chat</span> <span class="chip">스트리밍 릴레이</span> <span class="chip">신원 핸드셰이크</span></div>
+    <p class="desc" style="margin-top:12px">FE 메시지(text·screen_context·신원) → BE <code>/internal/turn</code> WS로 중계 → 청크(delta/section)를 FE로 되돌림. 끊김 무노출·점진 렌더.</p>
+  </div>
+
+  <!-- 4. 응답 정형 -->
+  <h2 class="sec"><span class="n">4</span> 응답 정형 · 폴백 (계약)</h2>
+  <p class="sec-sub">gateway/transform.py — 업스트림 실패를 <b>클라이언트 계약(폴백 응답)</b>으로 정규화(R13). 대화·화면 중단 금지.</p>
+  <div class="note bff">BE/네트워크 오류 → 표준 폴백 메시지·템플릿으로 변환해 중계. FE는 항상 일관된 봉투를 받는다(계약 3계층 동기화).</div>
+
+  <!-- 5~8 -->
+  <h2 class="sec"><span class="n">5</span> 보안 · 관측 · 분석 · 구성</h2>
+  <p class="sec-sub">운영 횡단 관심사. 토글로 게이트(기본 off=회귀 불변).</p>
+  <div class="grid g2">
+    <div class="card tag-bff"><h3>🔒 보안</h3><p class="desc">security.py · ratelimit.py</p>
+      <div class="chips"><span class="chip">보안 헤더</span><span class="chip">토큰버킷 레이트리밋(429)</span><span class="chip tog">RATE_LIMIT</span><span class="chip tog">SECURITY_HEADERS</span></div></div>
+    <div class="card tag-bff"><h3>📈 관측성</h3><p class="desc">observability.py — <span class="pill">/health</span> · <span class="pill">/metrics</span></p>
+      <div class="chips"><span class="chip">요청/에러 카운트</span><span class="chip">구조화 로깅</span></div></div>
+    <div class="card tag-bff"><h3>📊 분석</h3><p class="desc">analytics.py — <span class="pill">POST /internal/events</span> · <span class="pill">GET /internal/events</span></p>
+      <div class="chips"><span class="chip">이벤트 수집·중계</span><span class="chip">세션 일관 샘플링</span></div></div>
+    <div class="card tag-bff"><h3>⚙️ 구성</h3><p class="desc">config.py — 환경 계층·BE 베이스 URL·토글</p>
+      <div class="chips"><span class="chip">APP_ENV</span><span class="chip">명시 env 우선</span></div></div>
+  </div>
+
+  <div class="note bff">계약(응답 봉투·CTA kind·신원 헤더·게이트 상태코드) 변경 시 <code>docs/api-contract.md</code>·BE·FE <code>types/contract.ts</code>와 <b>3계층 동기화</b>. 검증: <code>cd bff &amp;&amp; python -m pytest</code>.</div>
+</div>
+<footer>BFF · 게이트웨이 카테고리 · 현재 코드 구현 기준</footer>
+</body>
+</html>
